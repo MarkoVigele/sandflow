@@ -25,7 +25,7 @@ Der Build landet in `docs/` (relativer Basispfad, bereit für GitHub Pages). Ein
 | Gießen | Taste halten | Finger halten |
 | Kamera drehen / zoomen | Rechte Taste, Rad, Mitteltaste | Zwei Finger. Oder Werkzeug **Kamera** für einen Finger |
 | Play / Pause | Leertaste oder Transportleiste | Transportleiste |
-| Werkzeuge 1–6 | Tasten `1`–`6` | Symbolleiste |
+| Werkzeuge 1–9 | Tasten `1`–`9` | Symbolleiste |
 | Rückgängig / Wiederholen | `Strg+Z` / `Strg+Y` | Symbole oben |
 
 Oben: Presets, Qualität, Tempo (0,25×–4×), Speichern, Laden, Screenshot. Rechts (am Telefon unten): Kontext zum aktiven Werkzeug. Unter **Erweitert** liegen Körnung, Kohäsion, Infiltration, Erosionsrate und Sedimentkapazität.
@@ -36,6 +36,12 @@ Oben: Presets, Qualität, Tempo (0,25×–4×), Speichern, Laden, Screenshot. Re
 - **Sanfte Schräge** — Gefälle, das Wasser bleibt in der Spur und gräbt nach.
 - **Vorgegrabenes Bett** — ein Rinnsal liegt schon da, Ufer werden später angefressen.
 - **Zwei Quellen** — zwei Zuläufe treffen sich in einer Mulde.
+- **Mini-Canyon** — steile Wände, tiefes Bett.
+- **Delta / Verzweigung** — ein Zulauf teilt sich in mehrere Arme.
+- **Referenz-Rinne** — tiefes, klares Bett als Vergleichsspur.
+- **Dünne Adern** — viele feine Rinnen auf der Schräge.
+
+Zusätzliche Werkzeuge: **Feststampfen** (Kohäsion lokal), **Rinne** vorzeichnen, **Einebnen** (Pinsel oder ganze Wanne). Requisiten-Radierer fehlt, solange es keine Requisiten gibt.
 
 ## Performance
 

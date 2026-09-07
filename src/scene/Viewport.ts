@@ -2,8 +2,9 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { GeneratedMaps } from "../assets/AssetService";
 import { SimClient, type SimFrame, type SimSnapshot } from "../sim/SimClient";
+import type { BrushKind } from "../sim/types";
 import { unpackRgba } from "../sim/mapsContract";
-import { getPreset, resampleHeight } from "../sim/presets";
+import { getPreset, resampleHeight, type CameraPose } from "../sim/presets";
 import { History } from "../state/history";
 import type { Store } from "../state/store";
 import {
@@ -68,6 +69,7 @@ export class Viewport {
   private clock = new THREE.Clock();
   private aim = new AimCursor();
   private lastPointer: { clientX: number; clientY: number } | null = null;
+  private lastStroke: { u: number; v: number } | null = null;
   private unsubStore: () => void = () => {};
   private onUi: () => void;
 
@@ -232,9 +234,17 @@ export class Viewport {
     this.sand.setMaps(this.maps);
     this.water.setMaps(this.maps);
     this.sim.init(grid, this.store.state.params, built.terrain, this.sources);
+    this.applyCamera(preset.camera);
     this.store.patch({ presetId: id, selectedSourceId: this.sources[0]?.id ?? null });
     if (recordHistory) this.history.clear();
     this.onUi();
+  }
+
+  applyCamera(pose?: CameraPose): void {
+    if (!pose) return;
+    this.camera.position.set(pose.position[0], pose.position[1], pose.position[2]);
+    this.controls.target.set(pose.target[0], pose.target[1], pose.target[2]);
+    this.controls.update();
   }
 
   async snapshot(): Promise<SimSnapshot> {
@@ -255,6 +265,7 @@ export class Viewport {
       water: snap.water,
       wetness: snap.wetness,
       sediment: snap.sediment,
+      cohesion: snap.cohesion,
     });
     this.onUi();
   }
@@ -283,6 +294,11 @@ export class Viewport {
 
   resetWater(): void {
     this.sim.resetWater();
+  }
+
+  async flattenAll(): Promise<void> {
+    await this.pushHistory();
+    this.sim.flattenAll();
   }
 
   addSourceAt(u: number, v: number): void {
@@ -433,7 +449,21 @@ export class Viewport {
       return;
     }
     if (tool === "source") return;
-    this.sim.brush(tool, u, v, brushRadius, brushStrength);
+    const stroke = tool === "groove" || tool === "tamp" || tool === "flatten";
+    if (stroke && this.lastStroke) {
+      const du = u - this.lastStroke.u;
+      const dv = v - this.lastStroke.v;
+      const dist = Math.hypot(du, dv);
+      const steps = Math.max(1, Math.ceil(dist / Math.max(0.008, brushRadius * 0.32)));
+      for (let s = 1; s <= steps; s++) {
+        const t = s / steps;
+        this.sim.brush(tool as BrushKind, this.lastStroke.u + du * t, this.lastStroke.v + dv * t, brushRadius, brushStrength);
+      }
+      this.lastStroke = { u, v };
+      return;
+    }
+    this.sim.brush(tool as BrushKind, u, v, brushRadius, brushStrength);
+    this.lastStroke = { u, v };
   }
 
   private onPointerDown = async (ev: PointerEvent): Promise<void> => {
@@ -467,6 +497,7 @@ export class Viewport {
     if (!hit) return;
     await this.pushHistory();
     this.strokeActive = true;
+    this.lastStroke = null;
     this.toolAt(tool, hit.u, hit.v);
     this.refreshAim(hit, ev);
   };
@@ -505,6 +536,7 @@ export class Viewport {
     this.pointerDown = false;
     this.strokeActive = false;
     this.draggingSource = null;
+    this.lastStroke = null;
     if (ev.pointerType === "touch" || ev.pointerType === "pen") {
       this.hideAim();
     } else if (this.lastPointer) {

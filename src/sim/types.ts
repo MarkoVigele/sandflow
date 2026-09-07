@@ -1,6 +1,6 @@
 import type { SimParams, WaterSource } from "../state/types";
 
-export type BrushKind = "pile" | "dig" | "smooth" | "dam";
+export type BrushKind = "pile" | "dig" | "smooth" | "dam" | "tamp" | "groove" | "flatten";
 
 export type WorkerIn =
   | {
@@ -11,6 +11,7 @@ export type WorkerIn =
       water?: Float32Array;
       wetness?: Float32Array;
       sediment?: Float32Array;
+      cohesion?: Float32Array;
       sources: WaterSource[];
     }
   | { type: "step"; steps: number }
@@ -29,11 +30,13 @@ export type WorkerIn =
   | { type: "removeSource"; id: string }
   | { type: "setSourceRate"; id: string; rate: number }
   | { type: "resetWater" }
+  | { type: "flattenAll" }
   | {
       type: "replaceTerrain";
       terrain: Float32Array;
       water?: Float32Array;
       wetness?: Float32Array;
+      cohesion?: Float32Array;
       sources: WaterSource[];
     }
   | { type: "requestSnapshot" };
@@ -54,6 +57,7 @@ export type WorkerOut =
       water: Float32Array;
       wetness: Float32Array;
       sediment: Float32Array;
+      cohesion: Float32Array;
       sources: WaterSource[];
       erodedSand: number;
     };

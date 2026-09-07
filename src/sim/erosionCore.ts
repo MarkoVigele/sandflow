@@ -37,6 +37,8 @@ export class ErosionSim {
   sediment: Float32Array;
   wetness: Float32Array;
   flow: Float32Array;
+  /** Local cohesion boost 0–0.85. Not packed into visual maps. */
+  cohesion: Float32Array;
   sources: WaterSource[] = [];
   erodedSand = 0;
   private waterDelta: Float32Array;
@@ -58,6 +60,7 @@ export class ErosionSim {
     this.sediment = new Float32Array(n);
     this.wetness = new Float32Array(n);
     this.flow = new Float32Array(n);
+    this.cohesion = new Float32Array(n);
     this.waterDelta = new Float32Array(n);
     this.sedDelta = new Float32Array(n);
     this.terrDelta = new Float32Array(n);
@@ -115,8 +118,8 @@ export class ErosionSim {
     tD.fill(0);
 
     const transfer = 0.72 * params.flowRate;
-    const erodeK = params.erosionRate * (1.05 - params.cohesion);
     const capK = params.sedimentCapacity;
+    const cohesion = this.cohesion;
 
     for (let y = 1; y < size - 1; y++) {
       for (let x = 1; x < size - 1; x++) {
@@ -192,6 +195,8 @@ export class ErosionSim {
         const steepFrac = steepBed / Math.max(this.nDrop[steep], 1e-6);
         const shear = movable * steepBed;
         const carving = !ponded && steepFrac >= MIN_BED_FRAC && shear > MIN_SHEAR && bedFall > 0;
+        const localC = Math.min(0.95, params.cohesion + cohesion[i]);
+        const localErodeK = params.erosionRate * (1.05 - localC);
 
         const moving = !ponded && movable > 0.0015;
         const stream = moving ? movable * (0.32 + maxDrop * 2.2) : movable * 0.05;
@@ -216,7 +221,7 @@ export class ErosionSim {
           const capacity =
             share * capK * (0.12 + bedSlope * BED_SLOPE_GAIN) * (0.9 + flux * 2.2);
           const pick = Math.min(
-            capacity * erodeK,
+            capacity * localErodeK,
             Math.max(0, terrain[i] - MIN_SAND) * MAX_ERODE_FRAC,
             share * 0.18,
           );
@@ -233,7 +238,7 @@ export class ErosionSim {
             const j = this.i(x + NEIGH[k][0], y + NEIGH[k][1]);
             const bank = terrain[j] - terrain[i];
             if (bank > 0.012) {
-              const nibble = Math.min(bank * 0.016 * erodeK * Math.min(flux, 0.09), bank * 0.045);
+              const nibble = Math.min(bank * 0.016 * localErodeK * Math.min(flux, 0.09), bank * 0.045);
               tD[j] -= nibble;
               sD[i] += nibble * 0.62;
             }
@@ -311,8 +316,7 @@ export class ErosionSim {
     const { size, params } = this;
     const terrain = this.terrain;
     const water = this.water;
-    const talus = 0.1 + params.grain * 0.045 + params.cohesion * 0.06;
-    const k = 0.028 * (1.05 - params.cohesion);
+    const cohesion = this.cohesion;
     const tD = this.terrDelta;
     tD.fill(0);
 
@@ -320,6 +324,9 @@ export class ErosionSim {
       for (let x = 1; x < size - 1; x++) {
         const i = this.i(x, y);
         if (water[i] > 0.01) continue;
+        const localC = Math.min(0.95, params.cohesion + cohesion[i]);
+        const talus = 0.1 + params.grain * 0.045 + localC * 0.06;
+        const k = 0.028 * (1.05 - localC);
         for (let kN = 0; kN < 4; kN++) {
           const j = this.i(x + NEIGH[kN][0], y + NEIGH[kN][1]);
           const dh = terrain[i] - terrain[j];
@@ -346,15 +353,36 @@ export class ErosionSim {
     const y0 = Math.max(1, Math.floor(cy - r));
     const y1 = Math.min(size - 2, Math.ceil(cy + r));
 
-    if (kind === "smooth") {
+    if (kind === "smooth" || kind === "flatten") {
       const copy = this.terrain.slice();
+      let mean = 0;
+      let meanW = 0;
+      if (kind === "flatten") {
+        for (let y = y0; y <= y1; y++) {
+          for (let x = x0; x <= x1; x++) {
+            const dx = x - cx;
+            const dy = y - cy;
+            const d2 = dx * dx + dy * dy;
+            if (d2 > r2) continue;
+            const w = Math.exp(-d2 / (r2 * 0.45));
+            mean += copy[this.i(x, y)] * w;
+            meanW += w;
+          }
+        }
+        mean = meanW > 0 ? mean / meanW : 0.42;
+      }
       for (let y = y0; y <= y1; y++) {
         for (let x = x0; x <= x1; x++) {
           const dx = x - cx;
           const dy = y - cy;
           const d2 = dx * dx + dy * dy;
           if (d2 > r2) continue;
-          const w = Math.exp(-d2 / (r2 * 0.45)) * strength * 0.35;
+          const w = Math.exp(-d2 / (r2 * 0.45)) * strength * (kind === "flatten" ? 0.55 : 0.35);
+          const i = this.i(x, y);
+          if (kind === "flatten") {
+            this.terrain[i] += (mean - this.terrain[i]) * Math.min(1, w);
+            continue;
+          }
           let acc = 0;
           let c = 0;
           for (let oy = -1; oy <= 1; oy++) {
@@ -363,7 +391,6 @@ export class ErosionSim {
               c++;
             }
           }
-          const i = this.i(x, y);
           this.terrain[i] += (acc / c - this.terrain[i]) * w;
         }
       }
@@ -385,7 +412,38 @@ export class ErosionSim {
         } else if (kind === "dam") {
           const ridge = Math.exp(-d2 / (r2 * 0.18));
           this.terrain[i] += ridge * strength * 0.07;
+        } else if (kind === "tamp") {
+          this.cohesion[i] = Math.min(0.85, this.cohesion[i] + fall * strength * 0.22);
+          this.terrain[i] = Math.max(0.05, this.terrain[i] - fall * strength * 0.01);
+        } else if (kind === "groove") {
+          const t = Math.sqrt(d2) / r;
+          if (t < 0.55) {
+            const cut = (1 - t / 0.55) ** 2;
+            this.terrain[i] = Math.max(0.05, this.terrain[i] - cut * strength * 0.07);
+          } else {
+            const bank = 1 - Math.abs(t - 0.78) / 0.25;
+            if (bank > 0) this.terrain[i] += bank * strength * 0.016;
+          }
         }
+      }
+    }
+  }
+
+  flattenAll(): void {
+    const { size } = this;
+    const edge = Math.max(3, Math.round(size * 0.03));
+    let sum = 0;
+    let count = 0;
+    for (let y = edge; y < size - edge; y++) {
+      for (let x = edge; x < size - edge; x++) {
+        sum += this.terrain[this.i(x, y)];
+        count++;
+      }
+    }
+    const mean = count > 0 ? sum / count : 0.42;
+    for (let y = edge; y < size - edge; y++) {
+      for (let x = edge; x < size - edge; x++) {
+        this.terrain[this.i(x, y)] = mean;
       }
     }
   }
