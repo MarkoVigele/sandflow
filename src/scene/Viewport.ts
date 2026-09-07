@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { GeneratedMaps } from "../assets/AssetService";
 import { SimClient, type SimFrame, type SimSnapshot } from "../sim/SimClient";
+import { MAP_R_TERRAIN, unpackRgba } from "../sim/mapsContract";
 import { getPreset, resampleHeight } from "../sim/presets";
 import { History } from "../state/history";
 import type { Store } from "../state/store";
@@ -194,7 +195,7 @@ export class Viewport {
 
     const grid = QUALITY_GRID[quality];
     if (this.lastPacked && resample && this.lastSize !== grid) {
-      const { terrain, water, wetness } = this.splitPacked(this.lastPacked, this.lastSize);
+      const { terrain, water, wetness } = unpackRgba(this.lastPacked, this.lastSize);
       const t2 = resampleHeight(terrain, this.lastSize, grid);
       const w2 = resampleHeight(water, this.lastSize, grid);
       const n2 = resampleHeight(wetness, this.lastSize, grid);
@@ -340,19 +341,6 @@ export class Viewport {
     );
   }
 
-  private splitPacked(packed: Float32Array, size: number) {
-    const n = size * size;
-    const terrain = new Float32Array(n);
-    const water = new Float32Array(n);
-    const wetness = new Float32Array(n);
-    for (let i = 0; i < n; i++) {
-      terrain[i] = packed[i * 4];
-      water[i] = packed[i * 4 + 1];
-      wetness[i] = packed[i * 4 + 2];
-    }
-    return { terrain, water, wetness };
-  }
-
   private rebuildMarkers(): void {
     for (const m of this.markers.values()) this.sourceGroup.remove(m);
     this.markers.clear();
@@ -375,7 +363,7 @@ export class Viewport {
     const size = this.lastSize;
     const x = Math.max(0, Math.min(size - 1, Math.round(u * (size - 1))));
     const y = Math.max(0, Math.min(size - 1, Math.round(v * (size - 1))));
-    return this.lastPacked[(y * size + x) * 4] ?? 0.42;
+    return this.lastPacked[(y * size + x) * 4 + MAP_R_TERRAIN] ?? 0.42;
   }
 
   private hitUv(ev: PointerEvent): { u: number; v: number; world: THREE.Vector3 } | null {

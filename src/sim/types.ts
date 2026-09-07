@@ -58,28 +58,5 @@ export type WorkerOut =
       erodedSand: number;
     };
 
-export interface PackedMaps {
-  terrain: Float32Array;
-  water: Float32Array;
-  wetness: Float32Array;
-  flow: Float32Array;
-}
-
-export function unpackRgba(
-  packed: Float32Array,
-  size: number,
-): PackedMaps {
-  const n = size * size;
-  const terrain = new Float32Array(n);
-  const water = new Float32Array(n);
-  const wetness = new Float32Array(n);
-  const flow = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const o = i * 4;
-    terrain[i] = packed[o];
-    water[i] = packed[o + 1];
-    wetness[i] = packed[o + 2];
-    flow[i] = packed[o + 3];
-  }
-  return { terrain, water, wetness, flow };
-}
+export type { PackedMaps } from "./mapsContract";
+export { unpackRgba } from "./mapsContract";

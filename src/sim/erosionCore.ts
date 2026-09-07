@@ -1,5 +1,6 @@
 import { hash2 } from "../assets/noise";
 import type { SimParams, WaterSource } from "../state/types";
+import { packMapsRgba } from "./mapsContract";
 import type { BrushKind } from "./types";
 
 const NEIGH = [
@@ -359,16 +360,7 @@ export class ErosionSim {
   }
 
   pack(): Float32Array {
-    const n = this.size * this.size;
-    const packed = new Float32Array(n * 4);
-    for (let i = 0; i < n; i++) {
-      const o = i * 4;
-      packed[o] = this.terrain[i];
-      packed[o + 1] = this.water[i];
-      packed[o + 2] = this.wetness[i];
-      packed[o + 3] = this.flow[i];
-    }
-    return packed;
+    return packMapsRgba(this.terrain, this.water, this.wetness, this.flow);
   }
 
   collectParticles(): Float32Array {

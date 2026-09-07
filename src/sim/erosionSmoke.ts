@@ -1,5 +1,6 @@
 import { DEFAULT_PARAMS } from "../state/types";
 import { ErosionSim } from "./erosionCore";
+import { MAP_A_FLOW, MAP_B_WETNESS, MAP_G_WATER, MAP_R_TERRAIN, unpackRgba } from "./mapsContract";
 import { getPreset } from "./presets";
 
 function fail(msg: string): never {
@@ -83,3 +84,13 @@ if (wetMid < 3) fail("Wasser erreicht die Mitte nicht");
 if (wetLow < 1) fail("Wasser kommt nicht über die Mitte hinaus");
 if (wetMid > size * 0.4) fail(`Flächenabfluss statt Ader: wetMid=${wetMid}`);
 if (clusters < 1) fail("keine Ader in der Mitte");
+
+const packed = sim.pack();
+const maps = unpackRgba(packed, size);
+if (Math.abs(maps.terrain[0] - sim.terrain[0]) > 1e-6) fail("pack R terrain");
+if (Math.abs(maps.water[10] - sim.water[10]) > 1e-6) fail("pack G water");
+if (packed[2] !== sim.wetness[0] || packed[MAP_B_WETNESS] !== sim.wetness[0]) fail("pack B wetness");
+if (packed[MAP_A_FLOW] !== sim.flow[0]) fail("pack A flow");
+if (packed[MAP_R_TERRAIN] !== sim.terrain[0] || packed[MAP_G_WATER] !== sim.water[0]) {
+  fail("channel contract");
+}
