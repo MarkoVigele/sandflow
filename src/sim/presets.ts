@@ -23,17 +23,17 @@ function source(id: string, x: number, y: number, rate = 1.6): WaterSource {
   return { id, x: clamp01(x), y: clamp01(y), rate };
 }
 
-function rim(terrain: Float32Array, size: number): void {
+function rim(terrain: Float32Array, size: number, openDown = false): void {
   const edge = Math.max(3, Math.round(size * 0.03));
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const dx = Math.min(x, size - 1 - x);
       const dy = Math.min(y, size - 1 - y);
       const d = Math.min(dx, dy);
-      if (d < edge) {
-        const t = 1 - d / edge;
-        terrain[idx(x, y, size)] += t * t * TRAY * 2.4;
-      }
+      if (d >= edge) continue;
+      const t = 1 - d / edge;
+      const down = openDown && y > size - edge - 1;
+      terrain[idx(x, y, size)] += t * t * TRAY * (down ? 0.28 : 2.4);
     }
   }
 }
@@ -56,10 +56,15 @@ export const PRESETS: PresetDef[] = [
     blurb: "Ebenes Sandbett, eine Quelle oben in der Mitte. Gut, um zu sehen, wie sich Adern von allein suchen.",
     build(size) {
       const terrain = new Float32Array(size * size);
-      for (let i = 0; i < terrain.length; i++) terrain[i] = BASE;
-      grain(terrain, size, 0.028, 11);
-      rim(terrain, size);
-      return { terrain, sources: [source("s-top", 0.5, 0.12, 1.8)] };
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const v = y / (size - 1);
+          terrain[idx(x, y, size)] = BASE + (1 - v) * 0.12;
+        }
+      }
+      grain(terrain, size, 0.016, 11);
+      rim(terrain, size, true);
+      return { terrain, sources: [source("s-top", 0.5, 0.12, 2.0)] };
     },
   },
   {
@@ -71,12 +76,12 @@ export const PRESETS: PresetDef[] = [
       for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
           const v = y / (size - 1);
-          terrain[idx(x, y, size)] = BASE + (1 - v) * 0.38;
+          terrain[idx(x, y, size)] = BASE + (1 - v) * 0.62;
         }
       }
-      grain(terrain, size, 0.034, 29);
-      rim(terrain, size);
-      return { terrain, sources: [source("s-high", 0.5, 0.1, 1.7)] };
+      grain(terrain, size, 0.016, 29);
+      rim(terrain, size, true);
+      return { terrain, sources: [source("s-high", 0.5, 0.1, 2.0)] };
     },
   },
   {
@@ -89,16 +94,16 @@ export const PRESETS: PresetDef[] = [
         for (let x = 0; x < size; x++) {
           const u = x / (size - 1);
           const v = y / (size - 1);
-          const slope = (1 - v) * 0.32;
+          const slope = (1 - v) * 0.52;
           const meander = 0.5 + Math.sin(v * Math.PI * 2.2) * 0.12 + Math.sin(v * 9.1) * 0.03;
           const dist = Math.abs(u - meander);
           const channel = Math.exp(-((dist * 18) ** 2)) * 0.16;
           terrain[idx(x, y, size)] = BASE + slope - channel;
         }
       }
-      grain(terrain, size, 0.03, 47);
-      rim(terrain, size);
-      return { terrain, sources: [source("s-bed", 0.5, 0.08, 1.9)] };
+      grain(terrain, size, 0.018, 47);
+      rim(terrain, size, true);
+      return { terrain, sources: [source("s-bed", 0.5, 0.08, 2.1)] };
     },
   },
   {

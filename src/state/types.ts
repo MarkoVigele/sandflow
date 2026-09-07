@@ -43,12 +43,12 @@ export const QUALITY_GRID: Record<QualityId, number> = {
 export const DEFAULT_PARAMS: SimParams = {
   grain: 0.55,
   cohesion: 0.28,
-  infiltration: 0.014,
-  erosionRate: 0.55,
-  sedimentCapacity: 0.56,
-  deposition: 0.28,
-  evaporation: 0.006,
-  flowRate: 1.15,
+  infiltration: 0.01,
+  erosionRate: 0.62,
+  sedimentCapacity: 0.58,
+  deposition: 0.3,
+  evaporation: 0.004,
+  flowRate: 1.22,
 };
 
 export function isMobile(): boolean {

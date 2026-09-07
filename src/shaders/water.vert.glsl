@@ -14,7 +14,8 @@ void main() {
   float water = sampleH.g;
   vDepth = water;
   vFlow = sampleH.a;
-  float h = (terrain + max(water, 0.0) + 0.004) * uHeightScale;
+  float lift = water > 0.00065 ? water + 0.006 : 0.0;
+  float h = (terrain + lift) * uHeightScale;
   vec3 pos = position;
   pos.y = h;
   vec4 worldPosition = modelMatrix * vec4(pos, 1.0);

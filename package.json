@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --outDir docs"
+    "preview": "vite preview --outDir docs",
+    "sim:smoke": "npx --yes vite-node src/sim/erosionSmoke.ts"
   },
   "dependencies": {
     "three": "^0.170.0"

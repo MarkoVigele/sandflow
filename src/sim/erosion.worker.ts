@@ -3,6 +3,7 @@ import type { WorkerIn, WorkerOut } from "./types";
 import { DEFAULT_PARAMS } from "../state/types";
 
 let sim: ErosionSim | null = null;
+let lastPourEmit = 0;
 
 function post(msg: WorkerOut, transfer: Transferable[] = []): void {
   (self as unknown as Worker).postMessage(msg, transfer);
@@ -79,6 +80,11 @@ self.onmessage = (ev: MessageEvent<WorkerIn>) => {
     case "pour": {
       if (!sim) return;
       sim.pour(msg.x, msg.y, msg.amount);
+      const now = Date.now();
+      if (now - lastPourEmit > 50) {
+        lastPourEmit = now;
+        emitFrame();
+      }
       break;
     }
     case "addSource": {
@@ -114,7 +120,7 @@ self.onmessage = (ev: MessageEvent<WorkerIn>) => {
     }
     case "replaceTerrain": {
       const params = sim?.params ?? DEFAULT_PARAMS;
-      sim = new ErosionSim(Math.sqrt(msg.terrain.length), params, msg.terrain.slice());
+      sim = new ErosionSim(Math.round(Math.sqrt(msg.terrain.length)), params, msg.terrain.slice());
       if (msg.water) sim.water.set(msg.water);
       if (msg.wetness) sim.wetness.set(msg.wetness);
       sim.sources = msg.sources.map((s) => ({ ...s }));

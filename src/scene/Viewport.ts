@@ -19,7 +19,7 @@ import { createSourceMarker, createTray } from "./Tray";
 import { WaterMesh } from "./WaterMesh";
 
 export const TRAY_SIZE = 8;
-export const HEIGHT_SCALE = 3.6;
+export const HEIGHT_SCALE = 2.5;
 
 export class Viewport {
   readonly renderer: THREE.WebGLRenderer;
@@ -404,7 +404,7 @@ export class Viewport {
   private toolAt(tool: ToolId, u: number, v: number): void {
     const { brushRadius, brushStrength, pourRate } = this.store.state;
     if (tool === "pour") {
-      this.sim.pour(u, v, 0.085 * pourRate);
+      this.sim.pour(u, v, 0.045 * pourRate);
       return;
     }
     if (tool === "source") return;
@@ -544,12 +544,18 @@ export class Viewport {
   }
 
   private clampCamera(): void {
-    if (this.camera.position.y < 0.45) this.camera.position.y = 0.45;
     const tgt = this.controls.target;
-    const lim = TRAY_SIZE * 0.45;
+    const lim = TRAY_SIZE * 0.42;
     tgt.x = Math.max(-lim, Math.min(lim, tgt.x));
     tgt.z = Math.max(-lim, Math.min(lim, tgt.z));
-    tgt.y = Math.max(0.15, Math.min(2.2, tgt.y));
+    tgt.y = Math.max(0.4, Math.min(1.7, tgt.y));
+
+    const minY = Math.max(0.62, tgt.y + 0.38);
+    if (this.camera.position.y < minY) this.camera.position.y = minY;
+
+    const floor = 0.08;
+    if (this.camera.position.y < floor) this.camera.position.y = floor;
+    this.controls.maxPolarAngle = Math.PI / 2 - 0.16;
   }
 
   private maybeAutoQuality(): void {

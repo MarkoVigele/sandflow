@@ -10,33 +10,37 @@ varying float vDepth;
 varying float vFlow;
 
 void main() {
-  if (vDepth < 0.0018) discard;
+  if (vDepth < 0.00065) discard;
 
-  float depth = clamp(vDepth * 14.0, 0.0, 1.0);
-  float turbid = clamp(vFlow * 4.5 + depth * 0.25, 0.0, 1.0);
+  float depth = clamp(vDepth * 22.0, 0.0, 1.0);
+  float turbid = clamp(vFlow * 5.2 + depth * 0.22, 0.0, 1.0);
 
-  vec3 clearC = vec3(0.22, 0.48, 0.58);
-  vec3 shallow = vec3(0.38, 0.62, 0.64);
-  vec3 muddy = vec3(0.42, 0.36, 0.24);
-  vec3 base = mix(mix(shallow, clearC, depth), muddy, turbid * 0.55);
+  vec3 clearC = vec3(0.20, 0.50, 0.60);
+  vec3 shallow = vec3(0.42, 0.66, 0.68);
+  vec3 muddy = vec3(0.44, 0.37, 0.24);
+  vec3 base = mix(mix(shallow, clearC, depth), muddy, turbid * 0.58);
 
   vec3 V = normalize(vViewDir);
-  float hL = texture2D(uMaps, vUv + vec2(-0.003, 0.0)).r + texture2D(uMaps, vUv + vec2(-0.003, 0.0)).g;
-  float hR = texture2D(uMaps, vUv + vec2(0.003, 0.0)).r + texture2D(uMaps, vUv + vec2(0.003, 0.0)).g;
-  float hD = texture2D(uMaps, vUv + vec2(0.0, -0.003)).r + texture2D(uMaps, vUv + vec2(0.0, -0.003)).g;
-  float hU = texture2D(uMaps, vUv + vec2(0.0, 0.003)).r + texture2D(uMaps, vUv + vec2(0.0, 0.003)).g;
-  vec3 N = normalize(vec3(hL - hR, 0.12, hD - hU));
+  vec4 sL = texture2D(uMaps, vUv + vec2(-0.0024, 0.0));
+  vec4 sR = texture2D(uMaps, vUv + vec2(0.0024, 0.0));
+  vec4 sD = texture2D(uMaps, vUv + vec2(0.0, -0.0024));
+  vec4 sU = texture2D(uMaps, vUv + vec2(0.0, 0.0024));
+  float hL = sL.r + sL.g;
+  float hR = sR.r + sR.g;
+  float hD = sD.r + sD.g;
+  float hU = sU.r + sU.g;
+  vec3 N = normalize(vec3(hL - hR, 0.1, hD - hU));
 
   float fresnel = pow(1.0 - max(dot(N, V), 0.0), 4.0);
   vec3 L = normalize(uSunDir);
   vec3 H = normalize(V + L);
-  float spec = pow(max(dot(N, H), 0.0), 80.0) * 0.65;
+  float spec = pow(max(dot(N, H), 0.0), 72.0) * 0.7;
 
-  float ripple = sin((vUv.x + vUv.y) * 70.0 + uTime * 3.2 + vFlow * 8.0) * 0.03;
-  vec3 color = base + uSunColor * (spec + fresnel * 0.18 + ripple);
+  float ripple = sin((vUv.x + vUv.y) * 80.0 + uTime * 3.4 + vFlow * 10.0) * 0.028;
+  vec3 color = base + uSunColor * (spec + fresnel * 0.2 + ripple);
 
-  float alpha = mix(0.18, 0.62, depth) + turbid * 0.12 + fresnel * 0.22;
-  alpha = clamp(alpha, 0.12, 0.78);
+  float alpha = mix(0.26, 0.7, depth) + turbid * 0.1 + fresnel * 0.18;
+  alpha = clamp(alpha, 0.2, 0.82);
 
   gl_FragColor = vec4(color, alpha);
 }

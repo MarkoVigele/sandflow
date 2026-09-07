@@ -1,3 +1,4 @@
+import { hash2 } from "../assets/noise";
 import type { SimParams, WaterSource } from "../state/types";
 import type { BrushKind } from "./types";
 
@@ -14,6 +15,8 @@ const NEIGH = [
 
 const DIAG = 1.41421356;
 const MAX_PARTICLES = 280;
+const CONCENTRATE = 2.15;
+const MIN_SAND = 0.04;
 
 export class ErosionSim {
   size: number;
@@ -30,6 +33,8 @@ export class ErosionSim {
   private terrDelta: Float32Array;
   private nDrop = new Float32Array(8);
   private nDest = new Int32Array(8);
+  private nW = new Float32Array(8);
+  private tick = 0;
 
   constructor(size: number, params: SimParams, terrain: Float32Array) {
     this.size = size;
@@ -54,12 +59,36 @@ export class ErosionSim {
   }
 
   private stepOnce(): void {
+    this.tick++;
+    this.addSources();
+    this.routeAndErode();
+    this.routeAndErode();
+    this.settleSediment();
+    this.soakAndDrain();
+    if ((this.tick & 1) === 0) this.thermal();
+  }
+
+  private addSources(): void {
+    const { size } = this;
+    const water = this.water;
+    for (const src of this.sources) {
+      const x = Math.max(1, Math.min(size - 2, Math.round(src.x * (size - 1))));
+      const y = Math.max(1, Math.min(size - 2, Math.round(src.y * (size - 1))));
+      const add = src.rate * 0.03;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          water[this.i(x + dx, y + dy)] += add / (1 + dx * dx + dy * dy);
+        }
+      }
+    }
+  }
+
+  private routeAndErode(): void {
     const { size, params } = this;
     const n = size * size;
     const terrain = this.terrain;
     const water = this.water;
     const sediment = this.sediment;
-    const wetness = this.wetness;
     const flow = this.flow;
     const wD = this.waterDelta;
     const sD = this.sedDelta;
@@ -68,78 +97,97 @@ export class ErosionSim {
     sD.fill(0);
     tD.fill(0);
 
-    for (const src of this.sources) {
-      const x = Math.max(1, Math.min(size - 2, Math.round(src.x * (size - 1))));
-      const y = Math.max(1, Math.min(size - 2, Math.round(src.y * (size - 1))));
-      const r = 1;
-      const add = src.rate * 0.045;
-      for (let dy = -r; dy <= r; dy++) {
-        for (let dx = -r; dx <= r; dx++) {
-          const w = 1 / (1 + dx * dx + dy * dy);
-          water[this.i(x + dx, y + dy)] += add * w;
-        }
-      }
-    }
-
-    const transfer = 0.42 * params.flowRate;
+    const transfer = 0.74 * params.flowRate;
     const erodeK = params.erosionRate * (1.05 - params.cohesion);
     const capK = params.sedimentCapacity;
-    const depK = params.deposition;
-    const minSand = 0.04;
 
     for (let y = 1; y < size - 1; y++) {
       for (let x = 1; x < size - 1; x++) {
         const i = this.i(x, y);
         const w = water[i];
         if (w < 1e-5) {
-          flow[i] *= 0.85;
+          flow[i] *= 0.82;
           continue;
         }
+
         const h = terrain[i] + w;
-        let totalDrop = 0;
+        let totalW = 0;
         let drops = 0;
+        let maxDrop = 0;
+        let minHn = h;
 
         for (let k = 0; k < 8; k++) {
           const nx = x + NEIGH[k][0];
           const ny = y + NEIGH[k][1];
           const j = this.i(nx, ny);
           const hn = terrain[j] + water[j];
+          if (hn < minHn) minHn = hn;
           const dh = h - hn;
-          if (dh > 1e-6) {
-            const len = k < 4 ? 1 : DIAG;
-            const d = dh / len;
-            this.nDrop[drops] = d;
-            this.nDest[drops] = j;
-            totalDrop += d;
-            drops++;
-          }
+          if (dh <= 1e-6) continue;
+          const len = k < 4 ? 1 : DIAG;
+          const drop = dh / len;
+          const bed = Math.max(0, terrain[i] - terrain[j]);
+          const wander = 0.9 + 0.2 * hash2(x + k * 13, y, 91);
+          const weight = Math.pow(drop * wander, CONCENTRATE) * (1 + 2.6 * bed);
+          this.nDrop[drops] = drop;
+          this.nDest[drops] = j;
+          this.nW[drops] = weight;
+          totalW += weight;
+          if (drop > maxDrop) maxDrop = drop;
+          drops++;
         }
 
-        if (drops === 0 || totalDrop < 1e-8) {
-          flow[i] *= 0.8;
+        if (drops === 0 || totalW < 1e-12) {
+          flow[i] *= 0.78;
           continue;
         }
 
-        const movable = Math.min(w * transfer, w * 0.72);
-        const slope = totalDrop / drops;
-        flow[i] = flow[i] * 0.45 + movable * (0.35 + slope * 2.2) * 0.55;
+        const head = Math.max(0, h - minHn);
+        const movable = Math.min(w * transfer, w * 0.94, Math.max(head * 0.9, w * 0.55));
+        flow[i] = flow[i] * 0.38 + movable * (0.35 + maxDrop * 2.1) * 0.62;
+        const flux = flow[i];
+        const ponded = maxDrop < 0.004;
+
+        let steep = 0;
+        for (let k = 1; k < drops; k++) {
+          if (this.nDrop[k] > this.nDrop[steep]) steep = k;
+        }
 
         for (let k = 0; k < drops; k++) {
-          const share = (this.nDrop[k] / totalDrop) * movable;
+          const leak = 0.18 * (this.nW[k] / totalW);
+          const share = movable * (k === steep ? 0.82 + leak : leak);
           const j = this.nDest[k];
           wD[i] -= share;
           wD[j] += share;
 
-          const localSlope = this.nDrop[k];
-          const capacity = share * capK * (0.18 + localSlope * 3.4);
+          if (ponded || w > 0.14) continue;
+          const slope = this.nDrop[k];
+          const capacity = share * capK * (0.1 + slope * 3.6) * (0.5 + flux);
           const pick = Math.min(
             capacity * erodeK,
-            Math.max(0, terrain[i] - minSand) * 0.08,
+            Math.max(0, terrain[i] - MIN_SAND) * 0.018,
+            share * 0.16,
           );
           tD[i] -= pick;
           const sedShare = sediment[i] * (share / Math.max(w, 1e-6));
           sD[i] -= sedShare;
           sD[j] += sedShare + pick;
+        }
+
+        if (tD[i] < -(terrain[i] - MIN_SAND) * 0.018) {
+          tD[i] = -(terrain[i] - MIN_SAND) * 0.018;
+        }
+
+        if (w > 0.02 && !ponded) {
+          for (let k = 0; k < 4; k++) {
+            const j = this.i(x + NEIGH[k][0], y + NEIGH[k][1]);
+            const bank = terrain[j] - terrain[i];
+            if (bank > 0.01) {
+              const nibble = Math.min(bank * 0.02 * erodeK * Math.min(w, 0.08), bank * 0.08);
+              tD[j] -= nibble;
+              sD[i] += nibble * 0.7;
+            }
+          }
         }
       }
     }
@@ -148,48 +196,78 @@ export class ErosionSim {
       water[i] = Math.max(0, water[i] + wD[i]);
       sediment[i] = Math.max(0, sediment[i] + sD[i]);
       const before = terrain[i];
-      terrain[i] = Math.max(minSand, terrain[i] + tD[i]);
+      terrain[i] = Math.max(MIN_SAND, terrain[i] + tD[i]);
       if (tD[i] < 0) this.erodedSand += before - terrain[i];
     }
+  }
 
-    for (let i = 0; i < n; i++) {
-      const w = water[i];
-      const cap = w * capK * 0.55;
-      if (sediment[i] > cap) {
-        const extra = (sediment[i] - cap) * depK;
+  private settleSediment(): void {
+    const { size, params } = this;
+    const terrain = this.terrain;
+    const water = this.water;
+    const sediment = this.sediment;
+    const flow = this.flow;
+    const capK = params.sedimentCapacity;
+    const depK = params.deposition;
+
+    for (let y = 1; y < size - 1; y++) {
+      for (let x = 1; x < size - 1; x++) {
+        const i = this.i(x, y);
+        if (sediment[i] < 1e-6) continue;
+        const w = water[i];
+        const h = terrain[i] + w;
+        let hasFall = false;
+        for (let k = 0; k < 4 && !hasFall; k++) {
+          const j = this.i(x + NEIGH[k][0], y + NEIGH[k][1]);
+          if (h > terrain[j] + water[j] + 0.004) hasFall = true;
+        }
+        if (hasFall && flow[i] > 0.008) continue;
+        const cap = w * capK * 0.85;
+        if (sediment[i] <= cap) continue;
+        const extra = Math.min((sediment[i] - cap) * depK * 0.35, 0.0035);
         terrain[i] += extra;
         sediment[i] -= extra;
       }
     }
+  }
 
+  private soakAndDrain(): void {
+    const { size, params } = this;
+    const n = size * size;
     const inf = params.infiltration;
     const eva = params.evaporation;
+    const last = size - 4;
     for (let i = 0; i < n; i++) {
-      const soak = Math.min(water[i], inf * (0.35 + water[i] * 2.5));
-      water[i] -= soak;
-      wetness[i] = Math.min(1, wetness[i] + soak * 6.5);
-      wetness[i] *= 0.996;
-      water[i] *= 1 - eva;
-      if (water[i] < 1e-5) {
-        water[i] = 0;
-        sediment[i] *= 0.9;
+      const y = (i / size) | 0;
+      const moving = this.flow[i];
+      const w = this.water[i];
+      const soakScale = w < 0.03 ? 0.12 : 1;
+      const soak = Math.min(w, (inf * 0.35 * soakScale * w) / (1 + moving * 14));
+      this.water[i] -= soak;
+      this.wetness[i] = Math.min(1, this.wetness[i] + soak * 8 + (w > 0.0015 ? 0.07 : 0));
+      this.wetness[i] *= 0.994;
+      this.water[i] *= 1 - eva * 0.6;
+      if (y >= last && this.water[i] > 0) this.water[i] *= 0.88;
+      if (this.water[i] < 1e-5) {
+        this.water[i] = 0;
+        this.sediment[i] *= 0.88;
       }
     }
-
-    this.thermal();
   }
 
   private thermal(): void {
     const { size, params } = this;
     const terrain = this.terrain;
-    const talus = 0.085 + params.grain * 0.04 + params.cohesion * 0.05;
-    const k = 0.08 * (1.1 - params.cohesion);
+    const water = this.water;
+    const talus = 0.1 + params.grain * 0.045 + params.cohesion * 0.06;
+    const k = 0.028 * (1.05 - params.cohesion);
     const tD = this.terrDelta;
     tD.fill(0);
 
     for (let y = 1; y < size - 1; y++) {
       for (let x = 1; x < size - 1; x++) {
         const i = this.i(x, y);
+        if (water[i] > 0.01) continue;
         for (let kN = 0; kN < 4; kN++) {
           const j = this.i(x + NEIGH[kN][0], y + NEIGH[kN][1]);
           const dh = terrain[i] - terrain[j];
@@ -202,7 +280,7 @@ export class ErosionSim {
       }
     }
     const n = size * size;
-    for (let i = 0; i < n; i++) terrain[i] = Math.max(0.04, terrain[i] + tD[i]);
+    for (let i = 0; i < n; i++) terrain[i] = Math.max(MIN_SAND, terrain[i] + tD[i]);
   }
 
   brush(kind: BrushKind, u: number, v: number, radius: number, strength: number): void {
@@ -264,14 +342,12 @@ export class ErosionSim {
     const { size } = this;
     const cx = Math.round(u * (size - 1));
     const cy = Math.round(v * (size - 1));
-    const r = 2;
-    for (let dy = -r; dy <= r; dy++) {
-      for (let dx = -r; dx <= r; dx++) {
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
         const x = cx + dx;
         const y = cy + dy;
         if (x < 1 || y < 1 || x >= size - 1 || y >= size - 1) continue;
-        const w = 1 / (1 + dx * dx + dy * dy);
-        this.water[this.i(x, y)] += amount * w;
+        this.water[this.i(x, y)] += amount / (1 + dx * dx + dy * dy);
       }
     }
   }
