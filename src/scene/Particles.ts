@@ -1,10 +1,27 @@
 import * as THREE from "three";
+import particleVert from "../shaders/particles.vert.glsl?raw";
+import particleFrag from "../shaders/particles.frag.glsl?raw";
+
+function isFiniteUvHeight(u: number, v: number, h: number): boolean {
+  return (
+    Number.isFinite(u) &&
+    Number.isFinite(v) &&
+    Number.isFinite(h) &&
+    u >= 0 &&
+    u <= 1 &&
+    v >= 0 &&
+    v <= 1 &&
+    h > -0.05 &&
+    h < 4
+  );
+}
 
 export class FlowParticles {
   points: THREE.Points;
   private geo: THREE.BufferGeometry;
   private positions: Float32Array;
   private max: number;
+  private material: THREE.ShaderMaterial;
 
   constructor(max = 280) {
     this.max = max;
@@ -12,17 +29,22 @@ export class FlowParticles {
     this.geo = new THREE.BufferGeometry();
     this.geo.setAttribute("position", new THREE.BufferAttribute(this.positions, 3));
     this.geo.setDrawRange(0, 0);
-    const mat = new THREE.PointsMaterial({
-      color: 0xb7d4de,
-      size: 0.045,
+    this.material = new THREE.ShaderMaterial({
       transparent: true,
-      opacity: 0.55,
       depthWrite: false,
-      sizeAttenuation: true,
+      depthTest: true,
+      blending: THREE.NormalBlending,
+      premultipliedAlpha: false,
+      uniforms: {
+        uSize: { value: 3.2 },
+      },
+      vertexShader: particleVert,
+      fragmentShader: particleFrag,
     });
-    this.points = new THREE.Points(this.geo, mat);
+    this.points = new THREE.Points(this.geo, this.material);
     this.points.frustumCulled = false;
     this.points.renderOrder = 3;
+    this.points.name = "flow-particles";
   }
 
   update(
@@ -31,21 +53,29 @@ export class FlowParticles {
     heightScale: number,
     enabled: boolean,
   ): void {
-    if (!enabled) {
+    if (!enabled || !particles || particles.length < 3) {
+      this.geo.setDrawRange(0, 0);
+      this.points.visible = false;
+      return;
+    }
+    let count = 0;
+    const incoming = Math.min(this.max, (particles.length / 3) | 0);
+    for (let i = 0; i < incoming; i++) {
+      const u = particles[i * 3];
+      const v = particles[i * 3 + 1];
+      const h = particles[i * 3 + 2];
+      if (!isFiniteUvHeight(u, v, h)) continue;
+      this.positions[count * 3] = (u - 0.5) * traySize;
+      this.positions[count * 3 + 1] = h * heightScale + 0.012;
+      this.positions[count * 3 + 2] = (v - 0.5) * traySize;
+      count++;
+    }
+    if (count === 0) {
       this.geo.setDrawRange(0, 0);
       this.points.visible = false;
       return;
     }
     this.points.visible = true;
-    const count = Math.min(this.max, particles.length / 3);
-    for (let i = 0; i < count; i++) {
-      const u = particles[i * 3];
-      const v = particles[i * 3 + 1];
-      const h = particles[i * 3 + 2];
-      this.positions[i * 3] = (u - 0.5) * traySize;
-      this.positions[i * 3 + 1] = h * heightScale + 0.02;
-      this.positions[i * 3 + 2] = (v - 0.5) * traySize;
-    }
     const attr = this.geo.getAttribute("position") as THREE.BufferAttribute;
     attr.needsUpdate = true;
     this.geo.setDrawRange(0, count);
@@ -53,6 +83,6 @@ export class FlowParticles {
 
   dispose(): void {
     this.geo.dispose();
-    (this.points.material as THREE.Material).dispose();
+    this.material.dispose();
   }
 }

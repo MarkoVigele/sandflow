@@ -26,11 +26,15 @@ export class WaterMesh {
     this.material = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
+      depthTest: true,
+      blending: THREE.NormalBlending,
+      premultipliedAlpha: false,
       uniforms: {
         uMaps: { value: maps },
         uHeightScale: { value: heightScale },
+        uTexel: { value: 1 / Math.max(1, maps.image.width) },
         uSunDir: { value: new THREE.Vector3(0.45, 0.82, 0.28).normalize() },
-        uSunColor: { value: new THREE.Color(1.0, 0.92, 0.78) },
+        uSunColor: { value: new THREE.Color(1.0, 0.9, 0.76) },
         uTime: { value: 0 },
       },
       vertexShader: waterVert,
@@ -43,6 +47,7 @@ export class WaterMesh {
 
   setMaps(maps: THREE.DataTexture): void {
     this.material.uniforms.uMaps.value = maps;
+    this.material.uniforms.uTexel.value = 1 / Math.max(1, maps.image.width);
   }
 
   setQuality(quality: QualityId, traySize: number): void {

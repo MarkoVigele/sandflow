@@ -106,13 +106,13 @@ export class ProceduralAssetProvider implements AssetProvider {
       for (let x = 0; x < size; x++) {
         const u = x / size;
         const v = y / size;
-        const n1 = fbm(u * freq, v * freq, 5, seed);
-        const n2 = fbm(u * freq * 3.2 + 4.1, v * freq * 3.2, 3, seed + 3);
+        const n1 = fbm(u * freq, v * freq, 4, seed);
+        const n2 = fbm(u * freq * 2.4 + 4.1, v * freq * 2.4, 3, seed + 3);
         const speck = hash2(x * 0.37, y * 0.41, seed);
-        const t = Math.min(1, Math.max(0, n1 * 0.75 + n2 * 0.25));
+        const t = Math.min(1, Math.max(0, n1 * 0.82 + n2 * 0.18));
         let col = mix(pal.dryA, pal.dryB, t);
-        if (speck > 0.93 - pal.grain * 0.08) col = pal.pebble;
-        const jitter = (rand() - 0.5) * 10;
+        if (speck > 0.978 - pal.grain * 0.03) col = pal.pebble;
+        const jitter = (rand() - 0.5) * 4;
         const i = (y * size + x) * 4;
         aImg.data[i] = Math.max(0, Math.min(255, col[0] + jitter));
         aImg.data[i + 1] = Math.max(0, Math.min(255, col[1] + jitter * 0.8));
@@ -123,10 +123,10 @@ export class ProceduralAssetProvider implements AssetProvider {
         const hR = fbm((x + 1) / size * freq, v * freq, 4, seed);
         const hD = fbm(u * freq, (y - 1) / size * freq, 4, seed);
         const hU = fbm(u * freq, (y + 1) / size * freq, 4, seed);
-        const nx = (hL - hR) * (1.2 + pal.grain);
-        const ny = (hD - hU) * (1.2 + pal.grain);
-        nImg.data[i] = Math.max(0, Math.min(255, 128 + nx * 180));
-        nImg.data[i + 1] = Math.max(0, Math.min(255, 128 + ny * 180));
+        const nx = (hL - hR) * (0.7 + pal.grain * 0.45);
+        const ny = (hD - hU) * (0.7 + pal.grain * 0.45);
+        nImg.data[i] = Math.max(0, Math.min(255, 128 + nx * 96));
+        nImg.data[i + 1] = Math.max(0, Math.min(255, 128 + ny * 96));
         nImg.data[i + 2] = 255;
         nImg.data[i + 3] = 255;
 

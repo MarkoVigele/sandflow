@@ -12,10 +12,14 @@ void main() {
   vec4 sampleH = texture2D(uMaps, uv);
   float terrain = sampleH.r;
   float water = sampleH.g;
+  if (!(terrain == terrain)) terrain = 0.0;
+  if (!(water == water) || water < 0.0) water = 0.0;
   vDepth = water;
-  vFlow = sampleH.a;
-  float lift = water > 0.00065 ? water + 0.006 : 0.0;
+  float flow = sampleH.a;
+  vFlow = (flow == flow && flow > 0.0) ? flow : 0.0;
+  float lift = water > 0.0008 ? water + 0.004 : 0.0;
   float h = (terrain + lift) * uHeightScale;
+  if (!(h == h)) h = 0.0;
   vec3 pos = position;
   pos.y = h;
   vec4 worldPosition = modelMatrix * vec4(pos, 1.0);
