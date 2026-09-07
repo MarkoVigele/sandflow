@@ -95,28 +95,6 @@ body {
 .viewport canvas { width: 100%; height: 100%; display: block; touch-action: none; }
 .viewport.is-aiming canvas { cursor: none; }
 
-.aim-hud {
-  position: absolute;
-  left: 0; top: 0;
-  width: 10px; height: 10px;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  z-index: 3;
-  opacity: 0;
-  visibility: hidden;
-}
-.aim-hud.is-visible { opacity: 1; visibility: visible; }
-.aim-hud-pip {
-  position: absolute; inset: 0; border-radius: 50%;
-  background: rgba(63, 208, 232, 0.95);
-  box-shadow: 0 0 0 1px rgba(20, 17, 14, 0.45), 0 0 8px rgba(63, 208, 232, 0.55);
-}
-.aim-hud.is-sand .aim-hud-pip {
-  background: rgba(232, 164, 74, 0.95);
-  box-shadow: 0 0 0 1px rgba(20, 17, 14, 0.45), 0 0 8px rgba(232, 164, 74, 0.5);
-}
-.aim-hud.is-active { filter: brightness(1.15); }
-
 .inspector {
   grid-area: inspector;
   overflow: auto;

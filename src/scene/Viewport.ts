@@ -149,7 +149,6 @@ export class Viewport {
     this.scene.add(this.sourceGroup);
 
     this.scene.add(this.aim.group);
-    this.aim.attachHud(host);
     this.syncAimHost();
     this.unsubStore = this.store.subscribe(() => {
       this.syncAimHost();
@@ -407,7 +406,7 @@ export class Viewport {
 
   private refreshAim(hit: AimHit, ev?: PointerEvent): void {
     if (ev) this.lastPointer = { clientX: ev.clientX, clientY: ev.clientY };
-    this.aim.show(hit, this.aimState(), this.lastPointer ?? undefined);
+    this.aim.show(hit, this.aimState());
   }
 
   private syncAimHost(): void {

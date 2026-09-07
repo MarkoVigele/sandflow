@@ -118,4 +118,35 @@ const miss = pickDeformedSand(
 );
 assert(!miss, "ray far from tray misses");
 
+const geo = new THREE.PlaneGeometry(tray, tray, 2, 2);
+geo.rotateX(-Math.PI / 2);
+const pos = geo.getAttribute("position");
+const uv = geo.getAttribute("uv");
+for (let i = 0; i < pos.count; i++) {
+  const mapped = uvToWorldXZ(uv.getX(i), uv.getY(i), tray);
+  almost(mapped.x, pos.getX(i), 1e-5, `PlaneGeometry x[${i}]`);
+  almost(mapped.z, pos.getZ(i), 1e-5, `PlaneGeometry z[${i}]`);
+}
+
+const camera = new THREE.PerspectiveCamera(48, 16 / 9, 0.12, 80);
+camera.position.set(6.4, 5.6, 6.8);
+camera.lookAt(0, 0.55, 0);
+camera.updateMatrixWorld();
+camera.updateProjectionMatrix();
+const ndcSamples = [
+  new THREE.Vector2(0, 0),
+  new THREE.Vector2(0.35, -0.2),
+  new THREE.Vector2(-0.4, 0.15),
+];
+const caster = new THREE.Raycaster();
+const flat = (): number => 0.42;
+for (const ndc of ndcSamples) {
+  caster.setFromCamera(ndc, camera);
+  const p = pickDeformedSand(caster.ray.origin, caster.ray.direction, tray, heightScale, flat);
+  assert(!!p, `NDC (${ndc.x},${ndc.y}) should hit flat sand`);
+  const clip = p!.world.clone().project(camera);
+  almost(clip.x, ndc.x, 0.03, `reproject x from (${ndc.x},${ndc.y})`);
+  almost(clip.y, ndc.y, 0.03, `reproject y from (${ndc.x},${ndc.y})`);
+}
+
 console.log("aim-cursor smoke ok");

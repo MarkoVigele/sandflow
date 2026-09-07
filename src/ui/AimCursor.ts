@@ -210,7 +210,7 @@ export function pickDeformedSand(
   const t = 0.5 * (tLo + tHi);
   const s = heightAtPoint(origin, dir, t, traySize, heightAt);
   if (!s.inside) return fallbackPlanePick(origin, dir, traySize, heightScale, heightAt);
-  return surfaceHit(s.u, s.v, s.h, traySize, heightScale, heightAt);
+  return surfaceHit(s.u, s.v, s.h, traySize, heightScale, heightAt, s);
 }
 
 function fallbackPlanePick(
@@ -237,7 +237,12 @@ function fallbackPlanePick(
     h = heightAt(u, v);
     yGuess = h * heightScale;
   }
-  return surfaceHit(u, v, h, traySize, heightScale, heightAt);
+  const t = (yGuess - origin.y) / dir.y;
+  return surfaceHit(u, v, h, traySize, heightScale, heightAt, {
+    px: origin.x + dir.x * t,
+    py: origin.y + dir.y * t,
+    pz: origin.z + dir.z * t,
+  });
 }
 
 function surfaceHit(
@@ -247,8 +252,13 @@ function surfaceHit(
   traySize: number,
   heightScale: number,
   heightAt: HeightSampleFn,
+  rayPoint?: { px: number; py: number; pz: number },
 ): AimHit {
-  const world = surfaceWorld(u, v, height01, traySize, heightScale);
+  // Stay on the camera ray so the ring projects under the pointer.
+  const y = height01 * heightScale;
+  const world = rayPoint
+    ? new THREE.Vector3(rayPoint.px, y, rayPoint.pz)
+    : surfaceWorld(u, v, height01, traySize, heightScale);
   const du = 1 / 64;
   const hL = heightAt(u - du, v) * heightScale;
   const hR = heightAt(u + du, v) * heightScale;
@@ -309,7 +319,6 @@ function overlayMaterial(
  */
 export class AimCursor {
   readonly group = new THREE.Group();
-  readonly hud: HTMLDivElement;
   private disc: THREE.Mesh;
   private ring: THREE.Mesh;
   private halo: THREE.Mesh;
@@ -321,7 +330,6 @@ export class AimCursor {
   private discMap: THREE.CanvasTexture;
   private baseRadius = 0.32;
   private waterish = true;
-  private host: HTMLElement | null = null;
   private up = new THREE.Vector3(0, 1, 0);
 
   constructor() {
@@ -361,24 +369,13 @@ export class AimCursor {
     this.pip.renderOrder = 43;
 
     this.group.add(this.halo, this.disc, this.ring, this.pip);
-
-    this.hud = document.createElement("div");
-    this.hud.className = "aim-hud";
-    this.hud.setAttribute("aria-hidden", "true");
-    this.hud.innerHTML = `<span class="aim-hud-pip"></span>`;
-  }
-
-  attachHud(host: HTMLElement): void {
-    this.host = host;
-    host.appendChild(this.hud);
   }
 
   hide(): void {
     this.group.visible = false;
-    this.hud.classList.remove("is-visible");
   }
 
-  show(hit: AimHit, state: AimCursorState, screen?: { clientX: number; clientY: number }): void {
+  show(hit: AimHit, state: AimCursorState): void {
     if (!aimCursorVisible(state)) {
       this.hide();
       return;
@@ -412,21 +409,6 @@ export class AimCursor {
     this.pipMat.opacity = this.waterish ? 1 : 0.8;
     this.pip.visible = true;
     this.group.visible = true;
-    this.placeHud(state, screen);
-  }
-
-  private placeHud(state: AimCursorState, screen?: { clientX: number; clientY: number }): void {
-    if (!this.host || !screen) {
-      this.hud.classList.remove("is-visible");
-      return;
-    }
-    const rect = this.host.getBoundingClientRect();
-    this.hud.style.left = `${screen.clientX - rect.left}px`;
-    this.hud.style.top = `${screen.clientY - rect.top}px`;
-    this.hud.classList.toggle("is-water", this.waterish);
-    this.hud.classList.toggle("is-sand", !this.waterish);
-    this.hud.classList.toggle("is-active", state.active);
-    this.hud.classList.add("is-visible");
   }
 
   tick(_elapsed: number, _active: boolean): void {
@@ -444,6 +426,5 @@ export class AimCursor {
     this.haloMat.dispose();
     this.pipMat.dispose();
     this.discMap.dispose();
-    this.hud.remove();
   }
 }
