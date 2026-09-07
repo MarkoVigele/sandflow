@@ -45,6 +45,9 @@ assert(source === 0.34, `source placement ring, got ${source}`);
 
 assert(isPourAim("pour") && isPourAim("source"), "pour/source use cyan water ring");
 assert(!isPourAim("pile") && !isPourAim("dig") && !isPourAim("smooth") && !isPourAim("dam"), "brushes use gold");
+assert(!isPourAim("stone") && !isPourAim("erase"), "kiesel/radierer use gold brush ring");
+assert(aimCursorVisible({ cameraMode: false }), "aim stays on for props tools");
+assert(!aimCursorVisible({ cameraMode: true }), "aim still hidden in camera mode");
 assert(AIM_POUR_FILL === 0x3fd0e8, "pour ring is cyan");
 assert(AIM_BRUSH_FILL === 0xe8a44a, "brush ring is gold");
 

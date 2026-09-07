@@ -6,10 +6,25 @@ export type ToolId =
   | "tamp"
   | "groove"
   | "flatten"
+  | "stone"
+  | "erase"
   | "pour"
   | "source";
 
 export type QualityId = "low" | "medium" | "high" | "ultra";
+
+export const QUALITY_LABEL: Record<QualityId, string> = {
+  low: "Niedrig",
+  medium: "Mittel",
+  high: "Hoch",
+  ultra: "Ultra",
+};
+
+export const SPEEDS = [0.25, 0.5, 1, 2, 4, 8];
+
+export function speedLabel(speed: number): string {
+  return `${String(speed).replace(".", ",")}×`;
+}
 
 export type HeatmapMode = "off" | "flow" | "depth";
 

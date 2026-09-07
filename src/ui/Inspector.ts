@@ -10,6 +10,8 @@ const TOOL_COPY: Record<ToolId, { title: string; body: string }> = {
   tamp: { title: "Feststampfen", body: "Drückt Sand fest: lokale Kohäsion steigt, Erosion hält schlechter." },
   groove: { title: "Rinne vorzeichnen", body: "Ziehen zeichnet eine V-Rinne mit leichten Ufern — Wasser folgt später." },
   flatten: { title: "Einebnen", body: "Pinsel ebnet die Fläche unter dem Finger. Unten: ganze Wanne." },
+  stone: { title: "Kiesel", body: "Kleine Steine auf den Sand setzen. Radius steuert die Größe. Der Radierer nimmt sie wieder weg." },
+  erase: { title: "Radierer", body: "Kiesel in Reichweite entfernen. Sand und Wasser bleiben unberührt." },
   pour: { title: "Gießen", body: "Der Kreis auf dem Sand zeigt die Tropfstelle. Halten zum Gießen." },
   source: { title: "Quelle", body: "Kreis unter dem Finger: Tippen setzt, Ziehen verschiebt." },
 };
@@ -73,13 +75,13 @@ export class Inspector {
           ${src ? slider("Durchfluss Quelle", 0.2, 6, 0.1, src.rate, "sourceRate") : ""}`
             : `
           ${s.tool === "pour" ? slider("Durchfluss", 0.25, 4, 0.05, s.pourRate, "pourRate") : ""}
-          ${s.tool !== "pour" ? slider("Radius", 0.02, 0.16, 0.005, s.brushRadius, "brushRadius") : ""}
-          ${s.tool !== "pour" ? slider("Stärke", 0.3, 2.2, 0.05, s.brushStrength, "brushStrength") : ""}
+          ${s.tool !== "pour" ? slider(s.tool === "stone" ? "Größe" : s.tool === "erase" ? "Reichweite" : "Radius", 0.02, 0.16, 0.005, s.brushRadius, "brushRadius") : ""}
+          ${s.tool !== "pour" && s.tool !== "stone" && s.tool !== "erase" ? slider("Stärke", 0.3, 2.2, 0.05, s.brushStrength, "brushStrength") : ""}
           ${s.tool === "flatten" ? `<div class="row"><button class="btn" data-flatten>Ganze Wanne</button></div>` : ""}`
         }
         <div class="row">
-          <button class="btn" data-reset-water>Nur Wasser</button>
-          <button class="btn" data-reset-all>Szene neu</button>
+          <button class="btn" data-reset-water>Nur Wasser zurücksetzen</button>
+          <button class="btn" data-reset-all>Szene zurücksetzen</button>
         </div>
         <button class="adv-toggle" data-adv>${s.advancedOpen ? "Erweitert schließen" : "Erweitert"}</button>
         ${

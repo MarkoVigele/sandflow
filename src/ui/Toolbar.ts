@@ -47,7 +47,7 @@ export class Toolbar {
 }
 
 function hintClass(id: string, step: number): string {
-  if (step === 1 && (id === "pile" || id === "dig" || id === "groove" || id === "flatten")) return "is-hint";
+  if (step === 1 && (id === "pile" || id === "dig" || id === "groove" || id === "flatten" || id === "stone")) return "is-hint";
   if (step === 2 && id === "source") return "is-hint";
   return "";
 }

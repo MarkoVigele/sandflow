@@ -8,8 +8,25 @@ export const TOOLBAR_TOOLS: { id: ToolId; label: string; hint: string }[] = [
   { id: "tamp", label: "Feststampfen", hint: "Kohäsion lokal erhöhen" },
   { id: "groove", label: "Rinne", hint: "Rinne vorzeichnen" },
   { id: "flatten", label: "Einebnen", hint: "Auswahl oder ganze Wanne glattziehen" },
+  { id: "stone", label: "Kiesel", hint: "Kleine Steine setzen" },
+  { id: "erase", label: "Radierer", hint: "Kiesel entfernen" },
   { id: "pour", label: "Gießen", hint: "Halten zum Gießen" },
   { id: "source", label: "Quelle", hint: "Setzen, ziehen, löschen" },
 ];
 
-export const TOOL_HOTKEYS: ToolId[] = TOOLBAR_TOOLS.map((t) => t.id);
+export const TOOL_HOTKEYS: ToolId[] = [
+  "pile",
+  "dig",
+  "smooth",
+  "dam",
+  "tamp",
+  "groove",
+  "flatten",
+  "pour",
+  "source",
+];
+
+export const LETTER_HOTKEYS: Partial<Record<string, ToolId>> = {
+  k: "stone",
+  r: "erase",
+};

@@ -14,8 +14,8 @@ const STEPS: Record<Exclude<OnboardStep, 0>, { kicker: string; title: string; bo
   },
   3: {
     kicker: "Schritt 3 von 3",
-    title: "Play",
-    body: "Starte die Simulation. Erst dünne Adern, dann ein Bett, später Verzweigungen.",
+    title: "Abspielen",
+    body: "Starte die Simulation. Erst dünne Adern, dann ein Bett, später Verzweigungen. Tempo und Zeitraffer liegen oben.",
   },
 };
 
