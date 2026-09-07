@@ -1,3 +1,4 @@
+import { fbm } from "../assets/noise";
 import { DEFAULT_PARAMS } from "../state/types";
 import { ErosionSim } from "./erosionCore";
 import { MAP_A_FLOW, MAP_B_WETNESS, MAP_G_WATER, MAP_R_TERRAIN, unpackRgba } from "./mapsContract";
@@ -94,3 +95,68 @@ if (packed[MAP_A_FLOW] !== sim.flow[0]) fail("pack A flow");
 if (packed[MAP_R_TERRAIN] !== sim.terrain[0] || packed[MAP_G_WATER] !== sim.water[0]) {
   fail("channel contract");
 }
+
+function maxCutNear(before: Float32Array, after: Float32Array, cx: number, cy: number, rad: number): number {
+  let cut = 0;
+  for (let y = cy - rad; y <= cy + rad; y++) {
+    for (let x = cx - rad; x <= cx + rad; x++) {
+      if (x < 0 || y < 0 || x >= size || y >= size) continue;
+      const i = y * size + x;
+      cut = Math.max(cut, before[i] - after[i]);
+    }
+  }
+  return cut;
+}
+
+const flat = new Float32Array(size * size);
+flat.fill(0.52);
+const still = new ErosionSim(size, DEFAULT_PARAMS, flat);
+still.sources = [];
+still.pour(0.5, 0.5, 1.1);
+const still0 = still.terrain.slice();
+still.step(90);
+const cut90 = maxCutNear(still0, still.terrain, (size * 0.5) | 0, (size * 0.5) | 0, 8);
+still.step(90);
+const cut180 = maxCutNear(still0, still.terrain, (size * 0.5) | 0, (size * 0.5) | 0, 8);
+const stillWet = still.wetness[((size * 0.5) | 0) * size + ((size * 0.5) | 0)];
+console.log(JSON.stringify({ stagnantCut90: +cut90.toFixed(4), stagnantCut180: +cut180.toFixed(4), stillWet: +stillWet.toFixed(3) }));
+
+if (cut90 > 0.018) fail(`stehendes Wasser brennt ein: cut90=${cut90}`);
+if (cut180 > cut90 + 0.006) fail(`stehendes Loch wächst weiter: ${cut90} → ${cut180}`);
+if (stillWet < 0.04) fail(`stehendes Wasser sollte zumindest nässen: wet=${stillWet}`);
+
+const holdFlat = new Float32Array(size * size);
+holdFlat.fill(0.52);
+const hold = new ErosionSim(size, DEFAULT_PARAMS, holdFlat);
+hold.sources = [];
+const hold0 = hold.terrain.slice();
+for (let s = 0; s < 80; s++) {
+  hold.pour(0.5, 0.5, 0.22);
+  hold.step(1);
+}
+const holdCut = maxCutNear(hold0, hold.terrain, (size * 0.5) | 0, (size * 0.5) | 0, 8);
+hold.step(80);
+const holdCutLater = maxCutNear(hold0, hold.terrain, (size * 0.5) | 0, (size * 0.5) | 0, 8);
+console.log(JSON.stringify({ holdPourCut: +holdCut.toFixed(4), holdPourCutLater: +holdCutLater.toFixed(4) }));
+if (holdCut > 0.02) fail(`Gießen auf ebener Fläche brennt ein: ${holdCut}`);
+if (holdCutLater > holdCut + 0.008) fail(`Gießgrube wächst ohne Fluss weiter: ${holdCut} → ${holdCutLater}`);
+
+const grainy = new Float32Array(size * size);
+for (let y = 0; y < size; y++) {
+  for (let x = 0; x < size; x++) {
+    grainy[y * size + x] = 0.52 + (fbm(x / size * 7.5, y / size * 7.5, 4, 11) - 0.5) * 0.016;
+  }
+}
+const grainHold = new ErosionSim(size, DEFAULT_PARAMS, grainy);
+grainHold.sources = [];
+const grain0 = grainHold.terrain.slice();
+for (let s = 0; s < 80; s++) {
+  grainHold.pour(0.5, 0.5, 0.22);
+  grainHold.step(1);
+}
+const grainCut = maxCutNear(grain0, grainHold.terrain, (size * 0.5) | 0, (size * 0.5) | 0, 8);
+grainHold.step(80);
+const grainCutLater = maxCutNear(grain0, grainHold.terrain, (size * 0.5) | 0, (size * 0.5) | 0, 8);
+console.log(JSON.stringify({ grainPourCut: +grainCut.toFixed(4), grainPourCutLater: +grainCutLater.toFixed(4) }));
+if (grainCut > 0.022) fail(`Gießen auf Körnung brennt ein: ${grainCut}`);
+if (grainCutLater > grainCut + 0.01) fail(`Körnungsgrube wächst weiter: ${grainCut} → ${grainCutLater}`);
