@@ -17,8 +17,11 @@ void main() {
   vDepth = water;
   float flow = sampleH.a;
   vFlow = (flow == flow && flow > 0.0) ? flow : 0.0;
-  float lift = water > 0.0008 ? water + 0.004 : 0.0;
-  float h = (terrain + lift) * uHeightScale;
+  float sheet = 0.0;
+  if (water > 0.0008) {
+    sheet = 0.004 + min(water, 0.07) * 0.10;
+  }
+  float h = (terrain + sheet) * uHeightScale;
   if (!(h == h)) h = 0.0;
   vec3 pos = position;
   pos.y = h;

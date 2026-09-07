@@ -40,10 +40,10 @@ void main() {
 
   vec3 N = safeNormalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.14, vec3(0.0, 1.0, 0.0));
 
-  float dark = mix(1.0, 0.52, wet);
+  float dark = mix(1.0, 0.72, wet);
   albedo *= dark;
-  albedo = mix(albedo, albedo * vec3(0.78, 0.74, 0.66), wet * 0.35);
-  albedo = mix(albedo, albedo * vec3(0.86, 0.88, 0.84), smoothstep(0.002, 0.03, water) * 0.18);
+  albedo = mix(albedo, albedo * vec3(0.84, 0.80, 0.72), wet * 0.22);
+  albedo = mix(albedo, albedo * vec3(0.90, 0.91, 0.88), smoothstep(0.003, 0.04, water) * 0.12);
 
   float roughness = mix(mix(0.92, 0.82, uGrain), 0.38, wet * 0.85);
   roughness = mix(roughness, roughTex, 0.16);

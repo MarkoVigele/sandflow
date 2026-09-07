@@ -32,9 +32,9 @@ void main() {
   if (!(flow == flow)) flow = 0.0;
   float turbid = clamp(flow * 2.4 + depth * 0.16, 0.0, 1.0);
 
-  vec3 clearC = vec3(0.30, 0.46, 0.47);
-  vec3 shallow = vec3(0.50, 0.58, 0.54);
-  vec3 silt = vec3(0.48, 0.44, 0.36);
+  vec3 clearC = vec3(0.34, 0.44, 0.43);
+  vec3 shallow = vec3(0.52, 0.56, 0.51);
+  vec3 silt = vec3(0.50, 0.47, 0.40);
   vec3 base = mix(mix(shallow, clearC, depth), silt, turbid * 0.22);
 
   vec3 V = safeNormalize(vViewDir, vec3(0.0, 1.0, 0.0));
@@ -59,21 +59,27 @@ void main() {
     sin((vUv.x * 1.6 - vUv.y) * 13.0 - uTime * 1.1) * 0.008;
   rip *= depth * (1.0 - turbid * 0.4);
 
-  vec3 N = safeNormalize(vec3(grad.x + rip, 0.42, grad.y + rip * 0.7), vec3(0.0, 1.0, 0.0));
+  vec3 N = safeNormalize(vec3(grad.x + rip, 0.55, grad.y + rip * 0.7), vec3(0.0, 1.0, 0.0));
+
+  vec3 geoN = safeNormalize(cross(dFdx(vWorldPos), dFdy(vWorldPos)), vec3(0.0, 1.0, 0.0));
+  float geoUp = abs(geoN.y);
+  if (geoUp < 0.42) discard;
 
   float ndv = max(dot(N, V), 0.0);
-  float fresnel = pow(1.0 - ndv, 5.0) * 0.14 * depth;
+  float fresnel = pow(1.0 - ndv, 5.0) * 0.10 * depth;
 
   vec3 L = safeNormalize(uSunDir, vec3(0.4, 0.8, 0.3));
   vec3 H = safeNormalize(V + L, vec3(0.0, 1.0, 0.0));
-  float spec = pow(max(dot(N, H), 0.0), 26.0) * 0.18 * depth;
-  spec = min(spec, 0.22);
+  float spec = pow(max(dot(N, H), 0.0), 22.0) * 0.12 * depth;
+  spec = min(spec, 0.14);
 
   vec3 color = base + uSunColor * (spec + fresnel);
-  color = clamp(color, vec3(0.0), vec3(0.92));
+  color = mix(color, vec3(0.52, 0.54, 0.50), 0.18);
+  color = clamp(color, vec3(0.0), vec3(0.78));
 
-  float alpha = mix(0.18, 0.58, depth) + turbid * 0.05 + fresnel;
-  alpha = clamp(alpha, 0.12, 0.7);
+  float alpha = mix(0.14, 0.48, depth) + turbid * 0.04 + fresnel;
+  alpha *= smoothstep(0.42, 0.72, geoUp);
+  alpha = clamp(alpha, 0.10, 0.58);
 
   gl_FragColor = vec4(color, alpha);
 }
