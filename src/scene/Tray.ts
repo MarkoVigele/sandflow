@@ -50,8 +50,18 @@ export function createTray(traySize: number): TrayHandle {
   const east = mk(wallT, wallH, inner, wood);
   east.position.set(inner / 2 + wallT / 2, wallH / 2, 0);
 
-  const lip = mk(outer + 0.12, 0.06, outer + 0.12, rimDark);
-  lip.position.y = wallH + 0.01;
+  // Frame only — a solid slab here would cap the sand once the rim clears the bed.
+  const lipH = 0.07;
+  const lipOver = 0.07;
+  const lipY = wallH + lipH / 2;
+  const lipN = mk(outer + lipOver * 2, lipH, wallT + lipOver, rimDark);
+  lipN.position.set(0, lipY, -inner / 2 - wallT / 2);
+  const lipS = mk(outer + lipOver * 2, lipH, wallT + lipOver, rimDark);
+  lipS.position.set(0, lipY, inner / 2 + wallT / 2);
+  const lipW = mk(wallT + lipOver, lipH, inner, rimDark);
+  lipW.position.set(-inner / 2 - wallT / 2, lipY, 0);
+  const lipE = mk(wallT + lipOver, lipH, inner, rimDark);
+  lipE.position.set(inner / 2 + wallT / 2, lipY, 0);
 
   const table = mk(outer + 3.4, 0.16, outer + 3.4, bench);
   table.position.y = -0.08;
@@ -63,7 +73,7 @@ export function createTray(traySize: number): TrayHandle {
   under.position.y = -0.02;
   under.receiveShadow = true;
 
-  g.add(north, south, west, east, lip, table, under);
+  g.add(north, south, west, east, lipN, lipS, lipW, lipE, table, under);
   return { group: g, wood, lip: rimDark, maps: [] };
 }
 
