@@ -7,6 +7,7 @@ uniform vec3 uSunColor;
 uniform vec3 uAmbient;
 uniform float uReceiveShadow;
 uniform float uGrain;
+uniform float uHeatMode;
 
 varying vec2 vUv;
 varying vec3 vWorldPos;
@@ -66,6 +67,17 @@ void main() {
   vec3 color = albedo * (uAmbient + uSunColor * wrap * shadow) + uSunColor * spec * shadow;
   float underWater = smoothstep(0.003, 0.04, water);
   color = mix(color, color * vec3(0.88, 0.86, 0.80), underWater * 0.2);
+
+  if (uHeatMode > 0.5) {
+    float flow = maps.a;
+    if (!(flow == flow) || flow < 0.0) flow = 0.0;
+    float t = uHeatMode < 1.5 ? clamp(flow * 9.0, 0.0, 1.0) : clamp(water * 16.0, 0.0, 1.0);
+    vec3 heat = uHeatMode < 1.5
+      ? mix(vec3(0.55, 0.28, 0.10), vec3(0.92, 0.78, 0.36), t)
+      : mix(vec3(0.28, 0.36, 0.30), vec3(0.62, 0.68, 0.52), t);
+    color = mix(color, heat, smoothstep(0.02, 0.18, t) * 0.62);
+  }
+
   color = clamp(color, vec3(0.0), vec3(1.0));
 
   gl_FragColor = vec4(color, 1.0);

@@ -32,8 +32,8 @@ void main() {
   if (!(flow == flow)) flow = 0.0;
   float turbid = clamp(flow * 1.8 + depth * 0.12, 0.0, 0.65);
 
-  vec3 clearC = vec3(0.38, 0.48, 0.44);
-  vec3 shallow = vec3(0.56, 0.58, 0.52);
+  vec3 clearC = vec3(0.34, 0.46, 0.42);
+  vec3 shallow = vec3(0.54, 0.56, 0.50);
   vec3 silt = vec3(0.50, 0.46, 0.38);
   vec3 base = mix(mix(shallow, clearC, depth), silt, turbid * 0.2);
 
@@ -81,9 +81,9 @@ void main() {
   color = mix(color, vec3(0.48, 0.50, 0.46), 0.12);
   color = clamp(color, vec3(0.05), vec3(0.70));
 
-  float alpha = mix(0.26, 0.54, depth) + turbid * 0.03 + fresnel;
+  float alpha = mix(0.34, 0.60, depth) + turbid * 0.04 + fresnel;
   if (geoArea > 4.0e-4) alpha *= mix(0.45, 1.0, smoothstep(0.14, 0.40, geoUp));
-  alpha = clamp(alpha, 0.14, 0.56);
+  alpha = clamp(alpha, 0.22, 0.64);
 
   gl_FragColor = vec4(color, alpha);
 }

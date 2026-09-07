@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import sandVert from "../shaders/sand.vert.glsl?raw";
 import sandFrag from "../shaders/sand.frag.glsl?raw";
-import type { QualityId } from "../state/types";
+import type { HeatmapMode, QualityId } from "../state/types";
 import { canvasTexture } from "./mapsTexture";
 import type { GeneratedMaps } from "../assets/AssetService";
 
@@ -49,6 +49,7 @@ export class SandMesh {
         uAmbient: { value: new THREE.Color(0.24, 0.21, 0.17) },
         uReceiveShadow: { value: 0 },
         uGrain: { value: 0.55 },
+        uHeatMode: { value: 0 },
       },
       vertexShader: sandVert,
       fragmentShader: sandFrag,
@@ -92,6 +93,10 @@ export class SandMesh {
 
   setGrain(grain: number): void {
     this.material.uniforms.uGrain.value = grain;
+  }
+
+  setHeatMode(mode: HeatmapMode): void {
+    this.material.uniforms.uHeatMode.value = mode === "off" ? 0 : mode === "depth" ? 2 : 1;
   }
 
   dispose(): void {

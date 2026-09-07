@@ -22,7 +22,6 @@ import {
   type AimHit,
 } from "../ui/AimCursor";
 import { createMapsTexture, uploadPacked } from "./mapsTexture";
-import { HeatmapOverlay } from "./HeatmapOverlay";
 import { FlowParticles } from "./Particles";
 import { SandMesh } from "./SandMesh";
 import { createSourceMarker, createTray } from "./Tray";
@@ -52,7 +51,6 @@ export class Viewport {
   private maps: THREE.DataTexture;
   private sand: SandMesh;
   private water: WaterMesh;
-  private heatmap: HeatmapOverlay;
   private particles: FlowParticles;
   private sun: THREE.DirectionalLight;
   private hemi: THREE.HemisphereLight;
@@ -147,11 +145,10 @@ export class Viewport {
     this.maps = createMapsTexture(grid);
     this.sand = new SandMesh(TRAY_SIZE, this.maps, q, HEIGHT_SCALE);
     this.water = new WaterMesh(TRAY_SIZE, this.maps, q, HEIGHT_SCALE);
-    this.heatmap = new HeatmapOverlay(TRAY_SIZE, this.maps, q, HEIGHT_SCALE);
     this.particles = new FlowParticles();
-    this.scene.add(this.sand.mesh, this.water.mesh, this.heatmap.mesh, this.particles.points);
-    this.heatmap.setMode(store.state.heatmap);
-    store.subscribe(() => this.heatmap.setMode(this.store.state.heatmap));
+    this.scene.add(this.sand.mesh, this.water.mesh, this.particles.points);
+    this.sand.setHeatMode(store.state.heatmap);
+    store.subscribe(() => this.sand.setHeatMode(this.store.state.heatmap));
     this.sourceGroup.name = "sources";
     this.scene.add(this.sourceGroup);
 
@@ -207,7 +204,6 @@ export class Viewport {
     );
     this.sand.setQuality(quality, TRAY_SIZE);
     this.water.setQuality(quality, TRAY_SIZE);
-    this.heatmap.setQuality(quality, TRAY_SIZE);
 
     const grid = QUALITY_GRID[quality];
     if (this.lastPacked && resample && this.lastSize !== grid) {
@@ -219,14 +215,12 @@ export class Viewport {
       this.maps = createMapsTexture(grid);
       this.sand.setMaps(this.maps);
       this.water.setMaps(this.maps);
-      this.heatmap.setMaps(this.maps);
       this.sim.replaceTerrain(t2, this.sources, w2, n2);
     } else if (!this.lastPacked) {
       this.maps.dispose();
       this.maps = createMapsTexture(grid);
       this.sand.setMaps(this.maps);
       this.water.setMaps(this.maps);
-      this.heatmap.setMaps(this.maps);
     }
   }
 
@@ -241,7 +235,6 @@ export class Viewport {
     this.maps = createMapsTexture(grid);
     this.sand.setMaps(this.maps);
     this.water.setMaps(this.maps);
-    this.heatmap.setMaps(this.maps);
     this.sim.init(grid, this.store.state.params, built.terrain, this.sources);
     this.applyCamera(preset.camera);
     this.store.patch({ presetId: id, selectedSourceId: this.sources[0]?.id ?? null });
@@ -269,7 +262,6 @@ export class Viewport {
       this.maps = createMapsTexture(snap.size);
       this.sand.setMaps(this.maps);
       this.water.setMaps(this.maps);
-      this.heatmap.setMaps(this.maps);
     }
     this.sim.init(snap.size, this.store.state.params, snap.terrain, this.sources, {
       water: snap.water,
@@ -357,7 +349,6 @@ export class Viewport {
     this.sim.dispose();
     this.sand.dispose();
     this.water.dispose();
-    this.heatmap.dispose();
     this.particles.dispose();
     this.aim.dispose();
     this.maps.dispose();
