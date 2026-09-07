@@ -72,7 +72,7 @@ export function createSourceMarker(): THREE.Group {
   const drop = new THREE.Mesh(
     new THREE.SphereGeometry(0.055, 16, 12),
     new THREE.MeshStandardMaterial({
-      color: 0x6aa8ba,
+      color: 0x8d9a8c,
       roughness: 0.2,
       metalness: 0.1,
       transparent: true,
