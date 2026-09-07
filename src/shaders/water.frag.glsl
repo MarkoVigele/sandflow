@@ -32,9 +32,9 @@ void main() {
   if (!(flow == flow)) flow = 0.0;
   float turbid = clamp(flow * 1.8 + depth * 0.12, 0.0, 0.65);
 
-  vec3 clearC = vec3(0.36, 0.48, 0.46);
-  vec3 shallow = vec3(0.54, 0.58, 0.53);
-  vec3 silt = vec3(0.50, 0.47, 0.40);
+  vec3 clearC = vec3(0.40, 0.52, 0.48);
+  vec3 shallow = vec3(0.58, 0.62, 0.56);
+  vec3 silt = vec3(0.52, 0.49, 0.42);
   vec3 base = mix(mix(shallow, clearC, depth), silt, turbid * 0.18);
 
   vec3 V = safeNormalize(vViewDir, vec3(0.0, 1.0, 0.0));
@@ -81,7 +81,7 @@ void main() {
   color = mix(color, vec3(0.50, 0.52, 0.48), 0.12);
   color = clamp(color, vec3(0.05), vec3(0.72));
 
-  float alpha = mix(0.20, 0.50, depth) + turbid * 0.03 + fresnel;
+  float alpha = mix(0.26, 0.54, depth) + turbid * 0.03 + fresnel;
   if (geoArea > 4.0e-4) alpha *= mix(0.45, 1.0, smoothstep(0.14, 0.40, geoUp));
   alpha = clamp(alpha, 0.14, 0.56);
 
