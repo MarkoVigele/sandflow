@@ -379,7 +379,6 @@ export class Viewport {
       u,
       v,
       world: this.surfacePoint(u, v),
-      normal: this.sampleNormal(u, v),
     };
   }
 
@@ -389,17 +388,6 @@ export class Viewport {
       this.sampleHeight(u, v) * HEIGHT_SCALE,
       (v - 0.5) * TRAY_SIZE,
     );
-  }
-
-  private sampleNormal(u: number, v: number): THREE.Vector3 {
-    const e = 0.014;
-    const hL = this.sampleHeight(u - e, v);
-    const hR = this.sampleHeight(u + e, v);
-    const hD = this.sampleHeight(u, v - e);
-    const hU = this.sampleHeight(u, v + e);
-    const du = new THREE.Vector3(2 * e * TRAY_SIZE, (hR - hL) * HEIGHT_SCALE, 0);
-    const dv = new THREE.Vector3(0, (hU - hD) * HEIGHT_SCALE, 2 * e * TRAY_SIZE);
-    return new THREE.Vector3().crossVectors(dv, du).normalize();
   }
 
   private aimState(): AimCursorState {
@@ -578,7 +566,6 @@ export class Viewport {
         u,
         v,
         world: this.surfacePoint(u, v),
-        normal: this.sampleNormal(u, v),
       });
     }
     this.aim.tick(t, this.strokeActive || !!this.draggingSource);

@@ -17,12 +17,12 @@ assert(aimCursorVisible(base), "aim should show while using a tool");
 assert(!aimCursorVisible({ cameraMode: true }), "aim hidden in camera mode");
 
 const pour = aimRadiusWorld(base);
-assert(pour >= 0.24 && pour <= 0.46, `pour radius readable, got ${pour}`);
+assert(pour >= 0.3 && pour <= 0.52, `pour radius readable, got ${pour}`);
 
 const brush = aimRadiusWorld({ ...base, tool: "pile" });
 assert(Math.abs(brush - 0.06 * 8) < 1e-6, `brush matches world radius, got ${brush}`);
 
 const source = aimRadiusWorld({ ...base, tool: "source" });
-assert(source === 0.22, `source placement ring, got ${source}`);
+assert(source === 0.34, `source placement ring, got ${source}`);
 
 console.log("aim-cursor smoke ok");

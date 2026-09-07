@@ -1,12 +1,10 @@
 import * as THREE from "three";
 import type { ToolId } from "../state/types";
 
-const UP = new THREE.Vector3(0, 1, 0);
-
-const WATER_FILL = 0x5ec4d8;
-const WATER_RING = 0xe8f7fb;
-const SAND_FILL = 0xf2d39a;
-const SAND_RING = 0xfff6e4;
+const WATER_FILL = 0x3fd0e8;
+const WATER_RING = 0xf4ffff;
+const SAND_FILL = 0xe8a44a;
+const SAND_RING = 0xffe08a;
 
 export type AimHit = {
   u: number;
@@ -26,11 +24,11 @@ export type AimCursorState = {
 
 /** World-space radius of the aim disc. Pour splat is a few cells — keep the marker readable. */
 export function aimRadiusWorld(state: AimCursorState): number {
-  if (state.tool === "source") return 0.22;
+  if (state.tool === "source") return 0.34;
   if (state.tool === "pour") {
-    return THREE.MathUtils.clamp(0.2 + state.pourRate * 0.06, 0.24, 0.46);
+    return THREE.MathUtils.clamp(0.26 + state.pourRate * 0.07, 0.3, 0.52);
   }
-  return Math.max(0.16, state.brushRadius * state.traySize);
+  return Math.max(0.22, state.brushRadius * state.traySize);
 }
 
 export function aimCursorVisible(state: Pick<AimCursorState, "cameraMode">): boolean {
@@ -50,9 +48,9 @@ function makeSoftDiscTexture(): THREE.CanvasTexture {
   }
   const mid = size / 2;
   const gradient = ctx.createRadialGradient(mid, mid, 0, mid, mid, mid);
-  gradient.addColorStop(0, "rgba(255,255,255,0.62)");
-  gradient.addColorStop(0.42, "rgba(255,255,255,0.28)");
-  gradient.addColorStop(0.78, "rgba(255,255,255,0.08)");
+  gradient.addColorStop(0, "rgba(255,255,255,0.85)");
+  gradient.addColorStop(0.38, "rgba(255,255,255,0.42)");
+  gradient.addColorStop(0.72, "rgba(255,255,255,0.14)");
   gradient.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, size, size);
@@ -62,19 +60,22 @@ function makeSoftDiscTexture(): THREE.CanvasTexture {
   return tex;
 }
 
-function overlayMaterial(color: number, opacity: number, map?: THREE.Texture): THREE.MeshBasicMaterial {
+function overlayMaterial(
+  color: number,
+  opacity: number,
+  map?: THREE.Texture,
+  additive = false,
+): THREE.MeshBasicMaterial {
   return new THREE.MeshBasicMaterial({
     color,
     map: map ?? null,
     transparent: true,
     opacity,
     depthWrite: false,
-    depthTest: true,
+    depthTest: false,
     side: THREE.DoubleSide,
-    polygonOffset: true,
-    polygonOffsetFactor: -4,
-    polygonOffsetUnits: -4,
     toneMapped: false,
+    blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
   });
 }
 
@@ -93,12 +94,12 @@ export class AimCursor {
   private haloMat: THREE.MeshBasicMaterial;
   private pipMat: THREE.MeshBasicMaterial;
   private discMap: THREE.CanvasTexture;
-  private baseRadius = 0.28;
+  private baseRadius = 0.32;
   private waterish = true;
 
   constructor() {
     this.group.name = "aim-cursor";
-    this.group.renderOrder = 20;
+    this.group.renderOrder = 40;
     this.group.visible = false;
     this.group.raycast = () => {
       /* ignore so the marker never steals the sand hit */
@@ -108,28 +109,29 @@ export class AimCursor {
 
     const discGeo = new THREE.CircleGeometry(1, 48);
     discGeo.rotateX(-Math.PI / 2);
-    this.discMat = overlayMaterial(WATER_FILL, 0.34, this.discMap);
+    this.discMat = overlayMaterial(WATER_FILL, 0.55, this.discMap, true);
     this.disc = new THREE.Mesh(discGeo, this.discMat);
-    this.disc.renderOrder = 20;
+    this.disc.renderOrder = 40;
 
-    const ringGeo = new THREE.RingGeometry(0.78, 1, 64);
+    const ringGeo = new THREE.RingGeometry(0.7, 1.02, 64);
     ringGeo.rotateX(-Math.PI / 2);
-    this.ringMat = overlayMaterial(WATER_RING, 0.95);
+    this.ringMat = overlayMaterial(WATER_RING, 1);
     this.ring = new THREE.Mesh(ringGeo, this.ringMat);
-    this.ring.renderOrder = 22;
+    this.ring.renderOrder = 42;
+    this.ring.position.y = 0.006;
 
-    const haloGeo = new THREE.RingGeometry(1, 1.38, 48);
+    const haloGeo = new THREE.RingGeometry(1.02, 1.42, 48);
     haloGeo.rotateX(-Math.PI / 2);
-    this.haloMat = overlayMaterial(WATER_FILL, 0.22, this.discMap);
+    this.haloMat = overlayMaterial(WATER_FILL, 0.35, this.discMap, true);
     this.halo = new THREE.Mesh(haloGeo, this.haloMat);
-    this.halo.renderOrder = 19;
+    this.halo.renderOrder = 39;
 
-    const pipGeo = new THREE.CircleGeometry(0.11, 20);
+    const pipGeo = new THREE.CircleGeometry(0.14, 20);
     pipGeo.rotateX(-Math.PI / 2);
-    this.pipMat = overlayMaterial(WATER_RING, 0.9);
+    this.pipMat = overlayMaterial(WATER_RING, 1);
     this.pip = new THREE.Mesh(pipGeo, this.pipMat);
-    this.pip.position.y = 0.004;
-    this.pip.renderOrder = 23;
+    this.pip.position.y = 0.01;
+    this.pip.renderOrder = 43;
 
     this.group.add(this.halo, this.disc, this.ring, this.pip);
   }
@@ -151,30 +153,27 @@ export class AimCursor {
     this.haloMat.color.setHex(fill);
     this.ringMat.color.setHex(stroke);
     this.pipMat.color.setHex(stroke);
+    this.discMat.blending = this.waterish ? THREE.AdditiveBlending : THREE.NormalBlending;
+    this.haloMat.blending = this.waterish ? THREE.AdditiveBlending : THREE.NormalBlending;
 
     this.baseRadius = aimRadiusWorld(state);
     this.group.scale.setScalar(this.baseRadius);
     this.group.position.copy(hit.world);
-    this.group.position.y += 0.04;
-
-    if (hit.normal && hit.normal.lengthSq() > 0.2) {
-      this.group.quaternion.setFromUnitVectors(UP, hit.normal);
-    } else {
-      this.group.quaternion.identity();
-    }
+    this.group.position.y += 0.08;
+    this.group.quaternion.identity();
 
     const press = state.active ? 1 : 0;
-    this.discMat.opacity = (this.waterish ? 0.36 : 0.22) + press * 0.16;
-    this.ringMat.opacity = 0.88 + press * 0.1;
-    this.haloMat.opacity = 0.16 + press * 0.14;
-    this.pipMat.opacity = this.waterish ? 0.92 : 0.55;
-    this.pip.visible = this.waterish;
+    this.discMat.opacity = (this.waterish ? 0.62 : 0.42) + press * 0.18;
+    this.ringMat.opacity = 1;
+    this.haloMat.opacity = 0.28 + press * 0.16;
+    this.pipMat.opacity = this.waterish ? 1 : 0.75;
+    this.pip.visible = true;
     this.group.visible = true;
   }
 
   tick(elapsed: number, active: boolean): void {
     if (!this.group.visible) return;
-    const pulse = active && this.waterish ? 1 + Math.sin(elapsed * 10) * 0.07 : 1;
+    const pulse = active && this.waterish ? 1 + Math.sin(elapsed * 10) * 0.08 : 1;
     this.group.scale.setScalar(this.baseRadius * pulse);
   }
 
