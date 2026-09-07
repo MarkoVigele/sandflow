@@ -604,6 +604,7 @@ export class Viewport {
       }
     }
 
+    this.sand.setHeatMode(this.store.state.heatmap);
     this.water.tick(t);
     if (this.lastPointer && !this.store.state.cameraMode) {
       const hit = this.hitFromClient(this.lastPointer.clientX, this.lastPointer.clientY);

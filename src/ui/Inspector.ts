@@ -92,8 +92,16 @@ export class Inspector {
             ${slider("Erosionsrate", 0.05, 1, 0.01, s.params.erosionRate, "erosionRate")}
             ${slider("Sedimentkapazität", 0.08, 1, 0.01, s.params.sedimentCapacity, "sedimentCapacity")}
             ${slider("Ablagerung", 0.05, 0.8, 0.01, s.params.deposition, "deposition")}
+            <label class="field">
+              <span>Heatmap</span>
+              <select data-heat>
+                <option value="off" ${s.heatmap === "off" ? "selected" : ""}>Aus</option>
+                <option value="flow" ${s.heatmap === "flow" ? "selected" : ""}>Fluss</option>
+                <option value="depth" ${s.heatmap === "depth" ? "selected" : ""}>Tiefe</option>
+              </select>
+            </label>
             <fieldset class="seg">
-              <legend>Heatmap</legend>
+              <legend class="visually-hidden">Heatmap</legend>
               ${segBtn("off", "Aus", s.heatmap)}
               ${segBtn("flow", "Fluss", s.heatmap)}
               ${segBtn("depth", "Tiefe", s.heatmap)}
@@ -140,6 +148,9 @@ export class Inspector {
       btn.addEventListener("click", () => {
         this.store.patch({ heatmap: btn.dataset.heat as HeatmapMode });
       });
+    });
+    this.el.querySelector<HTMLSelectElement>("select[data-heat]")?.addEventListener("change", (e) => {
+      this.store.patch({ heatmap: (e.target as HTMLSelectElement).value as HeatmapMode });
     });
   }
 

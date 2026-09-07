@@ -71,11 +71,13 @@ void main() {
   if (uHeatMode > 0.5) {
     float flow = maps.a;
     if (!(flow == flow) || flow < 0.0) flow = 0.0;
-    float t = uHeatMode < 1.5 ? clamp(flow * 9.0, 0.0, 1.0) : clamp(water * 16.0, 0.0, 1.0);
+    float t = uHeatMode < 1.5
+      ? clamp(max(flow * 22.0, wet * 0.9), 0.0, 1.0)
+      : clamp(max(water * 32.0, wet * 0.95), 0.0, 1.0);
     vec3 heat = uHeatMode < 1.5
-      ? mix(vec3(0.55, 0.28, 0.10), vec3(0.92, 0.78, 0.36), t)
-      : mix(vec3(0.28, 0.36, 0.30), vec3(0.62, 0.68, 0.52), t);
-    color = mix(color, heat, smoothstep(0.02, 0.18, t) * 0.62);
+      ? mix(vec3(0.42, 0.16, 0.04), vec3(0.95, 0.72, 0.22), t)
+      : mix(vec3(0.16, 0.28, 0.24), vec3(0.55, 0.72, 0.58), t);
+    color = mix(color, heat, mix(0.28, 0.82, smoothstep(0.0, 0.22, t)));
   }
 
   color = clamp(color, vec3(0.0), vec3(1.0));
