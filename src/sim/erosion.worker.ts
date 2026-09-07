@@ -1,4 +1,5 @@
 import { ErosionSim } from "./erosionCore";
+import { resampleHeight } from "./presets";
 import type { WorkerIn, WorkerOut } from "./types";
 import { DEFAULT_PARAMS } from "../state/types";
 
@@ -15,6 +16,7 @@ function snapshot(): void {
   const water = sim.water.slice();
   const wetness = sim.wetness.slice();
   const sediment = sim.sediment.slice();
+  const cohesion = sim.cohesion.slice();
   post(
     {
       type: "snapshot",
@@ -23,10 +25,11 @@ function snapshot(): void {
       water,
       wetness,
       sediment,
+      cohesion,
       sources: sim.sources.map((s) => ({ ...s })),
       erodedSand: sim.erodedSand,
     },
-    [terrain.buffer, water.buffer, wetness.buffer, sediment.buffer],
+    [terrain.buffer, water.buffer, wetness.buffer, sediment.buffer, cohesion.buffer],
   );
 }
 
@@ -55,6 +58,7 @@ self.onmessage = (ev: MessageEvent<WorkerIn>) => {
       if (msg.water) sim.water.set(msg.water);
       if (msg.wetness) sim.wetness.set(msg.wetness);
       if (msg.sediment) sim.sediment.set(msg.sediment);
+      if (msg.cohesion) sim.cohesion.set(msg.cohesion);
       sim.sources = msg.sources.map((s) => ({ ...s }));
       sim.erodedSand = 0;
       emitFrame();
@@ -118,11 +122,22 @@ self.onmessage = (ev: MessageEvent<WorkerIn>) => {
       emitFrame();
       break;
     }
+    case "flattenAll": {
+      if (!sim) return;
+      sim.flattenAll();
+      emitFrame();
+      break;
+    }
     case "replaceTerrain": {
       const params = sim?.params ?? DEFAULT_PARAMS;
-      sim = new ErosionSim(Math.round(Math.sqrt(msg.terrain.length)), params, msg.terrain.slice());
+      const oldCoh = sim?.cohesion;
+      const oldSize = sim?.size;
+      const nextSize = Math.round(Math.sqrt(msg.terrain.length));
+      sim = new ErosionSim(nextSize, params, msg.terrain.slice());
       if (msg.water) sim.water.set(msg.water);
       if (msg.wetness) sim.wetness.set(msg.wetness);
+      if (msg.cohesion) sim.cohesion.set(msg.cohesion);
+      else if (oldCoh && oldSize) sim.cohesion.set(resampleHeight(oldCoh, oldSize, nextSize));
       sim.sources = msg.sources.map((s) => ({ ...s }));
       emitFrame();
       break;

@@ -12,6 +12,7 @@ import {
 } from "../state/persist";
 import { Store } from "../state/store";
 import { QUALITY_GRID } from "../state/types";
+import { TOOL_HOTKEYS } from "./tools";
 import { Inspector } from "./Inspector";
 import { PresetGallery } from "./PresetGallery";
 import { StatsPanel } from "./StatsPanel";
@@ -85,7 +86,7 @@ export class App {
 
   private async saveScene(): Promise<void> {
     const snap = await this.viewport.snapshot();
-    const packed = packMaps(snap.terrain, snap.water, snap.wetness);
+    const packed = packMaps(snap.terrain, snap.water, snap.wetness, snap.cohesion);
     const file = encodeScene({
       name: `sandflow-${this.store.state.presetId}`,
       quality: this.store.state.quality,
@@ -114,6 +115,11 @@ export class App {
         scene.size === grid ? maps.water : resampleHeight(maps.water, scene.size, grid);
       const wetness =
         scene.size === grid ? maps.wetness : resampleHeight(maps.wetness, scene.size, grid);
+      const cohesion = maps.cohesion
+        ? scene.size === grid
+          ? maps.cohesion
+          : resampleHeight(maps.cohesion, scene.size, grid)
+        : undefined;
       this.store.patch({
         params: scene.params,
         presetId: scene.presetId,
@@ -127,6 +133,7 @@ export class App {
         water,
         wetness,
         sediment: new Float32Array(grid * grid),
+        cohesion: cohesion ?? new Float32Array(grid * grid),
         sources: scene.sources,
         erodedSand: 0,
       });
@@ -189,9 +196,10 @@ export class App {
         e.preventDefault();
         void this.viewport.redo();
       }
-      const tools = ["pile", "dig", "smooth", "dam", "pour", "source"] as const;
       const n = Number(e.key);
-      if (n >= 1 && n <= 6) this.store.patch({ tool: tools[n - 1], cameraMode: false });
+      if (n >= 1 && n <= TOOL_HOTKEYS.length) {
+        this.store.patch({ tool: TOOL_HOTKEYS[n - 1], cameraMode: false });
+      }
     });
   }
 

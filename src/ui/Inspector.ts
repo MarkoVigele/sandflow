@@ -7,6 +7,9 @@ const TOOL_COPY: Record<ToolId, { title: string; body: string }> = {
   dig: { title: "Graben", body: "Kreis = Pinselradius. Sand abtragen — gut für Rinnen." },
   smooth: { title: "Glätten", body: "Kreis = Pinselradius. Mittelwert über die Nachbarschaft." },
   dam: { title: "Damm / Wand", body: "Kreis = Pinselradius. Steiler als Aufschütten." },
+  tamp: { title: "Feststampfen", body: "Drückt Sand fest: lokale Kohäsion steigt, Erosion hält schlechter." },
+  groove: { title: "Rinne vorzeichnen", body: "Ziehen zeichnet eine V-Rinne mit leichten Ufern — Wasser folgt später." },
+  flatten: { title: "Einebnen", body: "Pinsel ebnet die Fläche unter dem Finger. Unten: ganze Wanne." },
   pour: { title: "Gießen", body: "Der Kreis auf dem Sand zeigt die Tropfstelle. Halten zum Gießen." },
   source: { title: "Quelle", body: "Kreis unter dem Finger: Tippen setzt, Ziehen verschiebt." },
 };
@@ -71,7 +74,8 @@ export class Inspector {
             : `
           ${s.tool === "pour" ? slider("Durchfluss", 0.25, 4, 0.05, s.pourRate, "pourRate") : ""}
           ${s.tool !== "pour" ? slider("Radius", 0.02, 0.16, 0.005, s.brushRadius, "brushRadius") : ""}
-          ${s.tool !== "pour" ? slider("Stärke", 0.3, 2.2, 0.05, s.brushStrength, "brushStrength") : ""}`
+          ${s.tool !== "pour" ? slider("Stärke", 0.3, 2.2, 0.05, s.brushStrength, "brushStrength") : ""}
+          ${s.tool === "flatten" ? `<div class="row"><button class="btn" data-flatten>Ganze Wanne</button></div>` : ""}`
         }
         <div class="row">
           <button class="btn" data-reset-water>Nur Wasser</button>
@@ -109,6 +113,9 @@ export class Inspector {
     });
     this.el.querySelector("[data-reset-all]")?.addEventListener("click", () => {
       this.viewport.resetScene();
+    });
+    this.el.querySelector("[data-flatten]")?.addEventListener("click", () => {
+      void this.viewport.flattenAll();
     });
     this.el.querySelector("[data-del]")?.addEventListener("click", async () => {
       await this.viewport.pushHistory();

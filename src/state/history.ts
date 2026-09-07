@@ -9,6 +9,7 @@ function cloneSnap(s: SimSnapshot): SimSnapshot {
     water: s.water.slice(),
     wetness: s.wetness.slice(),
     sediment: s.sediment.slice(),
+    cohesion: s.cohesion.slice(),
     sources: s.sources.map((x) => ({ ...x })),
     erodedSand: s.erodedSand,
   };

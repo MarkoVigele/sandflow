@@ -15,6 +15,7 @@ export interface SimSnapshot {
   water: Float32Array;
   wetness: Float32Array;
   sediment: Float32Array;
+  cohesion: Float32Array;
   sources: WaterSource[];
   erodedSand: number;
 }
@@ -48,6 +49,7 @@ export class SimClient {
           water: msg.water,
           wetness: msg.wetness,
           sediment: msg.sediment,
+          cohesion: msg.cohesion,
           sources: msg.sources,
           erodedSand: msg.erodedSand,
         };
@@ -75,6 +77,7 @@ export class SimClient {
       water?: Float32Array;
       wetness?: Float32Array;
       sediment?: Float32Array;
+      cohesion?: Float32Array;
     },
   ): void {
     this.busy = true;
@@ -86,6 +89,7 @@ export class SimClient {
       water: extras?.water,
       wetness: extras?.wetness,
       sediment: extras?.sediment,
+      cohesion: extras?.cohesion,
       sources,
     });
   }
@@ -126,6 +130,10 @@ export class SimClient {
 
   resetWater(): void {
     this.send({ type: "resetWater" });
+  }
+
+  flattenAll(): void {
+    this.send({ type: "flattenAll" });
   }
 
   replaceTerrain(

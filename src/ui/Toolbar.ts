@@ -1,15 +1,7 @@
 import type { Store } from "../state/store";
 import type { ToolId } from "../state/types";
 import { ICONS } from "./icons";
-
-const TOOLS: { id: ToolId; label: string; hint: string }[] = [
-  { id: "pile", label: "Aufschütten", hint: "Sand anhäufen" },
-  { id: "dig", label: "Graben", hint: "Sand abtragen" },
-  { id: "smooth", label: "Glätten", hint: "Unebenheiten ziehen" },
-  { id: "dam", label: "Damm", hint: "Steile Wand setzen" },
-  { id: "pour", label: "Gießen", hint: "Halten zum Gießen" },
-  { id: "source", label: "Quelle", hint: "Setzen, ziehen, löschen" },
-];
+import { TOOLBAR_TOOLS } from "./tools";
 
 export class Toolbar {
   el: HTMLElement;
@@ -30,7 +22,7 @@ export class Toolbar {
     const { tool, cameraMode } = this.store.state;
     this.el.innerHTML = `
       <div class="toolbar-inner" role="toolbar" aria-label="Werkzeuge">
-        ${TOOLS.map(
+        ${TOOLBAR_TOOLS.map(
           (t) => `
           <button class="tool ${tool === t.id && !cameraMode ? "is-active" : ""}" data-tool="${t.id}" title="${t.hint}" aria-pressed="${tool === t.id}">
             <span class="icon">${ICONS[t.id]}</span>

@@ -10,6 +10,7 @@ export interface SceneFile {
   terrainB64: string;
   waterB64: string;
   wetnessB64: string;
+  cohesionB64?: string;
   sources: WaterSource[];
   texturePrompt: string;
 }
@@ -45,11 +46,17 @@ export function parseScene(json: string): SceneFile {
   return data;
 }
 
-export function packMaps(terrain: Float32Array, water: Float32Array, wetness: Float32Array) {
+export function packMaps(
+  terrain: Float32Array,
+  water: Float32Array,
+  wetness: Float32Array,
+  cohesion?: Float32Array,
+) {
   return {
     terrainB64: f32ToB64(terrain),
     waterB64: f32ToB64(water),
     wetnessB64: f32ToB64(wetness),
+    cohesionB64: cohesion ? f32ToB64(cohesion) : undefined,
   };
 }
 
@@ -58,6 +65,7 @@ export function unpackMaps(file: SceneFile) {
     terrain: b64ToF32(file.terrainB64),
     water: b64ToF32(file.waterB64),
     wetness: b64ToF32(file.wetnessB64),
+    cohesion: file.cohesionB64 ? b64ToF32(file.cohesionB64) : undefined,
   };
 }
 

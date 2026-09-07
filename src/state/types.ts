@@ -3,6 +3,9 @@ export type ToolId =
   | "dig"
   | "smooth"
   | "dam"
+  | "tamp"
+  | "groove"
+  | "flatten"
   | "pour"
   | "source";
 

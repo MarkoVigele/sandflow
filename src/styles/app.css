@@ -57,6 +57,7 @@ body {
   background: var(--panel);
   border-right: 1px solid var(--panel-border);
   padding: 8px 6px calc(8px + var(--safe-b));
+  overflow-y: auto;
 }
 .toolbar-inner { display: flex; flex-direction: column; gap: 4px; }
 .tool, .icon-btn, .chip, .btn {
@@ -74,7 +75,7 @@ body {
 }
 .tool .icon { width: 22px; height: 22px; display: grid; }
 .tool .icon svg, .icon-btn svg { width: 20px; height: 20px; display: block; }
-.tool-label { font-size: 9px; letter-spacing: 0.02em; }
+.tool-label { font-size: 9px; letter-spacing: 0.02em; text-align: center; line-height: 1.15; max-width: 68px; }
 .tool.is-active, .icon-btn:hover, .chip:hover, .btn:hover {
   background: rgba(212, 180, 131, 0.12);
   border-color: var(--panel-border);
@@ -158,6 +159,10 @@ body {
 .swatch-slope { background: linear-gradient(180deg, #e0c08a, #6b4e2c); }
 .swatch-bed { background: linear-gradient(90deg, #b08950, #3d4f55 45%, #b08950); }
 .swatch-meet { background: radial-gradient(circle at 50% 70%, #4a6a72, #b08950); }
+.swatch-canyon { background: linear-gradient(90deg, #c9a36a 0%, #3a2a18 42%, #2a1c10 50%, #3a2a18 58%, #c9a36a 100%); }
+.swatch-delta { background: linear-gradient(180deg, #6a8a92 0%, #b08950 38%, #8a6a3e 100%); }
+.swatch-referenz { background: linear-gradient(90deg, #c4a06a, #4a5a60 48%, #c4a06a); }
+.swatch-veins { background: repeating-linear-gradient(90deg, #b08950 0 10px, #4a5a58 10px 14px, #b08950 14px 24px); }
 .about p { color: var(--muted); line-height: 1.5; }
 
 .toast {
@@ -181,8 +186,8 @@ body {
     border-top: 1px solid var(--panel-border);
     padding: 6px 8px calc(8px + var(--safe-b));
   }
-  .toolbar-inner { flex-direction: row; justify-content: space-around; overflow-x: auto; }
-  .tool { min-width: 56px; }
+  .toolbar-inner { flex-direction: row; justify-content: flex-start; overflow-x: auto; overflow-y: hidden; gap: 2px; }
+  .tool { min-width: 64px; flex: 0 0 auto; }
   .inspector { border-left: 0; border-top: 1px solid var(--panel-border); max-height: 34vh; }
   .stats { left: 10px; bottom: auto; top: calc(var(--top) + var(--safe-t) + 8px); }
   .top-actions { gap: 4px; }
