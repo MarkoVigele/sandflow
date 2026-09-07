@@ -28,7 +28,7 @@ Der Build landet in `docs/` (relativer Basispfad, bereit für GitHub Pages). Ein
 | Werkzeuge 1–9 | Tasten `1`–`9` | Symbolleiste |
 | Rückgängig / Wiederholen | `Strg+Z` / `Strg+Y` | Symbole oben |
 
-Oben: Presets, Qualität, Tempo (0,25×–4×), Speichern, Laden, Screenshot. Rechts (am Telefon unten): Kontext zum aktiven Werkzeug. Unter **Erweitert** liegen Körnung, Kohäsion, Infiltration, Erosionsrate und Sedimentkapazität.
+Oben: Presets, Qualität, Tempo (0,25×–4×), Speichern, Laden, Screenshot. Rechts (am Telefon unten): Kontext zum aktiven Werkzeug. Unter **Erweitert** liegen Körnung, Kohäsion, Infiltration, Erosionsrate, Sedimentkapazität und eine optionale Heatmap (Fluss oder Tiefe). Beim ersten Start führt eine Kurzanleitung in drei Schritten: Sand formen → Quelle → Play.
 
 ## Presets
 
@@ -56,4 +56,4 @@ JSON nimmt Höhe, Wasser, Quellen und Materialparameter mit. PNG ist ein Blick a
 
 ## Was V1 nicht ist
 
-Kein WebGPU, kein fremdes Bild-API, keine Heatmaps, keine Teilen-Links, keine komplette Requisitenbibliothek. Das kommt später — erst muss das Wasser glaubwürdig graben.
+Kein WebGPU, kein fremdes Bild-API, keine Teilen-Links, keine komplette Requisitenbibliothek. Das kommt später — erst muss das Wasser glaubwürdig graben.

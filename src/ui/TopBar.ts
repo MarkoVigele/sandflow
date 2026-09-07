@@ -1,4 +1,4 @@
-import type { Store } from "../state/store";
+import { persistOnboardDone, type Store } from "../state/store";
 import { ICONS } from "./icons";
 import { QualitySwitcher } from "./QualitySwitcher";
 import type { QualityId } from "../state/types";
@@ -25,7 +25,7 @@ export class TopBar {
     let sig = "";
     store.subscribe(() => {
       const st = store.state;
-      const next = `${st.playing}|${st.speed}|${st.quality}`;
+      const next = `${st.playing}|${st.speed}|${st.quality}|${st.onboardStep}`;
       if (next !== sig) {
         sig = next;
         this.render();
@@ -47,7 +47,7 @@ export class TopBar {
         <button class="chip" data-presets>Presets</button>
         <div class="q-slot"></div>
         <div class="transport">
-          <button class="icon-btn" data-play title="${s.playing ? "Pause" : "Abspielen"}">${s.playing ? ICONS.pause : ICONS.play}</button>
+          <button class="icon-btn ${s.onboardStep === 3 ? "is-hint" : ""}" data-play title="${s.playing ? "Pause" : "Abspielen"}">${s.playing ? ICONS.pause : ICONS.play}</button>
           <button class="icon-btn" data-step title="Schritt">${ICONS.step}</button>
           <label class="speed">
             <span>${s.speed}×</span>
@@ -70,7 +70,13 @@ export class TopBar {
       this.store.patch({ galleryOpen: true });
     });
     this.el.querySelector("[data-play]")?.addEventListener("click", () => {
-      this.store.patch({ playing: !this.store.state.playing });
+      const playing = !this.store.state.playing;
+      if (playing && this.store.state.onboardStep === 3) {
+        persistOnboardDone();
+        this.store.patch({ playing: true, onboardStep: 0 });
+        return;
+      }
+      this.store.patch({ playing });
     });
     this.el.querySelector("[data-step]")?.addEventListener("click", () => {
       this.store.patch({ playing: false });

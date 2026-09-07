@@ -28,7 +28,7 @@ void main() {
   if (!(wet == wet)) wet = 0.0;
   if (!(water == water) || water < 0.0) water = 0.0;
 
-  vec2 tile = vUv * (3.6 + uGrain * 2.2);
+  vec2 tile = vUv * (3.4 + uGrain * 2.0);
   vec2 d = vec2(0.0018, 0.0014);
   vec3 albedo =
     (texture2D(uAlbedo, tile).rgb +
@@ -40,18 +40,18 @@ void main() {
   if (!(nTex.x == nTex.x)) nTex = vec3(0.0, 0.0, 1.0);
   if (!(roughTex == roughTex)) roughTex = 0.85;
 
-  albedo = mix(vec3(0.72, 0.60, 0.42), albedo, 0.55);
+  albedo = mix(vec3(0.72, 0.60, 0.42), albedo, 0.52);
 
-  vec3 N = safeNormalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.08, vec3(0.0, 1.0, 0.0));
+  vec3 N = safeNormalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.07, vec3(0.0, 1.0, 0.0));
 
-  float dark = mix(1.0, 0.72, wet);
+  float dark = mix(1.0, 0.54, wet);
   albedo *= dark;
-  albedo = mix(albedo, albedo * vec3(0.84, 0.80, 0.72), wet * 0.22);
-  albedo = mix(albedo, albedo * vec3(0.90, 0.91, 0.88), smoothstep(0.003, 0.04, water) * 0.12);
+  albedo = mix(albedo, albedo * vec3(0.78, 0.70, 0.58), wet * 0.38);
+  albedo = mix(albedo, albedo * vec3(0.88, 0.86, 0.80), smoothstep(0.003, 0.04, water) * 0.16);
 
-  float roughness = mix(mix(0.92, 0.82, uGrain), 0.38, wet * 0.85);
-  roughness = mix(roughness, roughTex, 0.16);
-  roughness = clamp(roughness, 0.28, 0.96);
+  float roughness = mix(mix(0.93, 0.84, uGrain), 0.36, wet * 0.82);
+  roughness = mix(roughness, roughTex, 0.14);
+  roughness = clamp(roughness, 0.30, 0.96);
 
   vec3 V = safeNormalize(vViewDir, vec3(0.0, 1.0, 0.0));
   vec3 L = safeNormalize(uSunDir, vec3(0.4, 0.8, 0.3));
@@ -59,13 +59,13 @@ void main() {
   float wrap = clamp((dot(N, L) + 0.22) / 1.22, 0.0, 1.0);
 
   float shadow = mix(1.0, 0.78 + wrap * 0.22, step(0.5, uReceiveShadow));
-  float specPow = mix(6.0, 20.0, 1.0 - roughness);
-  float spec = pow(max(dot(N, H), 0.0), specPow) * mix(0.015, 0.10, wet);
-  spec = min(spec, 0.10);
+  float specPow = mix(6.0, 22.0, 1.0 - roughness);
+  float spec = pow(max(dot(N, H), 0.0), specPow) * mix(0.012, 0.09, wet);
+  spec = min(spec, 0.09);
 
   vec3 color = albedo * (uAmbient + uSunColor * wrap * shadow) + uSunColor * spec * shadow;
   float underWater = smoothstep(0.003, 0.04, water);
-  color = mix(color, color * vec3(0.90, 0.91, 0.88), underWater * 0.22);
+  color = mix(color, color * vec3(0.88, 0.86, 0.80), underWater * 0.2);
   color = clamp(color, vec3(0.0), vec3(1.0));
 
   gl_FragColor = vec4(color, 1.0);

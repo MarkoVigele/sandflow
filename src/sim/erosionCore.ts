@@ -16,7 +16,7 @@ const NEIGH = [
 
 const DIAG = 1.41421356;
 const MAX_PARTICLES = 280;
-const CONCENTRATE = 2.8;
+const CONCENTRATE = 2.65;
 const MIN_SAND = 0.04;
 /** Water-surface drop below this is a still pool, not a stream. */
 const MIN_SURFACE_SLOPE = 0.0016;
@@ -24,10 +24,13 @@ const MIN_SURFACE_SLOPE = 0.0016;
 const MIN_BED_FRAC = 0.28;
 /** Shear = outgoing flux × bed slope. Standing mounds sit near 0. */
 const MIN_SHEAR = 2.5e-6;
-const INERTIA = 0.62;
-const MAX_ERODE_FRAC = 0.012;
+const INERTIA = 0.64;
+const MAX_ERODE_FRAC = 0.013;
 /** Scales tiny per-cell bed slopes (~0.005 on the slope preset) into capacity. */
-const BED_SLOPE_GAIN = 38;
+const BED_SLOPE_GAIN = 40;
+/** Established streams may split when a second downhill path is close. */
+const BRANCH_FLUX = 0.03;
+const BRANCH_RATIO = 0.46;
 
 export class ErosionSim {
   size: number;
@@ -150,13 +153,15 @@ export class ErosionSim {
           const len = k < 4 ? 1 : DIAG;
           const drop = dh / len;
           const bed = Math.max(0, terrain[i] - terrain[j]);
-          const wander = 0.92 + 0.16 * hash2(x + k * 13, y, 91);
-          let weight = Math.pow(drop * wander, CONCENTRATE) * (1 + 16 * bed);
+          const wander = 0.93 + 0.14 * hash2(x + k * 13, y, 91);
+          const channel = 1 + 15 * bed + 2.6 * Math.min(flow[j], 0.22);
+          let weight = Math.pow(drop * wander, CONCENTRATE) * channel;
           if (lastDir[i] === k) weight *= 1 + INERTIA;
           else if (lastDir[i] < 8) {
             const pdx = NEIGH[lastDir[i]][0];
             const pdy = NEIGH[lastDir[i]][1];
-            const align = (pdx * NEIGH[k][0] + pdy * NEIGH[k][1]) / (len * (lastDir[i] < 4 ? 1 : DIAG));
+            const align =
+              (pdx * NEIGH[k][0] + pdy * NEIGH[k][1]) / (len * (lastDir[i] < 4 ? 1 : DIAG));
             if (align > 0.2) weight *= 1 + INERTIA * 0.45 * align;
           }
           this.nDrop[drops] = drop;
@@ -180,8 +185,14 @@ export class ErosionSim {
         const bedFall = Math.max(0, terrain[i] - minBed);
 
         let steep = 0;
+        let second = -1;
         for (let k = 1; k < drops; k++) {
-          if (this.nDrop[k] > this.nDrop[steep]) steep = k;
+          if (this.nDrop[k] > this.nDrop[steep]) {
+            second = steep;
+            steep = k;
+          } else if (second < 0 || this.nDrop[k] > this.nDrop[second]) {
+            second = k;
+          }
         }
         lastDir[i] = 255;
         for (let k = 0; k < 8; k++) {
@@ -203,9 +214,23 @@ export class ErosionSim {
         flow[i] = flow[i] * 0.4 + stream * 0.6;
         const flux = flow[i];
 
+        const ratio = second >= 0 ? this.nDrop[second] / Math.max(this.nDrop[steep], 1e-6) : 0;
+        const canBranch =
+          carving &&
+          second >= 0 &&
+          flux > BRANCH_FLUX &&
+          ratio >= BRANCH_RATIO &&
+          this.nBed[second] > 1e-5;
+        const overflow = carving && w > 0.055;
+        const leakK = canBranch ? 0.16 : overflow ? 0.12 : 0.07;
+        const branchShare = canBranch ? 0.18 + 0.2 * Math.min(1, (ratio - BRANCH_RATIO) / 0.4) : 0;
+        const steepShare = Math.max(0.55, 1 - leakK - branchShare);
+
         for (let k = 0; k < drops; k++) {
-          const leak = 0.08 * (this.nW[k] / totalW);
-          const share = movable * (k === steep ? 0.92 + leak : leak);
+          const leak = leakK * (this.nW[k] / totalW);
+          let share = movable * leak;
+          if (k === steep) share += movable * steepShare;
+          else if (canBranch && k === second) share += movable * branchShare;
           const j = this.nDest[k];
           wD[i] -= share;
           wD[j] += share;
@@ -238,7 +263,7 @@ export class ErosionSim {
             const j = this.i(x + NEIGH[k][0], y + NEIGH[k][1]);
             const bank = terrain[j] - terrain[i];
             if (bank > 0.012) {
-              const nibble = Math.min(bank * 0.016 * localErodeK * Math.min(flux, 0.09), bank * 0.045);
+              const nibble = Math.min(bank * 0.017 * localErodeK * Math.min(flux, 0.09), bank * 0.05);
               tD[j] -= nibble;
               sD[i] += nibble * 0.62;
             }

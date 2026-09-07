@@ -81,6 +81,10 @@ body {
   border-color: var(--panel-border);
   color: var(--sand);
 }
+.tool.is-hint, .icon-btn.is-hint {
+  box-shadow: 0 0 0 1px rgba(212, 180, 131, 0.45);
+  color: var(--sand);
+}
 .icon-btn { display: grid; place-items: center; color: var(--sand); }
 .chip, .btn {
   padding: 0 12px;
@@ -164,6 +168,64 @@ body {
 .swatch-referenz { background: linear-gradient(90deg, #c4a06a, #4a5a60 48%, #c4a06a); }
 .swatch-veins { background: repeating-linear-gradient(90deg, #b08950 0 10px, #4a5a58 10px 14px, #b08950 14px 24px); }
 .about p { color: var(--muted); line-height: 1.5; }
+
+.seg {
+  border: 0;
+  margin: 12px 0 4px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.seg legend {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 0;
+  margin-bottom: 6px;
+  width: 100%;
+}
+.seg-btn {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.seg-btn.is-active {
+  color: var(--sand);
+  background: rgba(212, 180, 131, 0.12);
+}
+
+#onboard {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 6;
+  pointer-events: none;
+}
+.coach {
+  pointer-events: auto;
+  width: min(320px, calc(100vw - 32px));
+  padding: 14px 14px 10px;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+}
+.coach h3 { margin: 0 0 6px; font-size: 16px; }
+.coach p { margin: 0 0 8px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+
+@media (max-width: 860px) {
+  #onboard {
+    left: 10px;
+    right: 10px;
+    top: 10px;
+  }
+  .coach { width: auto; }
+}
 
 .toast {
   position: fixed; bottom: calc(16px + var(--safe-b)); left: 50%; transform: translateX(-50%);

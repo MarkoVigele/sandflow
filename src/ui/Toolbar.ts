@@ -10,7 +10,7 @@ export class Toolbar {
     this.render();
     let sig = "";
     store.subscribe(() => {
-      const next = `${store.state.tool}|${store.state.cameraMode}`;
+      const next = `${store.state.tool}|${store.state.cameraMode}|${store.state.onboardStep}`;
       if (next !== sig) {
         sig = next;
         this.render();
@@ -19,12 +19,12 @@ export class Toolbar {
   }
 
   private render(): void {
-    const { tool, cameraMode } = this.store.state;
+    const { tool, cameraMode, onboardStep } = this.store.state;
     this.el.innerHTML = `
       <div class="toolbar-inner" role="toolbar" aria-label="Werkzeuge">
         ${TOOLBAR_TOOLS.map(
           (t) => `
-          <button class="tool ${tool === t.id && !cameraMode ? "is-active" : ""}" data-tool="${t.id}" title="${t.hint}" aria-pressed="${tool === t.id}">
+          <button class="tool ${tool === t.id && !cameraMode ? "is-active" : ""} ${hintClass(t.id, onboardStep)}" data-tool="${t.id}" title="${t.hint}" aria-pressed="${tool === t.id}">
             <span class="icon">${ICONS[t.id]}</span>
             <span class="tool-label">${t.label}</span>
           </button>`,
@@ -44,4 +44,10 @@ export class Toolbar {
       this.store.patch({ cameraMode: !this.store.state.cameraMode });
     });
   }
+}
+
+function hintClass(id: string, step: number): string {
+  if (step === 1 && (id === "pile" || id === "dig" || id === "groove" || id === "flatten")) return "is-hint";
+  if (step === 2 && id === "source") return "is-hint";
+  return "";
 }

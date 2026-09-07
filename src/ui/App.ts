@@ -10,10 +10,11 @@ import {
   toJson,
   unpackMaps,
 } from "../state/persist";
-import { Store } from "../state/store";
+import { persistOnboardDone, Store } from "../state/store";
 import { QUALITY_GRID } from "../state/types";
 import { TOOL_HOTKEYS } from "./tools";
 import { Inspector } from "./Inspector";
+import { Onboarding } from "./Onboarding";
 import { PresetGallery } from "./PresetGallery";
 import { StatsPanel } from "./StatsPanel";
 import { Toolbar } from "./Toolbar";
@@ -30,7 +31,9 @@ export class App {
     root.innerHTML = `
       <header id="topbar" class="topbar"></header>
       <aside id="toolbar" class="toolbar"></aside>
-      <main id="viewport" class="viewport"></main>
+      <main id="viewport" class="viewport">
+        <div id="onboard"></div>
+      </main>
       <aside id="inspector" class="inspector"></aside>
       <aside id="stats" class="stats"></aside>
       <div id="gallery"></div>
@@ -62,6 +65,7 @@ export class App {
       this.viewport.loadPreset(id, true);
     });
     new StatsPanel(this.store, root.querySelector("#stats")!, this.viewport);
+    new Onboarding(this.store, root.querySelector("#onboard")!);
 
     this.fileInput = document.createElement("input");
     this.fileInput.type = "file";
@@ -163,8 +167,9 @@ export class App {
               <button class="icon-btn" data-x>${ICONS.close}</button>
             </header>
             <p>Wasser sucht sich Wege durch Sand: erst dünne Adern, dann ein Bett, später ein verzweigtes Netz. V1 ist der Kern — spielbar, ohne Extra-Firlefanz.</p>
+            <p>Kurzanleitung: <strong>Sand formen</strong> → <strong>Quelle setzen</strong> → <strong>Play</strong>.</p>
             <p>Rechtsklick oder zwei Finger drehen die Kamera. Ein Finger (oder die linke Taste) bedient das Werkzeug. Unter <em>Kamera</em> geht das Drehen auch mit einem Finger.</p>
-            <p>Texturen entstehen lokal aus einer kurzen Beschreibung. Ein externer Dienst kann später an dieselbe Stelle.</p>
+            <p>Unter <em>Erweitert</em> liegt eine optionale Heatmap für Fluss oder Wassertiefe. Texturen entstehen lokal aus einer kurzen Beschreibung.</p>
           </div>
         </div>`
         : "";
@@ -185,7 +190,13 @@ export class App {
       const k = e.key.toLowerCase();
       if (k === " ") {
         e.preventDefault();
-        this.store.patch({ playing: !this.store.state.playing });
+        const playing = !this.store.state.playing;
+        if (playing && this.store.state.onboardStep === 3) {
+          persistOnboardDone();
+          this.store.patch({ playing: true, onboardStep: 0 });
+          return;
+        }
+        this.store.patch({ playing });
       }
       if ((e.metaKey || e.ctrlKey) && k === "z") {
         e.preventDefault();

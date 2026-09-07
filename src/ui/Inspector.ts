@@ -1,6 +1,6 @@
 import type { Store } from "../state/store";
 import type { Viewport } from "../scene/Viewport";
-import type { SimParams, ToolId } from "../state/types";
+import type { HeatmapMode, SimParams, ToolId } from "../state/types";
 
 const TOOL_COPY: Record<ToolId, { title: string; body: string }> = {
   pile: { title: "Aufschütten", body: "Kreis = Pinselradius. Ziehen, um Sand anzuhäufen." },
@@ -46,7 +46,7 @@ export class Inspector {
     let sig = "";
     store.subscribe(() => {
       const st = store.state;
-      const next = `${st.tool}|${st.advancedOpen}|${st.selectedSourceId}|${st.galleryOpen}`;
+      const next = `${st.tool}|${st.advancedOpen}|${st.selectedSourceId}|${st.galleryOpen}|${st.heatmap}`;
       if (next !== sig) {
         sig = next;
         this.render();
@@ -92,6 +92,12 @@ export class Inspector {
             ${slider("Erosionsrate", 0.05, 1, 0.01, s.params.erosionRate, "erosionRate")}
             ${slider("Sedimentkapazität", 0.08, 1, 0.01, s.params.sedimentCapacity, "sedimentCapacity")}
             ${slider("Ablagerung", 0.05, 0.8, 0.01, s.params.deposition, "deposition")}
+            <fieldset class="seg">
+              <legend>Heatmap</legend>
+              ${segBtn("off", "Aus", s.heatmap)}
+              ${segBtn("flow", "Fluss", s.heatmap)}
+              ${segBtn("depth", "Tiefe", s.heatmap)}
+            </fieldset>
           </div>`
             : ""
         }
@@ -130,6 +136,11 @@ export class Inspector {
     this.el.querySelectorAll<HTMLInputElement>("input[type=range]").forEach((input) => {
       input.addEventListener("input", () => this.onSlider(input));
     });
+    this.el.querySelectorAll<HTMLButtonElement>("[data-heat]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this.store.patch({ heatmap: btn.dataset.heat as HeatmapMode });
+      });
+    });
   }
 
   private onSlider(input: HTMLInputElement): void {
@@ -146,6 +157,10 @@ export class Inspector {
     const em = input.previousElementSibling?.querySelector("em");
     if (em) em.textContent = format(value);
   }
+}
+
+function segBtn(mode: HeatmapMode, label: string, current: HeatmapMode): string {
+  return `<button type="button" class="seg-btn ${current === mode ? "is-active" : ""}" data-heat="${mode}">${label}</button>`;
 }
 
 function escapeHtml(s: string): string {

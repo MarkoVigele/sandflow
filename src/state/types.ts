@@ -11,6 +11,10 @@ export type ToolId =
 
 export type QualityId = "low" | "medium" | "high" | "ultra";
 
+export type HeatmapMode = "off" | "flow" | "depth";
+
+export type OnboardStep = 0 | 1 | 2 | 3;
+
 export interface SimParams {
   grain: number;
   cohesion: number;
