@@ -98,7 +98,7 @@ body {
 .aim-hud {
   position: absolute;
   left: 0; top: 0;
-  width: var(--aim-r, 72px); height: var(--aim-r, 72px);
+  width: 10px; height: 10px;
   transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 3;
@@ -106,23 +106,14 @@ body {
   visibility: hidden;
 }
 .aim-hud.is-visible { opacity: 1; visibility: visible; }
-.aim-hud-disc, .aim-hud-ring {
-  position: absolute; inset: 0; border-radius: 50%; box-sizing: border-box;
+.aim-hud-pip {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: rgba(63, 208, 232, 0.95);
+  box-shadow: 0 0 0 1px rgba(20, 17, 14, 0.45), 0 0 8px rgba(63, 208, 232, 0.55);
 }
-.aim-hud-disc {
-  inset: 18%;
-  background: radial-gradient(circle, rgba(63, 208, 232, 0.55) 0%, rgba(63, 208, 232, 0.12) 62%, transparent 78%);
-}
-.aim-hud-ring {
-  border: 2px solid rgba(244, 255, 255, 0.95);
-  box-shadow: 0 0 0 1px rgba(20, 17, 14, 0.35), 0 0 14px rgba(63, 208, 232, 0.45);
-}
-.aim-hud.is-sand .aim-hud-disc {
-  background: radial-gradient(circle, rgba(232, 164, 74, 0.5) 0%, rgba(232, 164, 74, 0.12) 62%, transparent 78%);
-}
-.aim-hud.is-sand .aim-hud-ring {
-  border-color: rgba(255, 224, 138, 0.95);
-  box-shadow: 0 0 0 1px rgba(20, 17, 14, 0.35), 0 0 12px rgba(232, 164, 74, 0.4);
+.aim-hud.is-sand .aim-hud-pip {
+  background: rgba(232, 164, 74, 0.95);
+  box-shadow: 0 0 0 1px rgba(20, 17, 14, 0.45), 0 0 8px rgba(232, 164, 74, 0.5);
 }
 .aim-hud.is-active { filter: brightness(1.15); }
 

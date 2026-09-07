@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { GeneratedMaps } from "../assets/AssetService";
 import { SimClient, type SimFrame, type SimSnapshot } from "../sim/SimClient";
-import { MAP_R_TERRAIN, unpackRgba } from "../sim/mapsContract";
+import { unpackRgba } from "../sim/mapsContract";
 import { getPreset, resampleHeight } from "../sim/presets";
 import { History } from "../state/history";
 import type { Store } from "../state/store";
@@ -13,7 +13,13 @@ import {
   type ToolId,
   type WaterSource,
 } from "../state/types";
-import { AimCursor, type AimCursorState, type AimHit } from "../ui/AimCursor";
+import {
+  AimCursor,
+  pickDeformedSand,
+  samplePackedHeight,
+  type AimCursorState,
+  type AimHit,
+} from "../ui/AimCursor";
 import { createMapsTexture, uploadPacked } from "./mapsTexture";
 import { FlowParticles } from "./Particles";
 import { SandMesh } from "./SandMesh";
@@ -61,7 +67,6 @@ export class Viewport {
   private stepAccum = 0;
   private clock = new THREE.Clock();
   private aim = new AimCursor();
-  private lastAimHit: AimHit | null = null;
   private lastPointer: { clientX: number; clientY: number } | null = null;
   private unsubStore: () => void = () => {};
   private onUi: () => void;
@@ -149,7 +154,11 @@ export class Viewport {
     this.unsubStore = this.store.subscribe(() => {
       this.syncAimHost();
       if (this.store.state.cameraMode) this.aim.hide();
-      else if (this.lastAimHit) this.refreshAim(this.lastAimHit);
+      else if (this.lastPointer) {
+        const hit = this.hitFromClient(this.lastPointer.clientX, this.lastPointer.clientY);
+        if (hit) this.refreshAim(hit);
+        else this.aim.hide();
+      }
     });
 
     this.sim = new SimClient();
@@ -361,34 +370,26 @@ export class Viewport {
   }
 
   private sampleHeight(u: number, v: number): number {
-    if (!this.lastPacked) return 0.42;
-    const size = this.lastSize;
-    const x = Math.max(0, Math.min(size - 1, Math.round(u * (size - 1))));
-    const y = Math.max(0, Math.min(size - 1, Math.round(v * (size - 1))));
-    return this.lastPacked[(y * size + x) * 4 + MAP_R_TERRAIN] ?? 0.42;
+    return samplePackedHeight(this.lastPacked, this.lastSize, u, v);
   }
 
   private hitUv(ev: PointerEvent): AimHit | null {
-    const rect = this.canvas.getBoundingClientRect();
-    this.pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
-    this.pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
-    this.raycaster.setFromCamera(this.pointer, this.camera);
-    const hits = this.raycaster.intersectObject(this.sand.mesh, false);
-    if (!hits.length || !hits[0].uv) return null;
-    const u = hits[0].uv.x;
-    const v = hits[0].uv.y;
-    return {
-      u,
-      v,
-      world: this.surfacePoint(u, v),
-    };
+    return this.hitFromClient(ev.clientX, ev.clientY);
   }
 
-  private surfacePoint(u: number, v: number): THREE.Vector3 {
-    return new THREE.Vector3(
-      (u - 0.5) * TRAY_SIZE,
-      this.sampleHeight(u, v) * HEIGHT_SCALE,
-      (v - 0.5) * TRAY_SIZE,
+  private hitFromClient(clientX: number, clientY: number): AimHit | null {
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return null;
+    this.pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    this.camera.updateMatrixWorld();
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    return pickDeformedSand(
+      this.raycaster.ray.origin,
+      this.raycaster.ray.direction,
+      TRAY_SIZE,
+      HEIGHT_SCALE,
+      (u, v) => this.sampleHeight(u, v),
     );
   }
 
@@ -405,7 +406,6 @@ export class Viewport {
   }
 
   private refreshAim(hit: AimHit, ev?: PointerEvent): void {
-    this.lastAimHit = hit;
     if (ev) this.lastPointer = { clientX: ev.clientX, clientY: ev.clientY };
     this.aim.show(hit, this.aimState(), this.lastPointer ?? undefined);
   }
@@ -473,9 +473,12 @@ export class Viewport {
   };
 
   private onPointerMove = (ev: PointerEvent): void => {
+    this.lastPointer = { clientX: ev.clientX, clientY: ev.clientY };
     const hit = this.hitUv(ev);
     if (hit) this.refreshAim(hit, ev);
-    else this.hideAim();
+    else {
+      this.aim.hide();
+    }
 
     if (!this.pointerDown) return;
 
@@ -505,8 +508,10 @@ export class Viewport {
     this.draggingSource = null;
     if (ev.pointerType === "touch" || ev.pointerType === "pen") {
       this.hideAim();
-    } else if (this.lastAimHit) {
-      this.refreshAim(this.lastAimHit);
+    } else if (this.lastPointer) {
+      const hit = this.hitFromClient(this.lastPointer.clientX, this.lastPointer.clientY);
+      if (hit) this.refreshAim(hit);
+      else this.hideAim();
     }
   };
 
@@ -516,7 +521,6 @@ export class Viewport {
   };
 
   private hideAim(): void {
-    this.lastAimHit = null;
     this.lastPointer = null;
     this.aim.hide();
   }
@@ -564,13 +568,10 @@ export class Viewport {
     }
 
     this.water.tick(t);
-    if (this.lastAimHit && !this.store.state.cameraMode) {
-      const { u, v } = this.lastAimHit;
-      this.refreshAim({
-        u,
-        v,
-        world: this.surfacePoint(u, v),
-      });
+    if (this.lastPointer && !this.store.state.cameraMode) {
+      const hit = this.hitFromClient(this.lastPointer.clientX, this.lastPointer.clientY);
+      if (hit) this.refreshAim(hit);
+      else this.aim.hide();
     }
     this.aim.tick(t, this.strokeActive || !!this.draggingSource);
     this.renderer.render(this.scene, this.camera);
