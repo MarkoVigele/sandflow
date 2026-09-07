@@ -1,18 +1,31 @@
 import { createAssetService } from "../assets/AssetService";
+import { propsFromShare, propsToShare } from "../scene/PropsLite";
 import { Viewport } from "../scene/Viewport";
 import { resampleHeight } from "../sim/presets";
+import type { SimSnapshot } from "../sim/SimClient";
 import {
   downloadDataUrl,
   downloadText,
   encodeScene,
   packMaps,
-  parseScene,
   toJson,
   unpackMaps,
 } from "../state/persist";
+import {
+  buildSharePayload,
+  compactShareForHash,
+  decodeHeightField,
+  parseAnyScene,
+  parseShareHash,
+  SHARE_FILE_GRID,
+  shareCamera,
+  shareHref,
+  shareSources,
+  type SharePayload,
+} from "../state/share";
 import { persistOnboardDone, Store } from "../state/store";
-import { QUALITY_GRID } from "../state/types";
-import { TOOL_HOTKEYS } from "./tools";
+import { QUALITY_GRID, SPEEDS } from "../state/types";
+import { LETTER_HOTKEYS, TOOL_HOTKEYS } from "./tools";
 import { Inspector } from "./Inspector";
 import { Onboarding } from "./Onboarding";
 import { PresetGallery } from "./PresetGallery";
@@ -44,6 +57,7 @@ export class App {
     this.viewport = new Viewport(viewportHost, this.store, () => {
       /* store patches already notify */
     });
+    this.viewport.onToast = (msg) => this.toast(msg);
 
     new Toolbar(this.store, root.querySelector("#toolbar")!);
     new Inspector(
@@ -54,12 +68,19 @@ export class App {
     );
     new TopBar(this.store, root.querySelector("#topbar")!, {
       onQuality: (q) => this.viewport.applyQuality(q, true),
+      onAutoQuality: () => {
+        this.viewport.autoDropped = false;
+      },
       onSave: () => void this.saveScene(),
       onLoad: () => this.fileInput.click(),
       onShot: () => this.screenshot(),
       onUndo: () => void this.viewport.undo(),
       onRedo: () => void this.viewport.redo(),
       onStep: () => this.viewport.stepOnce(),
+      onResetScene: () => this.viewport.resetScene(),
+      onResetWater: () => this.viewport.resetWater(),
+      onShareLink: () => void this.shareLink(),
+      onShareJson: () => void this.shareJson(),
     });
     new PresetGallery(this.store, root.querySelector("#gallery")!, (id) => {
       this.viewport.loadPreset(id, true);
@@ -69,14 +90,22 @@ export class App {
 
     this.fileInput = document.createElement("input");
     this.fileInput.type = "file";
-    this.fileInput.accept = "application/json";
+    this.fileInput.accept = "application/json,.json";
     this.fileInput.hidden = true;
     root.appendChild(this.fileInput);
     this.fileInput.addEventListener("change", () => void this.loadScene());
 
     this.bindAbout(root.querySelector("#about")!);
     this.bindKeys();
+    window.addEventListener("pointerdown", (e) => {
+      if (!this.store.state.menuOpen) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest(".menu-wrap")) return;
+      this.store.patch({ menuOpen: null });
+    });
     void this.generateTexture(this.store.state.texturePrompt);
+    void this.bootFromHash();
+    window.addEventListener("hashchange", () => void this.bootFromHash());
 
     if (!this.viewport.renderer.capabilities.isWebGL2) {
       this.toast("WebGL2 fehlt — Sandflow braucht einen aktuellen Browser.");
@@ -110,7 +139,13 @@ export class App {
     this.fileInput.value = "";
     if (!file) return;
     try {
-      const scene = parseScene(await file.text());
+      const loaded = parseAnyScene(await file.text());
+      if (loaded.kind === "v2") {
+        this.applyShare(loaded.share);
+        this.toast("Share-JSON geladen.");
+        return;
+      }
+      const scene = loaded.file;
       const maps = unpackMaps(scene);
       const grid = QUALITY_GRID[this.store.state.quality];
       const terrain =
@@ -148,6 +183,100 @@ export class App {
     }
   }
 
+  private async bootFromHash(): Promise<void> {
+    const share = parseShareHash(location.hash);
+    if (!share) return;
+    this.applyShare(share);
+    this.toast("Geteilte Szene geladen.");
+  }
+
+  private applyShare(share: SharePayload): void {
+    const quality = share.quality;
+    this.store.patch({
+      params: share.params,
+      presetId: share.preset,
+      texturePrompt: share.prompt || this.store.state.texturePrompt,
+      quality,
+      speed: SPEEDS.includes(share.speed) ? share.speed : 1,
+      selectedSourceId: null,
+    });
+    this.viewport.applyQuality(quality, false);
+    this.viewport.loadPreset(share.preset, true);
+    const grid = QUALITY_GRID[quality];
+    const terrain = decodeHeightField(share.h, share.hn, grid);
+    const water = decodeHeightField(share.w, share.wn, grid);
+    const sources = shareSources(share);
+    if (terrain) {
+      const snap: SimSnapshot = {
+        size: grid,
+        terrain,
+        water: water ?? new Float32Array(grid * grid),
+        wetness: new Float32Array(grid * grid),
+        sediment: new Float32Array(grid * grid),
+        cohesion: new Float32Array(grid * grid),
+        sources,
+        erodedSand: 0,
+      };
+      this.viewport.applySnapshot(snap);
+      this.store.patch({ selectedSourceId: sources[0]?.id ?? null });
+    } else {
+      this.viewport.replaceSources(sources);
+    }
+    const cam = shareCamera(share);
+    if (cam) this.viewport.applyCamera(cam);
+    this.viewport.setProps(propsFromShare(share.props));
+    this.viewport.applyParams();
+    if (share.prompt) void this.generateTexture(share.prompt);
+  }
+
+  private async shareInput() {
+    const snap = await this.viewport.snapshot();
+    return {
+      presetId: this.store.state.presetId,
+      quality: this.store.state.quality,
+      speed: this.store.state.speed,
+      params: this.store.state.params,
+      sources: snap.sources,
+      texturePrompt: this.store.state.texturePrompt,
+      camera: this.viewport.cameraPose(),
+      props: propsToShare(this.viewport.listProps()),
+      terrain: snap.terrain,
+      water: snap.water,
+      size: snap.size,
+    };
+  }
+
+  private async shareLink(): Promise<void> {
+    try {
+      const { hash, omittedHeight } = compactShareForHash(await this.shareInput());
+      const href = shareHref(hash);
+      history.replaceState(null, "", `#${hash}`);
+      const ok = await copyText(href);
+      this.toast(
+        ok
+          ? omittedHeight
+            ? "Link kopiert — Gelände war zu groß, Vorlage bleibt."
+            : "Link in die Zwischenablage kopiert."
+          : omittedHeight
+            ? "Link steht in der Adresszeile (ohne Gelände)."
+            : "Link steht in der Adresszeile.",
+      );
+    } catch {
+      this.toast("Teilen hat nicht geklappt.");
+    }
+  }
+
+  private async shareJson(): Promise<void> {
+    try {
+      const payload = buildSharePayload(await this.shareInput(), SHARE_FILE_GRID, true);
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+      downloadText(`sandflow-share-${stamp}.json`, JSON.stringify(payload), "application/json");
+      this.toast("Share-JSON gespeichert.");
+    } catch {
+      this.toast("Share-JSON hat nicht geklappt.");
+    }
+  }
+
   private screenshot(): void {
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
     downloadDataUrl(`sandflow-${stamp}.png`, this.viewport.screenshotPng());
@@ -167,8 +296,9 @@ export class App {
               <button class="icon-btn" data-x>${ICONS.close}</button>
             </header>
             <p>Wasser sucht sich Wege durch Sand: erst dünne Adern, dann ein Bett, später ein verzweigtes Netz. V1 ist der Kern — spielbar, ohne Extra-Firlefanz.</p>
-            <p>Kurzanleitung: <strong>Sand formen</strong> → <strong>Quelle setzen</strong> → <strong>Play</strong>.</p>
+            <p>Kurzanleitung: <strong>Sand formen</strong> → <strong>Quelle setzen</strong> → <strong>Abspielen</strong>.</p>
             <p>Rechtsklick oder zwei Finger drehen die Kamera. Ein Finger (oder die linke Taste) bedient das Werkzeug. Unter <em>Kamera</em> geht das Drehen auch mit einem Finger.</p>
+            <p>Oben: <em>Tempo</em> und <em>Zeitraffer</em>, Qualität inkl. Auto, Szene oder nur Wasser zurücksetzen, Teilen per Link oder JSON. Kiesel sind kleine Steine — der Radierer nimmt sie weg.</p>
             <p>Unter <em>Erweitert</em> liegt eine optionale Heatmap für Fluss oder Wassertiefe. Texturen entstehen lokal aus einer kurzen Beschreibung.</p>
           </div>
         </div>`
@@ -209,7 +339,11 @@ export class App {
       }
       const n = Number(e.key);
       if (n >= 1 && n <= TOOL_HOTKEYS.length) {
-        this.store.patch({ tool: TOOL_HOTKEYS[n - 1], cameraMode: false });
+        this.store.patch({ tool: TOOL_HOTKEYS[n - 1], cameraMode: false, menuOpen: null });
+      }
+      const letter = LETTER_HOTKEYS[k];
+      if (letter) {
+        this.store.patch({ tool: letter, cameraMode: false, menuOpen: null });
       }
     });
   }
@@ -220,5 +354,30 @@ export class App {
     el.textContent = msg;
     document.body.appendChild(el);
     window.setTimeout(() => el.remove(), 4200);
+  }
+}
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* fall through */
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return ok;
+  } catch {
+    return false;
   }
 }

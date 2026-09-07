@@ -9,7 +9,7 @@ import { History } from "../state/history";
 import type { Store } from "../state/store";
 import {
   QUALITY_GRID,
-  isMobile,
+  QUALITY_LABEL,
   type QualityId,
   type ToolId,
   type WaterSource,
@@ -23,6 +23,7 @@ import {
 } from "../ui/AimCursor";
 import { createMapsTexture, uploadPacked } from "./mapsTexture";
 import { FlowParticles } from "./Particles";
+import { PropsLite, type PropLite } from "./PropsLite";
 import { SandMesh } from "./SandMesh";
 import { createSourceMarker, createTray } from "./Tray";
 import { WaterMesh } from "./WaterMesh";
@@ -45,6 +46,7 @@ export class Viewport {
   erodedSand = 0;
   fps = 0;
   autoDropped = false;
+  onToast: (msg: string) => void = () => {};
 
   private store: Store;
   private host: HTMLElement;
@@ -68,6 +70,9 @@ export class Viewport {
   private stepAccum = 0;
   private clock = new THREE.Clock();
   private aim = new AimCursor();
+  private propsLite = new PropsLite();
+  private propsUndo: PropLite[][] = [];
+  private propsRedo: PropLite[][] = [];
   private lastPointer: { clientX: number; clientY: number } | null = null;
   private lastStroke: { u: number; v: number } | null = null;
   private unsubStore: () => void = () => {};
@@ -146,7 +151,7 @@ export class Viewport {
     this.sand = new SandMesh(TRAY_SIZE, this.maps, q, HEIGHT_SCALE);
     this.water = new WaterMesh(TRAY_SIZE, this.maps, q, HEIGHT_SCALE);
     this.particles = new FlowParticles();
-    this.scene.add(this.sand.mesh, this.water.mesh, this.particles.points);
+    this.scene.add(this.sand.mesh, this.water.mesh, this.particles.points, this.propsLite.group);
     this.sand.setHeatMode(store.state.heatmap);
     store.subscribe(() => this.sand.setHeatMode(this.store.state.heatmap));
     this.sourceGroup.name = "sources";
@@ -237,8 +242,13 @@ export class Viewport {
     this.water.setMaps(this.maps);
     this.sim.init(grid, this.store.state.params, built.terrain, this.sources);
     this.applyCamera(preset.camera);
+    this.setProps([]);
     this.store.patch({ presetId: id, selectedSourceId: this.sources[0]?.id ?? null });
-    if (recordHistory) this.history.clear();
+    if (recordHistory) {
+      this.history.clear();
+      this.propsUndo.length = 0;
+      this.propsRedo.length = 0;
+    }
     this.onUi();
   }
 
@@ -275,19 +285,46 @@ export class Viewport {
   async pushHistory(): Promise<void> {
     const snap = await this.snapshot();
     this.history.push(snap);
+    this.propsUndo.push(this.listProps());
+    this.propsRedo.length = 0;
     this.onUi();
   }
 
   async undo(): Promise<void> {
     const current = await this.snapshot();
     const prev = this.history.undo(current);
+    const prevProps = this.propsUndo.pop();
+    if (prevProps) {
+      this.propsRedo.push(this.listProps());
+      this.setProps(prevProps);
+    }
     if (prev) this.applySnapshot(prev);
   }
 
   async redo(): Promise<void> {
     const current = await this.snapshot();
     const next = this.history.redo(current);
+    const nextProps = this.propsRedo.pop();
+    if (nextProps) {
+      this.propsUndo.push(this.listProps());
+      this.setProps(nextProps);
+    }
     if (next) this.applySnapshot(next);
+  }
+
+  listProps(): PropLite[] {
+    return this.propsLite.list();
+  }
+
+  setProps(props: PropLite[]): void {
+    this.propsLite.setAll(props, (u, v) => this.sampleHeight(u, v), TRAY_SIZE, HEIGHT_SCALE);
+  }
+
+  cameraPose(): CameraPose {
+    return {
+      position: [this.camera.position.x, this.camera.position.y, this.camera.position.z],
+      target: [this.controls.target.x, this.controls.target.y, this.controls.target.z],
+    };
   }
 
   resetScene(): void {
@@ -296,6 +333,15 @@ export class Viewport {
 
   resetWater(): void {
     this.sim.resetWater();
+  }
+
+  replaceSources(sources: WaterSource[]): void {
+    for (const s of this.sources) this.sim.removeSource(s.id);
+    this.sources = sources.map((s) => ({ ...s }));
+    for (const s of this.sources) this.sim.addSource(s);
+    this.rebuildMarkers();
+    this.store.patch({ selectedSourceId: this.sources[0]?.id ?? null });
+    this.onUi();
   }
 
   async flattenAll(): Promise<void> {
@@ -351,6 +397,7 @@ export class Viewport {
     this.water.dispose();
     this.particles.dispose();
     this.aim.dispose();
+    this.propsLite.dispose();
     this.maps.dispose();
     this.renderer.dispose();
   }
@@ -452,6 +499,14 @@ export class Viewport {
       return;
     }
     if (tool === "source") return;
+    if (tool === "stone") {
+      this.placeStone(u, v);
+      return;
+    }
+    if (tool === "erase") {
+      this.propsLite.removeNear(u, v, brushRadius);
+      return;
+    }
     const stroke = tool === "groove" || tool === "tamp" || tool === "flatten";
     if (stroke && this.lastStroke) {
       const du = u - this.lastStroke.u;
@@ -470,6 +525,29 @@ export class Viewport {
     if (this.store.state.onboardStep === 1) {
       this.store.patch({ onboardStep: 2, tool: "source" });
     }
+  }
+
+  private placeStone(u: number, v: number): void {
+    if (this.lastStroke) {
+      const dist = Math.hypot(u - this.lastStroke.u, v - this.lastStroke.v);
+      if (dist < Math.max(0.018, this.store.state.brushRadius * 0.55)) return;
+    }
+    this.lastStroke = { u, v };
+    const scale = THREE.MathUtils.clamp(0.034 + this.store.state.brushRadius * 0.55, 0.03, 0.14);
+    const kind = (Math.floor(Math.random() * 3) % 3) as 0 | 1 | 2;
+    this.propsLite.add(
+      {
+        id: `p-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4).toString(36)}`,
+        u,
+        v,
+        scale: scale * (0.82 + Math.random() * 0.36),
+        rot: Math.random() * Math.PI * 2,
+        kind,
+      },
+      (uu, vv) => this.sampleHeight(uu, vv),
+      TRAY_SIZE,
+      HEIGHT_SCALE,
+    );
   }
 
   private onPointerDown = async (ev: PointerEvent): Promise<void> => {
@@ -612,6 +690,7 @@ export class Viewport {
       else this.aim.hide();
     }
     this.aim.tick(t, this.strokeActive || !!this.draggingSource);
+    this.propsLite.settle((u, v) => this.sampleHeight(u, v), TRAY_SIZE, HEIGHT_SCALE);
     this.renderer.render(this.scene, this.camera);
 
     this.fpsFrames++;
@@ -644,8 +723,7 @@ export class Viewport {
   }
 
   private maybeAutoQuality(): void {
-    if (!this.store.state.autoQuality || this.autoDropped) return;
-    if (!isMobile()) return;
+    if (!this.store.state.autoQuality) return;
     if (this.fps > 0 && this.fps < 25) {
       this.lowFpsMs += 500;
       if (this.lowFpsMs >= 2000) {
@@ -653,9 +731,11 @@ export class Viewport {
         const i = order.indexOf(this.store.state.quality);
         if (i < order.length - 1) {
           const next = order[i + 1];
+          this.lowFpsMs = 0;
           this.autoDropped = true;
           this.store.patch({ quality: next });
           this.applyQuality(next, true);
+          this.onToast(`Qualität automatisch auf ${QUALITY_LABEL[next]} gesenkt.`);
           this.onUi();
         }
       }

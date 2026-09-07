@@ -93,6 +93,39 @@ body {
   font-size: 13px;
 }
 .chip.ghost { color: var(--muted); }
+.chip.is-on, .icon-btn.is-open {
+  background: rgba(212, 180, 131, 0.16);
+  border-color: var(--sand);
+  color: var(--sand);
+}
+.menu-wrap { position: relative; }
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 220px;
+  padding: 6px;
+  background: #1c1916;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.menu button {
+  min-height: 44px;
+  text-align: left;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.menu button:hover { background: rgba(212, 180, 131, 0.12); color: var(--sand); }
 .btn.primary { background: #3d3224; color: var(--sand); }
 .btn:disabled { opacity: 0.4; cursor: default; }
 
@@ -141,7 +174,8 @@ body {
   border: 1px solid var(--panel-border); border-radius: 10px; padding: 0 8px; font: inherit;
 }
 .transport { display: flex; align-items: center; gap: 4px; }
-.speed { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; min-width: 92px; }
+.speed { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; min-width: 118px; }
+.speed span { white-space: nowrap; }
 
 .overlay {
   position: fixed; inset: 0; background: rgba(10, 8, 6, 0.62);

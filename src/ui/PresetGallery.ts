@@ -17,11 +17,11 @@ export class PresetGallery {
   private render(): void {
     this.el.innerHTML = `
       <div class="overlay ${this.store.state.galleryOpen ? "is-open" : ""}" data-close>
-        <div class="sheet gallery" role="dialog" aria-label="Presets">
+        <div class="sheet gallery" role="dialog" aria-label="Vorlagen">
           <header class="sheet-head">
             <div>
               <p class="kicker">Labor</p>
-              <h2>Presets</h2>
+              <h2>Vorlagen</h2>
             </div>
             <button class="icon-btn" data-x title="Schließen">${ICONS.close}</button>
           </header>

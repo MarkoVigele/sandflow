@@ -1,5 +1,5 @@
 import type { Store } from "../state/store";
-import type { QualityId } from "../state/types";
+import { QUALITY_LABEL, type QualityId } from "../state/types";
 
 const LEVELS: { id: QualityId; label: string }[] = [
   { id: "low", label: "Niedrig" },
@@ -14,25 +14,33 @@ export class QualitySwitcher {
     private store: Store,
     host: HTMLElement,
     private onChange: (q: QualityId) => void,
+    private onAuto: () => void,
   ) {
     this.el = host;
     this.render();
   }
 
   private render(): void {
-    const q = this.store.state.quality;
+    const s = this.store.state;
+    const selected = s.autoQuality ? "auto" : s.quality;
     this.el.innerHTML = `
       <label class="quality">
         <span>Qualität</span>
         <select aria-label="Qualität">
-          ${LEVELS.map((l) => `<option value="${l.id}" ${l.id === q ? "selected" : ""}>${l.label}</option>`).join("")}
+          <option value="auto" ${selected === "auto" ? "selected" : ""}>Auto · ${QUALITY_LABEL[s.quality]}</option>
+          ${LEVELS.map((l) => `<option value="${l.id}" ${selected === l.id ? "selected" : ""}>${l.label}</option>`).join("")}
         </select>
       </label>
     `;
     this.el.querySelector("select")?.addEventListener("change", (e) => {
-      const value = (e.target as HTMLSelectElement).value as QualityId;
-      this.store.patch({ quality: value, autoQuality: false });
-      this.onChange(value);
+      const value = (e.target as HTMLSelectElement).value;
+      if (value === "auto") {
+        this.store.patch({ autoQuality: true, menuOpen: null });
+        this.onAuto();
+        return;
+      }
+      this.store.patch({ quality: value as QualityId, autoQuality: false, menuOpen: null });
+      this.onChange(value as QualityId);
     });
   }
 }

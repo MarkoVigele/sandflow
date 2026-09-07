@@ -47,6 +47,7 @@ export interface UiState {
   presetId: string;
   heatmap: HeatmapMode;
   onboardStep: OnboardStep;
+  menuOpen: null | "reset" | "share";
 }
 
 export const initialUiState = (): UiState => {
@@ -71,6 +72,7 @@ export const initialUiState = (): UiState => {
     presetId: "flat",
     heatmap: "off",
     onboardStep,
+    menuOpen: null,
   };
 };
 

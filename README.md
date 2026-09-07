@@ -24,13 +24,14 @@ Der Build landet in `docs/` (relativer Basispfad, bereit für GitHub Pages). Ein
 | Werkzeug | Linke Taste / ziehen | Ein Finger |
 | Gießen | Taste halten | Finger halten |
 | Kamera drehen / zoomen | Rechte Taste, Rad, Mitteltaste | Zwei Finger. Oder Werkzeug **Kamera** für einen Finger |
-| Play / Pause | Leertaste oder Transportleiste | Transportleiste |
+| Abspielen / Pause | Leertaste oder Transportleiste | Transportleiste |
 | Werkzeuge 1–9 | Tasten `1`–`9` | Symbolleiste |
+| Kiesel / Radierer | `K` / `R` | Symbolleiste |
 | Rückgängig / Wiederholen | `Strg+Z` / `Strg+Y` | Symbole oben |
 
-Oben: Presets, Qualität, Tempo (0,25×–4×), Speichern, Laden, Screenshot. Rechts (am Telefon unten): Kontext zum aktiven Werkzeug. Unter **Erweitert** liegen Körnung, Kohäsion, Infiltration, Erosionsrate, Sedimentkapazität und eine optionale Heatmap (Fluss oder Tiefe). Beim ersten Start führt eine Kurzanleitung in drei Schritten: Sand formen → Quelle → Play.
+Oben: Vorlagen, Qualität (inkl. **Auto**), Tempo (0,25×–8×) und **Zeitraffer**, Zurücksetzen (Szene oder nur Wasser), Teilen, Speichern, Laden, Bild. Rechts (am Telefon unten): Kontext zum aktiven Werkzeug. Unter **Erweitert** liegen Körnung, Kohäsion, Infiltration, Erosionsrate, Sedimentkapazität und eine optionale Heatmap (Fluss oder Tiefe). Beim ersten Start führt eine Kurzanleitung in drei Schritten: Sand formen → Quelle → Abspielen.
 
-## Presets
+## Vorlagen
 
 - **Flache Wanne** — ebenes Bett, Quelle oben. Adern entstehen von allein.
 - **Sanfte Schräge** — Gefälle, das Wasser bleibt in der Spur und gräbt nach.
@@ -41,19 +42,19 @@ Oben: Presets, Qualität, Tempo (0,25×–4×), Speichern, Laden, Screenshot. Re
 - **Referenz-Rinne** — tiefes, klares Bett als Vergleichsspur.
 - **Dünne Adern** — viele feine Rinnen auf der Schräge.
 
-Zusätzliche Werkzeuge: **Feststampfen** (Kohäsion lokal), **Rinne** vorzeichnen, **Einebnen** (Pinsel oder ganze Wanne). Requisiten-Radierer fehlt, solange es keine Requisiten gibt.
+Zusätzliche Werkzeuge: **Feststampfen** (Kohäsion lokal), **Rinne** vorzeichnen, **Einebnen** (Pinsel oder ganze Wanne), **Kiesel** (kleine Steine) und **Radierer**.
 
 ## Performance
 
 - **Mittel** ist die Vorgabe auf dem Telefon, **Hoch** am Rechner.
+- **Auto** bleibt an, bis eine feste Stufe gewählt wird. Unter 25 Bildern/s rutscht die Qualität eine Stufe tiefer (Toast).
 - Gitter: Niedrig 128², Mittel 256², Hoch/Ultra 512². Schatten und Partikel nur auf Hoch und Ultra.
-- Fällt die Bildrate auf dem Telefon unter 25, rutscht die Qualität eine Stufe runter.
 - Wenn es hakelt: Qualität senken, Tempo auf 0,5×, weniger Quellen, Ultra meiden.
 
-## Speichern
+## Speichern und teilen
 
-JSON nimmt Höhe, Wasser, Quellen und Materialparameter mit. PNG ist ein Blick aus der aktuellen Kamera. Die Sandtextur kommt aus einer kurzen Beschreibung (lokal erzeugt). Ein externer Dienst kann später an dieselbe Stelle.
+JSON (Speichern) nimmt Höhe, Wasser, Quellen und Materialparameter in voller Genauigkeit mit. **Teilen** schreibt einen kompakten Zustand in den URL-Hash (`#sf2.…`) oder als Share-JSON — ohne Cloud. Der Link trägt Vorlage, Quellen, Tempo, Kamera, Kiesel und ein grobes Höhenfeld (64²). Fehlt Platz, bleibt die Vorlage ohne Gelände. PNG ist ein Blick aus der aktuellen Kamera. Die Sandtextur kommt aus einer kurzen Beschreibung (lokal erzeugt).
 
 ## Was V1 nicht ist
 
-Kein WebGPU, kein fremdes Bild-API, keine Teilen-Links, keine komplette Requisitenbibliothek. Das kommt später — erst muss das Wasser glaubwürdig graben.
+Kein WebGPU, kein fremdes Bild-API, keine komplette Requisitenbibliothek. Erst muss das Wasser glaubwürdig graben.
