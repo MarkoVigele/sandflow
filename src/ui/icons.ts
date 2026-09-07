@@ -1,0 +1,18 @@
+export const ICONS: Record<string, string> = {
+  pile: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16l-4.2-7.2a3 3 0 0 0-5.2 0L4 18z" fill="currentColor" opacity=".9"/><path d="M8 10c1.2-2.2 2.4-3.2 4-3.2S14.8 7.8 16 10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>`,
+  dig: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 4.4 19.6 9.8 10 19.4 4.6 14z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4 20h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
+  smooth: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16c3-5 5-5 8-2s5 3 8-2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`,
+  dam: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V8l7-4 7 4v11" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 14h14" stroke="currentColor" stroke-width="1.6"/></svg>`,
+  pour: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c4 5.4 6 8.2 6 11a6 6 0 1 1-12 0c0-2.8 2-5.6 6-11z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>`,
+  source: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 11v9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
+  play: `<svg viewBox="0 0 24 24"><path d="M8 6v12l10-6z" fill="currentColor"/></svg>`,
+  pause: `<svg viewBox="0 0 24 24"><path d="M7 6h3.4v12H7zM13.6 6H17v12h-3.4z" fill="currentColor"/></svg>`,
+  step: `<svg viewBox="0 0 24 24"><path d="M7 6v12l7-6zM16 6h2v12h-2z" fill="currentColor"/></svg>`,
+  undo: `<svg viewBox="0 0 24 24"><path d="M8 7H4v4M4.6 11A7 7 0 1 0 6 6.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`,
+  redo: `<svg viewBox="0 0 24 24"><path d="M16 7h4v4M19.4 11A7 7 0 1 1 18 6.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`,
+  camera: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4 9.5V18h16V9.5h-3.2L15 7H9L7.2 9.5z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>`,
+  save: `<svg viewBox="0 0 24 24"><path d="M6 4h10l4 4v12H6z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 4v6h8V4M8 20v-6h8v6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>`,
+  load: `<svg viewBox="0 0 24 24"><path d="M12 5v10M8 11l4 4 4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
+  shot: `<svg viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="13" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>`,
+  close: `<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`,
+};
