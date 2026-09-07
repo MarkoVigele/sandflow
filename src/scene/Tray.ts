@@ -1,6 +1,14 @@
 import * as THREE from "three";
+import { canvasTexture } from "./mapsTexture";
 
-export function createTray(traySize: number): THREE.Group {
+export type TrayHandle = {
+  group: THREE.Group;
+  wood: THREE.MeshStandardMaterial;
+  lip: THREE.MeshStandardMaterial;
+  maps: THREE.Texture[];
+};
+
+export function createTray(traySize: number): TrayHandle {
   const g = new THREE.Group();
   g.name = "tray";
 
@@ -55,7 +63,51 @@ export function createTray(traySize: number): THREE.Group {
   under.receiveShadow = true;
 
   g.add(north, south, west, east, lip, table, under);
-  return g;
+  return { group: g, wood, lip: rimDark, maps: [] };
+}
+
+export function applyTrayWood(
+  tray: TrayHandle,
+  albedo: HTMLCanvasElement,
+  normal?: HTMLCanvasElement,
+  roughness?: HTMLCanvasElement,
+): void {
+  for (const tex of tray.maps) tex.dispose();
+  tray.maps.length = 0;
+
+  const map = canvasTexture(albedo);
+  map.repeat.set(2.4, 1);
+  tray.maps.push(map);
+  tray.wood.map = map;
+  tray.wood.color.set(0xffffff);
+  tray.wood.roughness = 0.74;
+  tray.wood.metalness = 0.03;
+
+  tray.lip.map = map;
+  tray.lip.color.set(0x6e5a42);
+  tray.lip.roughness = 0.7;
+
+  if (normal) {
+    const n = canvasTexture(normal);
+    n.colorSpace = THREE.LinearSRGBColorSpace;
+    n.repeat.copy(map.repeat);
+    tray.maps.push(n);
+    tray.wood.normalMap = n;
+    tray.wood.normalScale.set(0.42, 0.42);
+    tray.lip.normalMap = n;
+    tray.lip.normalScale.set(0.3, 0.3);
+  }
+  if (roughness) {
+    const r = canvasTexture(roughness);
+    r.colorSpace = THREE.LinearSRGBColorSpace;
+    r.repeat.copy(map.repeat);
+    tray.maps.push(r);
+    tray.wood.roughnessMap = r;
+    tray.lip.roughnessMap = r;
+  }
+
+  tray.wood.needsUpdate = true;
+  tray.lip.needsUpdate = true;
 }
 
 export function createSourceMarker(): THREE.Group {
@@ -72,7 +124,7 @@ export function createSourceMarker(): THREE.Group {
   const drop = new THREE.Mesh(
     new THREE.SphereGeometry(0.055, 16, 12),
     new THREE.MeshStandardMaterial({
-      color: 0x8d9a8c,
+      color: 0x6aa8ba,
       roughness: 0.2,
       metalness: 0.1,
       transparent: true,

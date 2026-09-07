@@ -64,7 +64,7 @@ export class App {
       this.store,
       root.querySelector("#inspector")!,
       this.viewport,
-      (prompt) => void this.generateTexture(prompt),
+      (prompt) => void this.loadLabTextures(prompt),
     );
     new TopBar(this.store, root.querySelector("#topbar")!, {
       onQuality: (q) => this.viewport.applyQuality(q, true),
@@ -103,7 +103,7 @@ export class App {
       if (t?.closest(".menu-wrap")) return;
       this.store.patch({ menuOpen: null });
     });
-    void this.generateTexture(this.store.state.texturePrompt);
+    void this.loadLabTextures(this.store.state.texturePrompt);
     void this.bootFromHash();
     window.addEventListener("hashchange", () => void this.bootFromHash());
 
@@ -112,8 +112,8 @@ export class App {
     }
   }
 
-  private async generateTexture(prompt: string): Promise<void> {
-    const maps = await this.assets.generate(prompt, 512);
+  private async loadLabTextures(prompt: string): Promise<void> {
+    const maps = await this.assets.loadLab(prompt);
     this.viewport.applyGeneratedMaps(maps);
   }
 
@@ -177,7 +177,7 @@ export class App {
         erodedSand: 0,
       });
       this.viewport.applyParams();
-      void this.generateTexture(scene.texturePrompt);
+      void this.loadLabTextures(scene.texturePrompt);
     } catch {
       this.toast("Datei konnte nicht gelesen werden.");
     }
@@ -226,7 +226,7 @@ export class App {
     if (cam) this.viewport.applyCamera(cam);
     this.viewport.setProps(propsFromShare(share.props));
     this.viewport.applyParams();
-    if (share.prompt) void this.generateTexture(share.prompt);
+    if (share.prompt) void this.loadLabTextures(share.prompt);
   }
 
   private async shareInput() {

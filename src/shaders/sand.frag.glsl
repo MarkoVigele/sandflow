@@ -1,5 +1,6 @@
 uniform sampler2D uMaps;
 uniform sampler2D uAlbedo;
+uniform sampler2D uAlbedoWet;
 uniform sampler2D uNormal;
 uniform sampler2D uRough;
 uniform vec3 uSunDir;
@@ -30,29 +31,26 @@ void main() {
   if (!(water == water) || water < 0.0) water = 0.0;
 
   vec2 tile = vUv * (3.4 + uGrain * 2.0);
-  vec2 d = vec2(0.0018, 0.0014);
-  vec3 albedo =
-    (texture2D(uAlbedo, tile).rgb +
-     texture2D(uAlbedo, tile + d).rgb +
-     texture2D(uAlbedo, tile - d).rgb) / 3.0;
+  vec3 dryAlb = texture2D(uAlbedo, tile).rgb;
+  vec3 wetAlb = texture2D(uAlbedoWet, tile).rgb;
   vec3 nTex = texture2D(uNormal, tile).rgb * 2.0 - 1.0;
-  float roughTex = texture2D(uRough, tile).r;
-  if (!(albedo.x == albedo.x)) albedo = vec3(0.70, 0.58, 0.40);
+  vec2 roughPair = texture2D(uRough, tile).rg;
+  if (!(dryAlb.x == dryAlb.x)) dryAlb = vec3(0.70, 0.58, 0.40);
+  if (!(wetAlb.x == wetAlb.x)) wetAlb = dryAlb * vec3(0.50, 0.44, 0.36);
   if (!(nTex.x == nTex.x)) nTex = vec3(0.0, 0.0, 1.0);
-  if (!(roughTex == roughTex)) roughTex = 0.85;
+  if (!(roughPair.x == roughPair.x)) roughPair = vec2(0.86, 0.30);
 
-  albedo = mix(vec3(0.72, 0.60, 0.42), albedo, 0.52);
+  vec3 albedo = mix(dryAlb, wetAlb, wet);
 
-  vec3 N = safeNormalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.07, vec3(0.0, 1.0, 0.0));
+  vec3 N = safeNormalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.09, vec3(0.0, 1.0, 0.0));
 
-  float dark = mix(1.0, 0.54, wet);
-  albedo *= dark;
-  albedo = mix(albedo, albedo * vec3(0.78, 0.70, 0.58), wet * 0.38);
-  albedo = mix(albedo, albedo * vec3(0.88, 0.86, 0.80), smoothstep(0.003, 0.04, water) * 0.16);
+  albedo *= mix(1.0, 0.94, wet);
+  albedo = mix(albedo, albedo * vec3(0.90, 0.88, 0.82), smoothstep(0.003, 0.04, water) * 0.12);
 
-  float roughness = mix(mix(0.93, 0.84, uGrain), 0.36, wet * 0.82);
-  roughness = mix(roughness, roughTex, 0.14);
-  roughness = clamp(roughness, 0.30, 0.96);
+  float roughTex = mix(roughPair.x, roughPair.y, wet);
+  float roughness = mix(mix(0.90, 0.82, uGrain), 0.30, wet * 0.78);
+  roughness = mix(roughness, roughTex, 0.58);
+  roughness = clamp(roughness, 0.22, 0.96);
 
   vec3 V = safeNormalize(vViewDir, vec3(0.0, 1.0, 0.0));
   vec3 L = safeNormalize(uSunDir, vec3(0.4, 0.8, 0.3));

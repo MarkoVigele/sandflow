@@ -1,11 +1,23 @@
+import {
+  darkenCanvas,
+  deriveCanvasMaps,
+  generateWoodCanvas,
+  imageToCanvas,
+  packRoughnessCanvas,
+} from "./deriveMaps";
 import { fbm, hash2, mulberry32 } from "./noise";
+import { BAKED_TEXTURE_FILES, bakedTextureUrl, preferBakedSand } from "./texturePaths";
 
 export type MapKind = "albedo" | "normal" | "roughness" | "wet";
 
 export interface GeneratedMaps {
   albedo: HTMLCanvasElement;
+  albedoWet?: HTMLCanvasElement;
   normal: HTMLCanvasElement;
   roughness: HTMLCanvasElement;
+  wood?: HTMLCanvasElement;
+  woodNormal?: HTMLCanvasElement;
+  woodRough?: HTMLCanvasElement;
   prompt: string;
   provider: string;
 }
@@ -172,8 +184,94 @@ export class HttpAssetProvider implements AssetProvider {
   }
 }
 
-export function createAssetService(): AssetProvider {
+export type ImageLoader = (url: string) => Promise<HTMLImageElement>;
+
+export async function loadHtmlImage(url: string, timeoutMs = 8000): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const timer = window.setTimeout(() => {
+      img.src = "";
+      reject(new Error(`timeout ${url}`));
+    }, timeoutMs);
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      window.clearTimeout(timer);
+      resolve(img);
+    };
+    img.onerror = () => {
+      window.clearTimeout(timer);
+      reject(new Error(`load ${url}`));
+    };
+    img.src = url;
+  });
+}
+
+async function loadOptionalImage(
+  url: string,
+  loadImage: ImageLoader,
+): Promise<HTMLImageElement | null> {
+  try {
+    return await loadImage(url);
+  } catch {
+    return null;
+  }
+}
+
+function withDerivedSand(
+  dry: HTMLCanvasElement,
+  wet: HTMLCanvasElement,
+  wood: HTMLCanvasElement,
+  prompt: string,
+  provider: string,
+): GeneratedMaps {
+  const dryMaps = deriveCanvasMaps(dry, 1.7);
+  const wetMaps = deriveCanvasMaps(wet, 1.15);
+  const woodMaps = deriveCanvasMaps(wood, 1.35);
+  return {
+    albedo: dry,
+    albedoWet: wet,
+    normal: dryMaps.normal,
+    roughness: packRoughnessCanvas(dryMaps.roughness, wetMaps.roughness),
+    wood,
+    woodNormal: woodMaps.normal,
+    woodRough: woodMaps.roughness,
+    prompt,
+    provider,
+  };
+}
+
+export async function loadLabMaps(
+  prompt: string,
+  procedural: AssetProvider,
+  loadImage: ImageLoader = loadHtmlImage,
+): Promise<GeneratedMaps> {
+  const dryImg = await loadOptionalImage(bakedTextureUrl(BAKED_TEXTURE_FILES.sandDry), loadImage);
+  const wetImg = await loadOptionalImage(bakedTextureUrl(BAKED_TEXTURE_FILES.sandWet), loadImage);
+  const woodImg = await loadOptionalImage(bakedTextureUrl(BAKED_TEXTURE_FILES.woodRim), loadImage);
+
+  const wood = woodImg ? imageToCanvas(woodImg) : generateWoodCanvas();
+  const useBakedDry = preferBakedSand(prompt) && !!dryImg;
+  const dry = useBakedDry ? imageToCanvas(dryImg!) : (await procedural.generate(prompt, 512)).albedo;
+  const wet = wetImg ? imageToCanvas(wetImg) : darkenCanvas(dry);
+
+  const bakedCount = Number(!!dryImg) + Number(!!wetImg) + Number(!!woodImg);
+  const provider =
+    bakedCount === 3 && useBakedDry ? "baked" : bakedCount > 0 ? "baked+procedural" : "procedural";
+
+  return withDerivedSand(dry, wet, wood, prompt, provider);
+}
+
+export interface LabAssetService extends AssetProvider {
+  loadLab(prompt: string): Promise<GeneratedMaps>;
+}
+
+export function createAssetService(): LabAssetService {
   const procedural = new ProceduralAssetProvider();
   const endpoint = (import.meta.env.VITE_ASSET_API as string | undefined) ?? null;
-  return new HttpAssetProvider(endpoint, procedural);
+  const http = new HttpAssetProvider(endpoint, procedural);
+  return {
+    id: http.id,
+    generate: (prompt, size) => http.generate(prompt, size),
+    loadLab: (prompt) => loadLabMaps(prompt, procedural),
+  };
 }

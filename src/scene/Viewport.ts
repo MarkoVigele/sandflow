@@ -25,7 +25,7 @@ import { createMapsTexture, uploadPacked } from "./mapsTexture";
 import { FlowParticles } from "./Particles";
 import { PropsLite, type PropLite } from "./PropsLite";
 import { SandMesh } from "./SandMesh";
-import { createSourceMarker, createTray } from "./Tray";
+import { applyTrayWood, createSourceMarker, createTray, type TrayHandle } from "./Tray";
 import { WaterMesh } from "./WaterMesh";
 
 export const TRAY_SIZE = 8;
@@ -52,6 +52,7 @@ export class Viewport {
   private host: HTMLElement;
   private maps: THREE.DataTexture;
   private sand: SandMesh;
+  private tray: TrayHandle;
   private water: WaterMesh;
   private particles: FlowParticles;
   private sun: THREE.DirectionalLight;
@@ -143,7 +144,8 @@ export class Viewport {
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);
 
-    this.scene.add(createTray(TRAY_SIZE));
+    this.tray = createTray(TRAY_SIZE);
+    this.scene.add(this.tray.group);
 
     const q = store.state.quality;
     const grid = QUALITY_GRID[q];
@@ -192,6 +194,7 @@ export class Viewport {
 
   applyGeneratedMaps(maps: GeneratedMaps): void {
     this.sand.applyMaps(maps);
+    if (maps.wood) applyTrayWood(this.tray, maps.wood, maps.woodNormal, maps.woodRough);
   }
 
   applyParams(): void {
@@ -394,6 +397,7 @@ export class Viewport {
     this.unsubStore();
     this.sim.dispose();
     this.sand.dispose();
+    for (const tex of this.tray.maps) tex.dispose();
     this.water.dispose();
     this.particles.dispose();
     this.aim.dispose();
