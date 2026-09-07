@@ -28,8 +28,9 @@ export function createTray(traySize: number): TrayHandle {
     metalness: 0.02,
   });
 
-  const wallH = 0.42;
-  const wallT = 0.22;
+  // Sand sits at ~BASE * HEIGHT_SCALE ≈ 1.05; rim must clear that so wood is visible.
+  const wallH = 1.18;
+  const wallT = 0.3;
   const inner = traySize;
   const outer = inner + wallT * 2;
 
@@ -76,16 +77,18 @@ export function applyTrayWood(
   tray.maps.length = 0;
 
   const map = canvasTexture(albedo);
-  map.repeat.set(2.4, 1);
+  map.repeat.set(3.2, 1.15);
   tray.maps.push(map);
   tray.wood.map = map;
-  tray.wood.color.set(0xffffff);
-  tray.wood.roughness = 0.74;
-  tray.wood.metalness = 0.03;
+  tray.wood.color.set(0xf3e6d2);
+  tray.wood.roughness = 0.7;
+  tray.wood.metalness = 0.02;
+  tray.wood.envMapIntensity = 0.35;
 
   tray.lip.map = map;
-  tray.lip.color.set(0x6e5a42);
-  tray.lip.roughness = 0.7;
+  tray.lip.color.set(0xe4d2b4);
+  tray.lip.roughness = 0.68;
+  tray.lip.envMapIntensity = 0.3;
 
   if (normal) {
     const n = canvasTexture(normal);
