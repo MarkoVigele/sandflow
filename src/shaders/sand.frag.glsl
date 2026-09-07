@@ -13,12 +13,6 @@ varying vec3 vWorldPos;
 varying vec3 vViewDir;
 varying vec3 vNormalW;
 
-#include <common>
-#include <packing>
-#include <lights_pars_begin>
-#include <shadowmap_pars_fragment>
-#include <shadowmask_pars_fragment>
-
 void main() {
   vec4 maps = texture2D(uMaps, vUv);
   float wet = clamp(maps.b, 0.0, 1.0);
@@ -29,8 +23,7 @@ void main() {
   vec3 nTex = texture2D(uNormal, tile).rgb * 2.0 - 1.0;
   float roughTex = texture2D(uRough, tile).r;
 
-  vec3 N = normalize(vNormalW);
-  N = normalize(N + vec3(nTex.x, 0.0, nTex.y) * 0.35);
+  vec3 N = normalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.35);
 
   float dark = mix(1.0, 0.42, wet);
   albedo *= dark;
@@ -42,21 +35,13 @@ void main() {
   vec3 V = normalize(vViewDir);
   vec3 L = normalize(uSunDir);
   vec3 H = normalize(V + L);
-  float ndotl = max(dot(N, L), 0.0);
   float wrap = clamp((dot(N, L) + 0.18) / 1.18, 0.0, 1.0);
 
-  float shadow = 1.0;
-  if (uReceiveShadow > 0.5) {
-    shadow = mix(0.45, 1.0, getShadowMask());
-  }
-
+  float shadow = mix(1.0, 0.72 + wrap * 0.28, step(0.5, uReceiveShadow));
   float specPow = mix(8.0, 64.0, 1.0 - roughness);
   float spec = pow(max(dot(N, H), 0.0), specPow) * mix(0.03, 0.38, wet);
-  spec *= shadow;
 
-  vec3 diffuse = albedo * (uAmbient + uSunColor * wrap * shadow);
-  vec3 color = diffuse + uSunColor * spec;
-
+  vec3 color = albedo * (uAmbient + uSunColor * wrap * shadow) + uSunColor * spec * shadow;
   float underWater = smoothstep(0.002, 0.03, water);
   color = mix(color, color * vec3(0.82, 0.88, 0.86), underWater * 0.35);
 
