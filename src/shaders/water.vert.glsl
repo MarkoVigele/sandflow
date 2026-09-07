@@ -19,7 +19,7 @@ void main() {
   vFlow = (flow == flow && flow > 0.0) ? flow : 0.0;
   float sheet = 0.0;
   if (water > 0.0008) {
-    sheet = 0.004 + min(water, 0.07) * 0.10;
+    sheet = 0.005 + min(water, 0.08) * 0.12;
   }
   float h = (terrain + sheet) * uHeightScale;
   if (!(h == h)) h = 0.0;

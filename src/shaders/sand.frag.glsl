@@ -28,17 +28,21 @@ void main() {
   if (!(wet == wet)) wet = 0.0;
   if (!(water == water) || water < 0.0) water = 0.0;
 
-  vec2 tile = vUv * (5.2 + uGrain * 3.4);
-  vec3 albedo = texture2D(uAlbedo, tile).rgb;
+  vec2 tile = vUv * (3.6 + uGrain * 2.2);
+  vec2 d = vec2(0.0018, 0.0014);
+  vec3 albedo =
+    (texture2D(uAlbedo, tile).rgb +
+     texture2D(uAlbedo, tile + d).rgb +
+     texture2D(uAlbedo, tile - d).rgb) / 3.0;
   vec3 nTex = texture2D(uNormal, tile).rgb * 2.0 - 1.0;
   float roughTex = texture2D(uRough, tile).r;
   if (!(albedo.x == albedo.x)) albedo = vec3(0.70, 0.58, 0.40);
   if (!(nTex.x == nTex.x)) nTex = vec3(0.0, 0.0, 1.0);
   if (!(roughTex == roughTex)) roughTex = 0.85;
 
-  albedo = mix(vec3(0.71, 0.59, 0.41), albedo, 0.72);
+  albedo = mix(vec3(0.72, 0.60, 0.42), albedo, 0.55);
 
-  vec3 N = safeNormalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.14, vec3(0.0, 1.0, 0.0));
+  vec3 N = safeNormalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.08, vec3(0.0, 1.0, 0.0));
 
   float dark = mix(1.0, 0.72, wet);
   albedo *= dark;
@@ -55,9 +59,9 @@ void main() {
   float wrap = clamp((dot(N, L) + 0.22) / 1.22, 0.0, 1.0);
 
   float shadow = mix(1.0, 0.78 + wrap * 0.22, step(0.5, uReceiveShadow));
-  float specPow = mix(6.0, 28.0, 1.0 - roughness);
-  float spec = pow(max(dot(N, H), 0.0), specPow) * mix(0.02, 0.16, wet);
-  spec = min(spec, 0.18);
+  float specPow = mix(6.0, 20.0, 1.0 - roughness);
+  float spec = pow(max(dot(N, H), 0.0), specPow) * mix(0.015, 0.10, wet);
+  spec = min(spec, 0.10);
 
   vec3 color = albedo * (uAmbient + uSunColor * wrap * shadow) + uSunColor * spec * shadow;
   float underWater = smoothstep(0.003, 0.04, water);

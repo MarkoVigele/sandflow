@@ -29,7 +29,7 @@ void main() {
   float hR = safeHeight(uv + vec2(texel, 0.0));
   float hD = safeHeight(uv + vec2(0.0, -texel));
   float hU = safeHeight(uv + vec2(0.0, texel));
-  vNormalW = safeNormalize(vec3(hL - hR, 2.0 * texel * 10.0, hD - hU), vec3(0.0, 1.0, 0.0));
+  vNormalW = safeNormalize(vec3(hL - hR, 2.0 * texel * 16.0, hD - hU), vec3(0.0, 1.0, 0.0));
 
   vec3 pos = position;
   pos.y = h;
