@@ -1,5 +1,5 @@
+import type { SimApi } from "../sim/api";
 import type { Store } from "../state/store";
-import type { Viewport } from "../scene/Viewport";
 import type { SimParams, ToolId } from "../state/types";
 
 const TOOL_COPY: Record<ToolId, { title: string; body: string }> = {
@@ -8,7 +8,10 @@ const TOOL_COPY: Record<ToolId, { title: string; body: string }> = {
   smooth: { title: "Glätten", body: "Mittelwert über die Nachbarschaft. Nimmt Kanten." },
   dam: { title: "Damm / Wand", body: "Steiler als Aufschütten. Hält Wasser eine Weile." },
   pour: { title: "Gießen", body: "Finger oder Taste halten. Menge über Durchfluss." },
-  source: { title: "Quelle", body: "Tippen setzt. Ziehen verschiebt. Unten löschen." },
+  source: {
+    title: "Quelle",
+    body: "Tippen setzt eine Quelle. Ziehen verschiebt sie. Unten löschen oder den Durchfluss ändern.",
+  },
 };
 
 function slider(
@@ -35,7 +38,7 @@ export class Inspector {
   constructor(
     private store: Store,
     host: HTMLElement,
-    private viewport: Viewport,
+    private api: SimApi,
     private onTexture: (prompt: string) => void,
   ) {
     this.el = host;
@@ -54,20 +57,20 @@ export class Inspector {
   private render(): void {
     const s = this.store.state;
     const copy = TOOL_COPY[s.tool];
-    const src = this.viewport.sources.find((x) => x.id === s.selectedSourceId);
+    const src = this.api.getSources().find((x) => x.id === s.selectedSourceId);
 
     this.el.innerHTML = `
       <section class="inspector-card">
-        <p class="kicker">Werkzeug</p>
+        <p class="kicker">Kontext</p>
         <h3>${copy.title}</h3>
         <p class="lede">${copy.body}</p>
         ${
           s.tool === "source"
             ? `
-          <div class="row">
+          <div class="row source-actions">
             <button class="btn" data-del ${src ? "" : "disabled"}>Quelle löschen</button>
           </div>
-          ${src ? slider("Durchfluss Quelle", 0.2, 6, 0.1, src.rate, "sourceRate") : ""}`
+          ${src ? slider("Durchfluss Quelle", 0.2, 6, 0.1, src.rate, "sourceRate") : `<p class="hint">Keine Quelle gewählt — auf die Wanne tippen.</p>`}`
             : `
           ${s.tool === "pour" ? slider("Durchfluss", 0.25, 4, 0.05, s.pourRate, "pourRate") : ""}
           ${s.tool !== "pour" ? slider("Radius", 0.02, 0.16, 0.005, s.brushRadius, "brushRadius") : ""}
@@ -97,6 +100,7 @@ export class Inspector {
             <input type="text" value="${escapeHtml(s.texturePrompt)}" data-prompt maxlength="80" placeholder="z. B. grober roter Laterit" />
           </label>
           <button class="btn primary" data-tex>Textur erzeugen</button>
+          <p class="hint">Lokal aus der Beschreibung. Ein späterer Dienst kann dieselbe Stelle nutzen.</p>
         </div>
       </section>
     `;
@@ -105,14 +109,13 @@ export class Inspector {
       this.store.patch({ advancedOpen: !this.store.state.advancedOpen });
     });
     this.el.querySelector("[data-reset-water]")?.addEventListener("click", () => {
-      this.viewport.resetWater();
+      this.api.resetWater();
     });
     this.el.querySelector("[data-reset-all]")?.addEventListener("click", () => {
-      this.viewport.resetScene();
+      this.api.resetScene();
     });
-    this.el.querySelector("[data-del]")?.addEventListener("click", async () => {
-      await this.viewport.pushHistory();
-      this.viewport.removeSelectedSource();
+    this.el.querySelector("[data-del]")?.addEventListener("click", () => {
+      void this.api.removeSelectedSource();
     });
     this.el.querySelector("[data-tex]")?.addEventListener("click", () => {
       const prompt =
@@ -131,10 +134,10 @@ export class Inspector {
     if (key === "pourRate") this.store.patch({ pourRate: value });
     else if (key === "brushRadius") this.store.patch({ brushRadius: value });
     else if (key === "brushStrength") this.store.patch({ brushStrength: value });
-    else if (key === "sourceRate") this.viewport.setSelectedRate(value);
+    else if (key === "sourceRate") this.api.setSelectedRate(value);
     else {
       this.store.setParams({ [key]: value } as Partial<SimParams>);
-      this.viewport.applyParams();
+      this.api.applyParams();
     }
     const em = input.previousElementSibling?.querySelector("em");
     if (em) em.textContent = format(value);

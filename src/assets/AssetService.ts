@@ -1,3 +1,7 @@
+/**
+ * Dummy texture service for V1: a short description becomes local canvas maps.
+ * HttpAssetProvider is the later hook (VITE_ASSET_API); it falls back here.
+ */
 import { fbm, hash2, mulberry32 } from "./noise";
 
 export type MapKind = "albedo" | "normal" | "roughness" | "wet";

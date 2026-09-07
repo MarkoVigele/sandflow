@@ -17,18 +17,30 @@ npm run build
 
 Der Build landet in `docs/` (relativer Basispfad, bereit für GitHub Pages). Ein leeres `.nojekyll` liegt mit im Output.
 
-## Steuern
+## Bedienung
+
+Beim ersten Start erscheint eine kurze Anleitung (vier Schritte). Später wieder unter **Über → Kurzanleitung**. Alle Trefferflächen sind mindestens 44 Pixel groß, Ränder beachten die Safe Area.
+
+### Bildschirm
+
+- **Oben** — Presets, Qualität (Niedrig–Ultra), Play / Pause / Schritt, Tempo 0,25×–4×, Rückgängig / Wiederholen, Speichern, Laden, Screenshot. Am Telefon liegt Speichern & Co. unter **Mehr**.
+- **Werkzeuge** — links am Rechner, unten am Telefon: Aufschütten, Graben, Glätten, Damm, Gießen, Quelle, Kamera.
+- **Kontext** — rechts am Rechner, unter der Wanne am Telefon. Zeigt das aktive Werkzeug, Radius/Stärke oder Quellendurchfluss, Reset, Erweitert, Sandtextur.
+- **Livewerte** — einklappbar (Wasser, erodierter Sand, FPS, Gitter).
+
+### Steuern
 
 | Aktion | Desktop | Touch |
 | --- | --- | --- |
 | Werkzeug | Linke Taste / ziehen | Ein Finger |
 | Gießen | Taste halten | Finger halten |
+| Quelle setzen / verschieben / löschen | Tippen, ziehen, Knopf im Kontext | gleich |
 | Kamera drehen / zoomen | Rechte Taste, Rad, Mitteltaste | Zwei Finger. Oder Werkzeug **Kamera** für einen Finger |
 | Play / Pause | Leertaste oder Transportleiste | Transportleiste |
 | Werkzeuge 1–6 | Tasten `1`–`6` | Symbolleiste |
-| Rückgängig / Wiederholen | `Strg+Z` / `Strg+Y` | Symbole oben |
+| Rückgängig / Wiederholen | `Strg+Z` / `Strg+Y` | Symbole oben bzw. **Mehr** |
 
-Oben: Presets, Qualität, Tempo (0,25×–4×), Speichern, Laden, Screenshot. Rechts (am Telefon unten): Kontext zum aktiven Werkzeug. Unter **Erweitert** liegen Körnung, Kohäsion, Infiltration, Erosionsrate und Sedimentkapazität.
+Unter **Erweitert** liegen Körnung, Kohäsion, Infiltration, Erosionsrate und Sedimentkapazität.
 
 ## Presets
 

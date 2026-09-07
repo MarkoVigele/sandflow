@@ -21,9 +21,13 @@ export interface UiState {
   statsOpen: boolean;
   galleryOpen: boolean;
   aboutOpen: boolean;
+  onboardingOpen: boolean;
+  onboardingStep: number;
   cameraMode: boolean;
   texturePrompt: string;
   presetId: string;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 export const initialUiState = (): UiState => ({
@@ -41,9 +45,13 @@ export const initialUiState = (): UiState => ({
   statsOpen: false,
   galleryOpen: false,
   aboutOpen: false,
+  onboardingOpen: false,
+  onboardingStep: 0,
   cameraMode: false,
   texturePrompt: "feiner Quarzsand, warm, trocken",
   presetId: "flat",
+  canUndo: false,
+  canRedo: false,
 });
 
 type Listener = () => void;

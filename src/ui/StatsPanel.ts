@@ -1,5 +1,5 @@
+import type { SimApi } from "../sim/api";
 import type { Store } from "../state/store";
-import type { Viewport } from "../scene/Viewport";
 
 export class StatsPanel {
   el: HTMLElement;
@@ -7,7 +7,7 @@ export class StatsPanel {
   constructor(
     private store: Store,
     host: HTMLElement,
-    private viewport: Viewport,
+    private api: SimApi,
   ) {
     this.el = host;
     this.render();
@@ -42,9 +42,17 @@ export class StatsPanel {
     const f = this.el.querySelector("[data-f]");
     const g = this.el.querySelector("[data-g]");
     if (!w || !e || !f || !g) return;
-    w.textContent = this.viewport.waterVolume.toFixed(1);
-    e.textContent = this.viewport.erodedSand.toFixed(1);
-    f.textContent = this.viewport.fps ? this.viewport.fps.toFixed(0) : "—";
-    g.textContent = `${this.viewport.lastSize || "—"}²`;
+    if (!this.api.hasLiveBackend()) {
+      w.textContent = "—";
+      e.textContent = "—";
+      f.textContent = "—";
+      g.textContent = "—";
+      return;
+    }
+    const s = this.api.getStats();
+    w.textContent = s.waterVolume.toFixed(1);
+    e.textContent = s.erodedSand.toFixed(1);
+    f.textContent = s.fps ? s.fps.toFixed(0) : "—";
+    g.textContent = s.grid ? `${s.grid}²` : "—";
   }
 }

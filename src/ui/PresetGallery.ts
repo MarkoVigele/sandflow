@@ -1,4 +1,4 @@
-import { PRESETS } from "../sim/presets";
+import type { PresetCard } from "../sim/api";
 import type { Store } from "../state/store";
 import { ICONS } from "./icons";
 
@@ -7,6 +7,7 @@ export class PresetGallery {
   constructor(
     private store: Store,
     host: HTMLElement,
+    private cards: PresetCard[],
     private onPick: (id: string) => void,
   ) {
     this.el = host;
@@ -26,14 +27,16 @@ export class PresetGallery {
             <button class="icon-btn" data-x title="Schließen">${ICONS.close}</button>
           </header>
           <div class="cards">
-            ${PRESETS.map(
-              (p) => `
+            ${this.cards
+              .map(
+                (p) => `
               <button class="card ${this.store.state.presetId === p.id ? "is-active" : ""}" data-id="${p.id}">
                 <span class="card-swatch swatch-${p.id}"></span>
                 <strong>${p.title}</strong>
                 <span>${p.blurb}</span>
               </button>`,
-            ).join("")}
+              )
+              .join("")}
           </div>
         </div>
       </div>

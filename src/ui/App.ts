@@ -1,29 +1,20 @@
-import { createAssetService } from "../assets/AssetService";
 import { Viewport } from "../scene/Viewport";
-import { resampleHeight } from "../sim/presets";
-import {
-  downloadDataUrl,
-  downloadText,
-  encodeScene,
-  packMaps,
-  parseScene,
-  toJson,
-  unpackMaps,
-} from "../state/persist";
 import { Store } from "../state/store";
-import { QUALITY_GRID } from "../state/types";
+import { createDummyAssetService } from "./DummyAssetService";
 import { Inspector } from "./Inspector";
+import { Onboarding, shouldOpenOnboarding } from "./Onboarding";
 import { PresetGallery } from "./PresetGallery";
+import { SaveLoad } from "./SaveLoad";
 import { StatsPanel } from "./StatsPanel";
 import { Toolbar } from "./Toolbar";
 import { TopBar } from "./TopBar";
+import { bindViewport } from "./bindSim";
 import { ICONS } from "./icons";
+import { showToast } from "./Toast";
 
 export class App {
   readonly store = new Store();
   readonly viewport: Viewport;
-  private assets = createAssetService();
-  private fileInput: HTMLInputElement;
 
   constructor(root: HTMLElement) {
     root.innerHTML = `
@@ -34,112 +25,69 @@ export class App {
       <aside id="stats" class="stats"></aside>
       <div id="gallery"></div>
       <div id="about"></div>
+      <div id="onboarding"></div>
     `;
 
     const viewportHost = root.querySelector<HTMLElement>("#viewport")!;
-    this.viewport = new Viewport(viewportHost, this.store, () => {
-      /* store patches already notify */
-    });
+    this.viewport = new Viewport(viewportHost, this.store, () => this.syncHistory());
+    const api = bindViewport(this.viewport, this.store);
+    const assets = createDummyAssetService();
+    const files = new SaveLoad(this.store, api, showToast);
+    root.appendChild(files.fileInput);
+
+    if (shouldOpenOnboarding()) {
+      this.store.patch({ onboardingOpen: true });
+    }
 
     new Toolbar(this.store, root.querySelector("#toolbar")!);
-    new Inspector(
-      this.store,
-      root.querySelector("#inspector")!,
-      this.viewport,
-      (prompt) => void this.generateTexture(prompt),
-    );
+    new Inspector(this.store, root.querySelector("#inspector")!, api, (prompt) => {
+      void this.generateTexture(assets, api, prompt);
+    });
     new TopBar(this.store, root.querySelector("#topbar")!, {
-      onQuality: (q) => this.viewport.applyQuality(q, true),
-      onSave: () => void this.saveScene(),
-      onLoad: () => this.fileInput.click(),
-      onShot: () => this.screenshot(),
-      onUndo: () => void this.viewport.undo(),
-      onRedo: () => void this.viewport.redo(),
-      onStep: () => this.viewport.stepOnce(),
+      onQuality: (q) => api.setQuality(q),
+      onSave: () => void files.save(),
+      onLoad: () => files.openPicker(),
+      onShot: () => files.screenshot(),
+      onUndo: () => void this.runHistory(() => api.undo()),
+      onRedo: () => void this.runHistory(() => api.redo()),
+      onStep: () => api.stepOnce(),
     });
-    new PresetGallery(this.store, root.querySelector("#gallery")!, (id) => {
-      this.viewport.loadPreset(id, true);
+    new PresetGallery(this.store, root.querySelector("#gallery")!, api.listPresets(), (id) => {
+      api.loadPreset(id);
     });
-    new StatsPanel(this.store, root.querySelector("#stats")!, this.viewport);
-
-    this.fileInput = document.createElement("input");
-    this.fileInput.type = "file";
-    this.fileInput.accept = "application/json";
-    this.fileInput.hidden = true;
-    root.appendChild(this.fileInput);
-    this.fileInput.addEventListener("change", () => void this.loadScene());
+    new StatsPanel(this.store, root.querySelector("#stats")!, api);
+    new Onboarding(this.store, root.querySelector("#onboarding")!);
 
     this.bindAbout(root.querySelector("#about")!);
-    this.bindKeys();
-    void this.generateTexture(this.store.state.texturePrompt);
+    this.bindKeys(api);
+    void this.generateTexture(assets, api, this.store.state.texturePrompt);
+    this.syncHistory();
 
     if (!this.viewport.renderer.capabilities.isWebGL2) {
-      this.toast("WebGL2 fehlt — Sandflow braucht einen aktuellen Browser.");
+      showToast("WebGL2 fehlt — Sandflow braucht einen aktuellen Browser.");
     }
   }
 
-  private async generateTexture(prompt: string): Promise<void> {
-    const maps = await this.assets.generate(prompt, 512);
-    this.viewport.applyGeneratedMaps(maps);
+  private async generateTexture(
+    assets: ReturnType<typeof createDummyAssetService>,
+    api: ReturnType<typeof bindViewport>,
+    prompt: string,
+  ): Promise<void> {
+    const maps = await assets.generate(prompt, 512);
+    api.applyGeneratedMaps(maps);
   }
 
-  private async saveScene(): Promise<void> {
-    const snap = await this.viewport.snapshot();
-    const packed = packMaps(snap.terrain, snap.water, snap.wetness);
-    const file = encodeScene({
-      name: `sandflow-${this.store.state.presetId}`,
-      quality: this.store.state.quality,
-      params: this.store.state.params,
-      presetId: this.store.state.presetId,
-      size: snap.size,
-      ...packed,
-      sources: snap.sources,
-      texturePrompt: this.store.state.texturePrompt,
-    });
-    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-    downloadText(`sandflow-${stamp}.json`, toJson(file), "application/json");
+  private async runHistory(op: () => Promise<void>): Promise<void> {
+    await op();
+    this.syncHistory();
   }
 
-  private async loadScene(): Promise<void> {
-    const file = this.fileInput.files?.[0];
-    this.fileInput.value = "";
-    if (!file) return;
-    try {
-      const scene = parseScene(await file.text());
-      const maps = unpackMaps(scene);
-      const grid = QUALITY_GRID[this.store.state.quality];
-      const terrain =
-        scene.size === grid ? maps.terrain : resampleHeight(maps.terrain, scene.size, grid);
-      const water =
-        scene.size === grid ? maps.water : resampleHeight(maps.water, scene.size, grid);
-      const wetness =
-        scene.size === grid ? maps.wetness : resampleHeight(maps.wetness, scene.size, grid);
-      this.store.patch({
-        params: scene.params,
-        presetId: scene.presetId,
-        texturePrompt: scene.texturePrompt,
-        selectedSourceId: scene.sources[0]?.id ?? null,
-      });
-      this.viewport.sources = scene.sources.map((s) => ({ ...s }));
-      this.viewport.applySnapshot({
-        size: grid,
-        terrain,
-        water,
-        wetness,
-        sediment: new Float32Array(grid * grid),
-        sources: scene.sources,
-        erodedSand: 0,
-      });
-      this.viewport.applyParams();
-      void this.generateTexture(scene.texturePrompt);
-    } catch {
-      this.toast("Datei konnte nicht gelesen werden.");
+  private syncHistory(): void {
+    const canUndo = this.viewport.history.canUndo;
+    const canRedo = this.viewport.history.canRedo;
+    if (canUndo !== this.store.state.canUndo || canRedo !== this.store.state.canRedo) {
+      this.store.patch({ canUndo, canRedo });
     }
-  }
-
-  private screenshot(): void {
-    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-    downloadDataUrl(`sandflow-${stamp}.png`, this.viewport.screenshotPng());
   }
 
   private bindAbout(host: HTMLElement): void {
@@ -157,7 +105,10 @@ export class App {
             </header>
             <p>Wasser sucht sich Wege durch Sand: erst dünne Adern, dann ein Bett, später ein verzweigtes Netz. V1 ist der Kern — spielbar, ohne Extra-Firlefanz.</p>
             <p>Rechtsklick oder zwei Finger drehen die Kamera. Ein Finger (oder die linke Taste) bedient das Werkzeug. Unter <em>Kamera</em> geht das Drehen auch mit einem Finger.</p>
-            <p>Texturen entstehen lokal aus einer kurzen Beschreibung. Ein externer Dienst kann später an dieselbe Stelle.</p>
+            <p>Die Sandtextur entsteht lokal aus einer kurzen Beschreibung. Ein externer Dienst kann später an dieselbe Stelle.</p>
+            <div class="row">
+              <button class="btn primary" data-guide>Kurzanleitung</button>
+            </div>
           </div>
         </div>`
         : "";
@@ -167,12 +118,15 @@ export class App {
       host.querySelector("[data-close]")?.addEventListener("click", (e) => {
         if (e.target === e.currentTarget) this.store.patch({ aboutOpen: false });
       });
+      host.querySelector("[data-guide]")?.addEventListener("click", () => {
+        this.store.patch({ aboutOpen: false, onboardingOpen: true, onboardingStep: 0 });
+      });
     };
     paint();
     this.store.subscribe(paint);
   }
 
-  private bindKeys(): void {
+  private bindKeys(api: ReturnType<typeof bindViewport>): void {
     window.addEventListener("keydown", (e) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const k = e.key.toLowerCase();
@@ -182,24 +136,16 @@ export class App {
       }
       if ((e.metaKey || e.ctrlKey) && k === "z") {
         e.preventDefault();
-        if (e.shiftKey) void this.viewport.redo();
-        else void this.viewport.undo();
+        if (e.shiftKey) void this.runHistory(() => api.redo());
+        else void this.runHistory(() => api.undo());
       }
       if ((e.metaKey || e.ctrlKey) && k === "y") {
         e.preventDefault();
-        void this.viewport.redo();
+        void this.runHistory(() => api.redo());
       }
       const tools = ["pile", "dig", "smooth", "dam", "pour", "source"] as const;
       const n = Number(e.key);
       if (n >= 1 && n <= 6) this.store.patch({ tool: tools[n - 1], cameraMode: false });
     });
-  }
-
-  private toast(msg: string): void {
-    const el = document.createElement("div");
-    el.className = "toast";
-    el.textContent = msg;
-    document.body.appendChild(el);
-    window.setTimeout(() => el.remove(), 4200);
   }
 }
