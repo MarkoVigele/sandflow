@@ -100,7 +100,7 @@ export class Inspector {
             <input type="text" value="${escapeHtml(s.texturePrompt)}" data-prompt maxlength="80" placeholder="z. B. grober roter Laterit" />
           </label>
           <button class="btn primary" data-tex>Textur erzeugen</button>
-          <p class="hint">Lokal aus der Beschreibung. Ein späterer Dienst kann dieselbe Stelle nutzen.</p>
+          <p class="hint">Kurze Beschreibung für die Sandoberfläche. Die Maps kommen vom Asset-Dienst.</p>
         </div>
       </section>
     `;

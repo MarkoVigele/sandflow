@@ -1,6 +1,7 @@
+import { createAssetService, type AssetProvider } from "../assets/AssetService";
 import { Viewport } from "../scene/Viewport";
+import type { SimApi } from "../sim/api";
 import { Store } from "../state/store";
-import { createDummyAssetService } from "./DummyAssetService";
 import { Inspector } from "./Inspector";
 import { Onboarding, shouldOpenOnboarding } from "./Onboarding";
 import { PresetGallery } from "./PresetGallery";
@@ -31,7 +32,7 @@ export class App {
     const viewportHost = root.querySelector<HTMLElement>("#viewport")!;
     this.viewport = new Viewport(viewportHost, this.store, () => this.syncHistory());
     const api = bindViewport(this.viewport, this.store);
-    const assets = createDummyAssetService();
+    const assets = createAssetService();
     const files = new SaveLoad(this.store, api, showToast);
     root.appendChild(files.fileInput);
 
@@ -69,12 +70,16 @@ export class App {
   }
 
   private async generateTexture(
-    assets: ReturnType<typeof createDummyAssetService>,
-    api: ReturnType<typeof bindViewport>,
+    assets: AssetProvider,
+    api: SimApi,
     prompt: string,
   ): Promise<void> {
-    const maps = await assets.generate(prompt, 512);
-    api.applyGeneratedMaps(maps);
+    try {
+      const maps = await assets.generate(prompt, 512);
+      api.applyGeneratedMaps(maps);
+    } catch {
+      showToast("Textur konnte nicht erzeugt werden.");
+    }
   }
 
   private async runHistory(op: () => Promise<void>): Promise<void> {
@@ -126,7 +131,7 @@ export class App {
     this.store.subscribe(paint);
   }
 
-  private bindKeys(api: ReturnType<typeof bindViewport>): void {
+  private bindKeys(api: SimApi): void {
     window.addEventListener("keydown", (e) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const k = e.key.toLowerCase();
