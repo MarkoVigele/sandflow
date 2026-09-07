@@ -3,12 +3,12 @@ import type { Viewport } from "../scene/Viewport";
 import type { SimParams, ToolId } from "../state/types";
 
 const TOOL_COPY: Record<ToolId, { title: string; body: string }> = {
-  pile: { title: "Aufschütten", body: "Ziehen, um Sand anzuhäufen. Radius und Stärke unten." },
-  dig: { title: "Graben", body: "Sand abtragen — gut für Rinnen, bevor du gießt." },
-  smooth: { title: "Glätten", body: "Mittelwert über die Nachbarschaft. Nimmt Kanten." },
-  dam: { title: "Damm / Wand", body: "Steiler als Aufschütten. Hält Wasser eine Weile." },
-  pour: { title: "Gießen", body: "Finger oder Taste halten. Menge über Durchfluss." },
-  source: { title: "Quelle", body: "Tippen setzt. Ziehen verschiebt. Unten löschen." },
+  pile: { title: "Aufschütten", body: "Kreis = Pinselradius. Ziehen, um Sand anzuhäufen." },
+  dig: { title: "Graben", body: "Kreis = Pinselradius. Sand abtragen — gut für Rinnen." },
+  smooth: { title: "Glätten", body: "Kreis = Pinselradius. Mittelwert über die Nachbarschaft." },
+  dam: { title: "Damm / Wand", body: "Kreis = Pinselradius. Steiler als Aufschütten." },
+  pour: { title: "Gießen", body: "Der Kreis auf dem Sand zeigt die Tropfstelle. Halten zum Gießen." },
+  source: { title: "Quelle", body: "Kreis unter dem Finger: Tippen setzt, Ziehen verschiebt." },
 };
 
 function slider(
