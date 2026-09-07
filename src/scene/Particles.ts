@@ -66,7 +66,7 @@ export class FlowParticles {
       uniforms: {
         uTime: { value: 0 },
         uPixelRatio: { value: 1 },
-        uSize: { value: 5.4 },
+        uSize: { value: 6.4 },
       },
       vertexShader: particleVert,
       fragmentShader: particleFrag,

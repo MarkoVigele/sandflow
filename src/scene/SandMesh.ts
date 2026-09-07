@@ -3,7 +3,8 @@ import sandVert from "../shaders/sand.vert.glsl?raw";
 import sandFrag from "../shaders/sand.frag.glsl?raw";
 import type { QualityId } from "../state/types";
 import { canvasTexture, linearCanvasTexture } from "./mapsTexture";
-import type { GeneratedMaps } from "../assets/AssetService";
+import { paintSandMaps, type GeneratedMaps } from "../assets/AssetService";
+import { parseSandPalette } from "../assets/lookPrompts";
 import { applyLookUniforms, LOOK } from "./look";
 
 const MESH_SEGS: Record<QualityId, number> = {
@@ -71,6 +72,12 @@ export class SandMesh {
       fragmentShader: sandFrag,
     });
     applyLookUniforms(this.material);
+    this.applyMaps({
+      ...paintSandMaps(96, parseSandPalette("feiner Quarzsand, warm, trocken"), 0x51a7d),
+      prompt: "preview",
+      composedPrompt: "preview",
+      provider: "preview",
+    });
 
     this.mesh = new THREE.Mesh(geo, this.material);
     this.mesh.receiveShadow = true;

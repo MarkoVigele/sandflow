@@ -3,19 +3,19 @@ import * as THREE from "three";
 /** Shared photoreal-lab look. Shaders and lights stay in lockstep. */
 export const LOOK = {
   sunDir: new THREE.Vector3(0.44, 0.86, 0.26).normalize(),
-  sunColor: new THREE.Color(1.0, 0.9, 0.74),
-  ambient: new THREE.Color(0.19, 0.175, 0.155),
-  fillColor: new THREE.Color(0.52, 0.6, 0.7),
-  hemiSky: 0xb8c6d4,
-  hemiGround: 0x5a4a36,
-  bg: 0x16130f,
-  fogNear: 16,
-  fogFar: 32,
-  sunIntensity: 1.28,
-  fillIntensity: 0.32,
-  hemiIntensity: 0.42,
-  exposure: 1.08,
-  envIntensity: 0.48,
+  sunColor: new THREE.Color(1.0, 0.92, 0.76),
+  ambient: new THREE.Color(0.24, 0.22, 0.19),
+  fillColor: new THREE.Color(0.58, 0.64, 0.72),
+  hemiSky: 0xc4d2de,
+  hemiGround: 0x6a5640,
+  bg: 0x18140f,
+  fogNear: 18,
+  fogFar: 36,
+  sunIntensity: 1.55,
+  fillIntensity: 0.4,
+  hemiIntensity: 0.55,
+  exposure: 1.18,
+  envIntensity: 0.55,
 } as const;
 
 export function applyLookUniforms(mat: THREE.ShaderMaterial): void {

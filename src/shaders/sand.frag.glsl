@@ -30,7 +30,7 @@ void main() {
   float water = maps.g;
   float flow = maps.a;
 
-  vec2 tile = vUv * (9.0 + uGrain * 10.0);
+  vec2 tile = vUv * (4.2 + uGrain * 5.5);
   vec3 dryAlb = texture2D(uAlbedo, tile).rgb;
   vec3 wetAlb = texture2D(uWetAlbedo, tile).rgb;
   vec3 nTex = texture2D(uNormal, tile).rgb * 2.0 - 1.0;
@@ -41,12 +41,12 @@ void main() {
   float hU = texture2D(uHeight, tile + vec2(0.0, 0.002)).r;
   vec3 nH = normalize(vec3(hL - hR, 0.18, hD - hU));
 
-  vec3 albedo = mix(dryAlb, wetAlb, wet);
-  float wetEdge = smoothstep(0.12, 0.38, wet) * (1.0 - smoothstep(0.42, 0.82, wet));
-  albedo *= 1.0 - wetEdge * 0.1;
-  albedo = mix(albedo, albedo * vec3(0.78, 0.74, 0.64), wet * 0.28);
+  vec3 albedo = mix(dryAlb, wetAlb, smoothstep(0.04, 0.72, wet));
+  float wetEdge = smoothstep(0.1, 0.36, wet) * (1.0 - smoothstep(0.4, 0.8, wet));
+  albedo *= 1.0 - wetEdge * 0.16;
+  albedo = mix(albedo, albedo * vec3(0.7, 0.64, 0.52), wet * 0.4);
 
-  vec3 N = normalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.38 + nH * 0.16);
+  vec3 N = normalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.62 + nH * 0.28);
   float roughness = mix(roughPack.r, roughPack.g, wet * 0.94);
   roughness = mix(mix(0.93, 0.76, uGrain), roughness, 0.72);
   roughness = mix(roughness, 0.22, wet * 0.78);

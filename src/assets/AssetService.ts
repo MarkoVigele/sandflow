@@ -95,28 +95,24 @@ export function paintSandMaps(
   const rImg = rCtx.createImageData(size, size);
   const hImg = hCtx.createImageData(size, size);
 
-  const freq = 5.5 + pal.grain * 9;
+    const freq = 5.5 + pal.grain * 9;
   const heights = new Float32Array(size * size);
 
   for (let y = 0; y < size; y++) {
     const v = y / size;
     for (let x = 0; x < size; x++) {
       const u = x / size;
-      const n1 = fbm(u * freq, v * freq, 4, seed);
-      const n2 = fbm(u * freq * 3.4 + 4.1, v * freq * 3.4, 3, seed + 3);
+      const n1 = fbm(u * freq, v * freq, 3, seed);
       const cell = hash2(Math.floor(u * freq * 5.2), Math.floor(v * freq * 5.2), seed + 9);
-      const grainBump = (cell - 0.5) * (0.18 + pal.grain * 0.22);
-      heights[y * size + x] = Math.min(1, Math.max(0, n1 * 0.62 + n2 * 0.28 + grainBump + 0.12));
+      const grainBump = (cell - 0.5) * (0.2 + pal.grain * 0.24);
+      heights[y * size + x] = Math.min(1, Math.max(0, n1 * 0.82 + grainBump + 0.1));
     }
   }
 
   for (let y = 0; y < size; y++) {
-    const v = y / size;
     for (let x = 0; x < size; x++) {
-      const u = x / size;
       const i = (y * size + x) * 4;
       const h = heights[y * size + x];
-      const n2 = fbm(u * freq * 3.4 + 4.1, v * freq * 3.4, 2, seed + 3);
       const speck = hash2(x * 0.37, y * 0.41, seed);
       const sparkle = hash2(x * 0.91, y * 1.17, seed + 21);
 
@@ -145,8 +141,8 @@ export function paintSandMaps(
       nImg.data[i + 2] = 255;
       nImg.data[i + 3] = 255;
 
-      const dryRough = 188 + n2 * 42 + pal.grain * 22 + (speck > 0.93 ? 18 : 0);
-      const wetRough = 58 + n2 * 28 + pal.grain * 10;
+      const dryRough = 176 + h * 52 + pal.grain * 22 + (speck > 0.93 ? 18 : 0);
+      const wetRough = 52 + h * 36 + pal.grain * 10;
       rImg.data[i] = Math.min(255, dryRough);
       rImg.data[i + 1] = Math.min(255, wetRough);
       rImg.data[i + 2] = rImg.data[i];
@@ -178,7 +174,8 @@ export class DummyKIAssetProvider implements AssetProvider {
     const composed = composeUserPrompt(userPrompt);
     const seed = seedFromPrompt(composed);
     const pal = parseSandPalette(userPrompt || composed);
-    const maps = paintSandMaps(size, pal, seed);
+    const dim = Math.max(64, Math.min(size, 256));
+    const maps = paintSandMaps(dim, pal, seed);
     return {
       ...maps,
       prompt: userPrompt,

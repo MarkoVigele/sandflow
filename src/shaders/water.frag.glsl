@@ -25,9 +25,9 @@ void main() {
   float depth = clamp(vDepth * 13.0, 0.0, 1.0);
   float turbid = clamp(vFlow * 4.2 + depth * 0.22, 0.0, 1.0);
 
-  vec3 clearC = vec3(0.26, 0.5, 0.56);
-  vec3 shallow = vec3(0.46, 0.66, 0.64);
-  vec3 muddy = vec3(0.44, 0.38, 0.26);
+  vec3 clearC = vec3(0.32, 0.56, 0.62);
+  vec3 shallow = vec3(0.58, 0.74, 0.7);
+  vec3 muddy = vec3(0.5, 0.42, 0.28);
   vec3 base = mix(mix(shallow, clearC, depth), muddy, turbid * 0.48);
 
   vec3 V = normalize(vViewDir);
@@ -53,8 +53,8 @@ void main() {
   color = mix(color, foamC, foam * 0.55);
   color += rip * 0.025 * uSunColor;
 
-  float alpha = mix(0.16, 0.58, depth) + turbid * 0.1 + fresnel * 0.24 + foam * 0.08;
-  alpha = clamp(alpha, 0.1, 0.76);
+  float alpha = mix(0.22, 0.64, depth) + turbid * 0.12 + fresnel * 0.26 + foam * 0.1;
+  alpha = clamp(alpha, 0.16, 0.8);
 
   gl_FragColor = vec4(color, alpha);
 }

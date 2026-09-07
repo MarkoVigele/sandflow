@@ -15,8 +15,10 @@ export function createTray(traySize: number): THREE.Group {
   const bench = createLabBenchMaterial();
   const underMat = createUnderBedMaterial();
 
-  const wallH = 0.42;
-  const wallT = 0.22;
+  // Sand sits near y = 0.42 * HEIGHT_SCALE ≈ 1.5; walls must clear that
+  // so a wood rim reads from the default camera.
+  const wallH = 1.78;
+  const wallT = 0.3;
   const inner = traySize;
   const outer = inner + wallT * 2;
 

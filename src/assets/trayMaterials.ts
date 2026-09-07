@@ -59,12 +59,12 @@ function paintWood(size = 256): {
       const i = (y * size + x) * 4;
       const h = heights[y * size + x];
       const dark = h > 0.62;
-      const r = 118 + h * 52 + (rand() - 0.5) * 10;
-      const g = 78 + h * 36 + (rand() - 0.5) * 8;
-      const b = 46 + h * 18;
-      aImg.data[i] = Math.max(0, Math.min(255, dark ? r * 0.72 : r));
-      aImg.data[i + 1] = Math.max(0, Math.min(255, dark ? g * 0.7 : g));
-      aImg.data[i + 2] = Math.max(0, Math.min(255, dark ? b * 0.68 : b));
+      const r = 148 + h * 58 + (rand() - 0.5) * 10;
+      const g = 102 + h * 40 + (rand() - 0.5) * 8;
+      const b = 62 + h * 20;
+      aImg.data[i] = Math.max(0, Math.min(255, dark ? r * 0.78 : r));
+      aImg.data[i + 1] = Math.max(0, Math.min(255, dark ? g * 0.76 : g));
+      aImg.data[i + 2] = Math.max(0, Math.min(255, dark ? b * 0.72 : b));
       aImg.data[i + 3] = 255;
 
       const rough = dark ? 150 : 190 + h * 30;
@@ -143,7 +143,10 @@ export function createWoodMaterial(): THREE.MeshStandardMaterial {
     metalness: 0.04,
     envMapIntensity: 0.45,
   });
-  mat.normalScale.set(0.45, 0.45);
+  mat.normalScale.set(0.55, 0.55);
+  t.albedo.repeat.set(1.4, 2.2);
+  t.roughness.repeat.set(1.4, 2.2);
+  t.normal.repeat.set(1.4, 2.2);
   mat.userData.maps = t;
   return mat;
 }
@@ -165,12 +168,18 @@ export function createLabBenchMaterial(): THREE.MeshStandardMaterial {
 }
 
 export function createRimLipMaterial(): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
-    color: 0x3a2e22,
-    roughness: 0.48,
-    metalness: 0.22,
-    envMapIntensity: 0.7,
+  const painted = paintWood();
+  const t = toMaps(painted.albedo, painted.roughness, painted.normal);
+  const mat = new THREE.MeshStandardMaterial({
+    map: t.albedo,
+    roughnessMap: t.roughness,
+    color: 0xc4a06a,
+    roughness: 0.52,
+    metalness: 0.08,
+    envMapIntensity: 0.55,
   });
+  mat.userData.maps = t;
+  return mat;
 }
 
 export function createUnderBedMaterial(): THREE.MeshStandardMaterial {
