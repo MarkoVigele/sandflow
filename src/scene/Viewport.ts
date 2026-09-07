@@ -13,6 +13,7 @@ import {
   type ToolId,
   type WaterSource,
 } from "../state/types";
+import { AimCursor, type AimCursorState, type AimHit } from "../ui/AimCursor";
 import { createMapsTexture, uploadPacked } from "./mapsTexture";
 import { FlowParticles } from "./Particles";
 import { SandMesh } from "./SandMesh";
@@ -59,7 +60,10 @@ export class Viewport {
   private lowFpsMs = 0;
   private stepAccum = 0;
   private clock = new THREE.Clock();
-  private cursorRing: THREE.Mesh;
+  private aim = new AimCursor();
+  private lastAimHit: AimHit | null = null;
+  private lastPointer: { clientX: number; clientY: number } | null = null;
+  private unsubStore: () => void = () => {};
   private onUi: () => void;
 
   constructor(host: HTMLElement, store: Store, onUi: () => void) {
@@ -139,19 +143,14 @@ export class Viewport {
     this.sourceGroup.name = "sources";
     this.scene.add(this.sourceGroup);
 
-    const ringGeo = new THREE.RingGeometry(0.16, 0.2, 40);
-    ringGeo.rotateX(-Math.PI / 2);
-    this.cursorRing = new THREE.Mesh(
-      ringGeo,
-      new THREE.MeshBasicMaterial({
-        color: 0xd4b483,
-        transparent: true,
-        opacity: 0.55,
-        depthWrite: false,
-      }),
-    );
-    this.cursorRing.visible = false;
-    this.scene.add(this.cursorRing);
+    this.scene.add(this.aim.group);
+    this.aim.attachHud(host);
+    this.syncAimHost();
+    this.unsubStore = this.store.subscribe(() => {
+      this.syncAimHost();
+      if (this.store.state.cameraMode) this.aim.hide();
+      else if (this.lastAimHit) this.refreshAim(this.lastAimHit);
+    });
 
     this.sim = new SimClient();
     this.sim.onFrame((frame) => this.applyFrame(frame));
@@ -162,7 +161,8 @@ export class Viewport {
     canvas.addEventListener("pointerdown", this.onPointerDown);
     canvas.addEventListener("pointermove", this.onPointerMove);
     canvas.addEventListener("pointerup", this.onPointerUp);
-    canvas.addEventListener("pointerleave", this.onPointerUp);
+    canvas.addEventListener("pointercancel", this.onPointerUp);
+    canvas.addEventListener("pointerleave", this.onPointerLeave);
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
     window.addEventListener("resize", this.resize);
     this.resize();
@@ -318,10 +318,12 @@ export class Viewport {
   dispose(): void {
     cancelAnimationFrame(this.raf);
     window.removeEventListener("resize", this.resize);
+    this.unsubStore();
     this.sim.dispose();
     this.sand.dispose();
     this.water.dispose();
     this.particles.dispose();
+    this.aim.dispose();
     this.maps.dispose();
     this.renderer.dispose();
   }
@@ -366,14 +368,50 @@ export class Viewport {
     return this.lastPacked[(y * size + x) * 4 + MAP_R_TERRAIN] ?? 0.42;
   }
 
-  private hitUv(ev: PointerEvent): { u: number; v: number; world: THREE.Vector3 } | null {
+  private hitUv(ev: PointerEvent): AimHit | null {
     const rect = this.canvas.getBoundingClientRect();
     this.pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
     this.pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.pointer, this.camera);
     const hits = this.raycaster.intersectObject(this.sand.mesh, false);
     if (!hits.length || !hits[0].uv) return null;
-    return { u: hits[0].uv.x, v: hits[0].uv.y, world: hits[0].point };
+    const u = hits[0].uv.x;
+    const v = hits[0].uv.y;
+    return {
+      u,
+      v,
+      world: this.surfacePoint(u, v),
+    };
+  }
+
+  private surfacePoint(u: number, v: number): THREE.Vector3 {
+    return new THREE.Vector3(
+      (u - 0.5) * TRAY_SIZE,
+      this.sampleHeight(u, v) * HEIGHT_SCALE,
+      (v - 0.5) * TRAY_SIZE,
+    );
+  }
+
+  private aimState(): AimCursorState {
+    const s = this.store.state;
+    return {
+      tool: s.tool,
+      cameraMode: s.cameraMode,
+      brushRadius: s.brushRadius,
+      pourRate: s.pourRate,
+      traySize: TRAY_SIZE,
+      active: this.strokeActive || !!this.draggingSource,
+    };
+  }
+
+  private refreshAim(hit: AimHit, ev?: PointerEvent): void {
+    this.lastAimHit = hit;
+    if (ev) this.lastPointer = { clientX: ev.clientX, clientY: ev.clientY };
+    this.aim.show(hit, this.aimState(), this.lastPointer ?? undefined);
+  }
+
+  private syncAimHost(): void {
+    this.host.classList.toggle("is-aiming", !this.store.state.cameraMode);
   }
 
   private pickSource(ev: PointerEvent): string | null {
@@ -413,12 +451,15 @@ export class Viewport {
         this.store.patch({ selectedSourceId: id });
         await this.pushHistory();
         this.onUi();
+        const hit = this.hitUv(ev);
+        if (hit) this.refreshAim(hit, ev);
         return;
       }
       const hit = this.hitUv(ev);
       if (hit) {
         await this.pushHistory();
         this.addSourceAt(hit.u, hit.v);
+        this.refreshAim(hit, ev);
       }
       return;
     }
@@ -428,13 +469,13 @@ export class Viewport {
     await this.pushHistory();
     this.strokeActive = true;
     this.toolAt(tool, hit.u, hit.v);
-    this.updateCursor(hit);
+    this.refreshAim(hit, ev);
   };
 
   private onPointerMove = (ev: PointerEvent): void => {
     const hit = this.hitUv(ev);
-    if (hit) this.updateCursor(hit);
-    else this.cursorRing.visible = false;
+    if (hit) this.refreshAim(hit, ev);
+    else this.hideAim();
 
     if (!this.pointerDown) return;
 
@@ -462,14 +503,22 @@ export class Viewport {
     this.pointerDown = false;
     this.strokeActive = false;
     this.draggingSource = null;
+    if (ev.pointerType === "touch" || ev.pointerType === "pen") {
+      this.hideAim();
+    } else if (this.lastAimHit) {
+      this.refreshAim(this.lastAimHit);
+    }
   };
 
-  private updateCursor(hit: { u: number; v: number; world: THREE.Vector3 }): void {
-    const r = this.store.state.brushRadius * TRAY_SIZE;
-    this.cursorRing.scale.setScalar(Math.max(0.35, r / 0.18));
-    this.cursorRing.position.copy(hit.world);
-    this.cursorRing.position.y += 0.02;
-    this.cursorRing.visible = this.store.state.tool !== "source" && !this.store.state.cameraMode;
+  private onPointerLeave = (ev: PointerEvent): void => {
+    this.onPointerUp(ev);
+    this.hideAim();
+  };
+
+  private hideAim(): void {
+    this.lastAimHit = null;
+    this.lastPointer = null;
+    this.aim.hide();
   }
 
   private resize = (): void => {
@@ -515,6 +564,15 @@ export class Viewport {
     }
 
     this.water.tick(t);
+    if (this.lastAimHit && !this.store.state.cameraMode) {
+      const { u, v } = this.lastAimHit;
+      this.refreshAim({
+        u,
+        v,
+        world: this.surfacePoint(u, v),
+      });
+    }
+    this.aim.tick(t, this.strokeActive || !!this.draggingSource);
     this.renderer.render(this.scene, this.camera);
 
     this.fpsFrames++;
