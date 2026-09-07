@@ -88,6 +88,8 @@ export class App {
   }
 
   private syncHistory(): void {
+    // Guard against being called during Viewport construction
+    if (!this.viewport) return;
     const canUndo = this.viewport.history.canUndo;
     const canRedo = this.viewport.history.canRedo;
     if (canUndo !== this.store.state.canUndo || canRedo !== this.store.state.canRedo) {
