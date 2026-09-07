@@ -1,0 +1,38 @@
+import * as THREE from "three";
+
+export function createMapsTexture(size: number): THREE.DataTexture {
+  const data = new Float32Array(size * size * 4);
+  const tex = new THREE.DataTexture(
+    data,
+    size,
+    size,
+    THREE.RGBAFormat,
+    THREE.FloatType,
+  );
+  tex.needsUpdate = true;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.colorSpace = THREE.LinearSRGBColorSpace;
+  return tex;
+}
+
+export function uploadPacked(tex: THREE.DataTexture, packed: Float32Array, size: number): void {
+  const image = tex.image as unknown as { data: Float32Array; width: number; height: number };
+  if (image.width !== size) {
+    tex.image = { data: packed, width: size, height: size } as unknown as typeof tex.image;
+  } else {
+    image.data = packed;
+  }
+  tex.needsUpdate = true;
+}
+
+export function canvasTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  return tex;
+}

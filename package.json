@@ -1,0 +1,20 @@
+{
+  "name": "sandflow",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Interaktive 3D-Sand-/Wasser-Erosion im Browser",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --outDir docs"
+  },
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.170.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  }
+}
