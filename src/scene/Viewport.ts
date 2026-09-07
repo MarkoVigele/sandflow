@@ -12,7 +12,9 @@ import {
   type ToolId,
   type WaterSource,
 } from "../state/types";
+import { createLabEnvironment, type LabEnvironment } from "../assets/labEnv";
 import { createMapsTexture, uploadPacked } from "./mapsTexture";
+import { LOOK } from "./look";
 import { FlowParticles } from "./Particles";
 import { SandMesh } from "./SandMesh";
 import { createSourceMarker, createTray } from "./Tray";
@@ -44,7 +46,9 @@ export class Viewport {
   private water: WaterMesh;
   private particles: FlowParticles;
   private sun: THREE.DirectionalLight;
+  private fill: THREE.DirectionalLight;
   private hemi: THREE.HemisphereLight;
+  private labEnv: LabEnvironment;
   private raycaster = new THREE.Raycaster();
   private pointer = new THREE.Vector2();
   private pointerDown = false;
@@ -76,10 +80,10 @@ export class Viewport {
       powerPreference: "high-performance",
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, store.state.quality === "ultra" ? 2 : 1.5));
-    this.renderer.setClearColor(0x14110e, 1);
+    this.renderer.setClearColor(LOOK.bg, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = LOOK.exposure;
     this.renderer.shadowMap.enabled = false;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -105,14 +109,23 @@ export class Viewport {
       TWO: THREE.TOUCH.DOLLY_ROTATE,
     };
 
-    this.scene.fog = new THREE.Fog(0x14110e, 14, 28);
-    this.scene.background = new THREE.Color(0x14110e);
+    this.scene.fog = new THREE.Fog(LOOK.bg, LOOK.fogNear, LOOK.fogFar);
+    this.scene.background = new THREE.Color(LOOK.bg);
 
-    this.hemi = new THREE.HemisphereLight(0xc5d4e0, 0x5a4a36, 0.55);
+    this.labEnv = createLabEnvironment(this.renderer);
+    this.scene.environment = this.labEnv.envMap;
+    this.scene.environmentIntensity = LOOK.envIntensity;
+
+    this.hemi = new THREE.HemisphereLight(LOOK.hemiSky, LOOK.hemiGround, LOOK.hemiIntensity);
     this.scene.add(this.hemi);
 
-    this.sun = new THREE.DirectionalLight(0xffe6c4, 1.45);
-    this.sun.position.set(6.2, 10.5, 3.8);
+    this.fill = new THREE.DirectionalLight(LOOK.fillColor, LOOK.fillIntensity);
+    this.fill.position.set(-5.4, 4.2, -3.6);
+    this.fill.castShadow = false;
+    this.scene.add(this.fill);
+
+    this.sun = new THREE.DirectionalLight(LOOK.sunColor, LOOK.sunIntensity);
+    this.sun.position.copy(LOOK.sunDir).multiplyScalar(14);
     this.sun.castShadow = false;
     this.sun.shadow.mapSize.set(1024, 1024);
     this.sun.shadow.camera.near = 1;
@@ -131,8 +144,8 @@ export class Viewport {
     const q = store.state.quality;
     const grid = QUALITY_GRID[q];
     this.maps = createMapsTexture(grid);
-    this.sand = new SandMesh(TRAY_SIZE, this.maps, q, HEIGHT_SCALE);
-    this.water = new WaterMesh(TRAY_SIZE, this.maps, q, HEIGHT_SCALE);
+    this.sand = new SandMesh(TRAY_SIZE, this.maps, q, HEIGHT_SCALE, this.labEnv.latlong);
+    this.water = new WaterMesh(TRAY_SIZE, this.maps, q, HEIGHT_SCALE, this.labEnv.latlong);
     this.particles = new FlowParticles();
     this.scene.add(this.sand.mesh, this.water.mesh, this.particles.points);
     this.sourceGroup.name = "sources";
@@ -322,6 +335,7 @@ export class Viewport {
     this.water.dispose();
     this.particles.dispose();
     this.maps.dispose();
+    this.labEnv.dispose();
     this.renderer.dispose();
   }
 
@@ -337,6 +351,8 @@ export class Viewport {
       TRAY_SIZE,
       HEIGHT_SCALE,
       q === "high" || q === "ultra",
+      frame.packed,
+      frame.size,
     );
   }
 
@@ -526,7 +542,9 @@ export class Viewport {
       }
     }
 
+    this.sand.tick(t);
     this.water.tick(t);
+    this.particles.tick(t, this.renderer.getPixelRatio());
     this.renderer.render(this.scene, this.camera);
 
     this.fpsFrames++;

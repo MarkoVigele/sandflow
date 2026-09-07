@@ -36,3 +36,9 @@ export function canvasTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
   tex.needsUpdate = true;
   return tex;
 }
+
+export function linearCanvasTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
+  const tex = canvasTexture(canvas);
+  tex.colorSpace = THREE.LinearSRGBColorSpace;
+  return tex;
+}

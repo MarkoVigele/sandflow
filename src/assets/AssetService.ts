@@ -1,18 +1,33 @@
 import { fbm, hash2, mulberry32 } from "./noise";
+import {
+  composeUserPrompt,
+  parseSandPalette,
+  type SandPalette,
+} from "./lookPrompts";
 
-export type MapKind = "albedo" | "normal" | "roughness" | "wet";
+export {
+  composeUserPrompt,
+  DEFAULT_USER_PROMPT,
+  FIXED_INTERNAL_PROMPTS,
+} from "./lookPrompts";
+
+export type MapKind = "albedo" | "wetAlbedo" | "normal" | "roughness" | "height";
 
 export interface GeneratedMaps {
   albedo: HTMLCanvasElement;
+  wetAlbedo: HTMLCanvasElement;
   normal: HTMLCanvasElement;
   roughness: HTMLCanvasElement;
+  height: HTMLCanvasElement;
   prompt: string;
+  composedPrompt: string;
   provider: string;
+  grain: number;
 }
 
 export interface AssetProvider {
   readonly id: string;
-  generate(prompt: string, size?: number): Promise<GeneratedMaps>;
+  generate(userPrompt: string, size?: number): Promise<GeneratedMaps>;
 }
 
 function canvas(size: number): HTMLCanvasElement {
@@ -31,47 +46,6 @@ function seedFromPrompt(prompt: string): number {
   return h >>> 0;
 }
 
-interface Palette {
-  dryA: [number, number, number];
-  dryB: [number, number, number];
-  pebble: [number, number, number];
-  grain: number;
-}
-
-function parsePrompt(prompt: string): Palette {
-  const p = prompt.toLowerCase();
-  let dryA: [number, number, number] = [196, 162, 112];
-  let dryB: [number, number, number] = [168, 132, 86];
-  let pebble: [number, number, number] = [122, 98, 72];
-  let grain = 0.55;
-
-  if (/dunkel|basalt|vulkan|schwarz/.test(p)) {
-    dryA = [92, 78, 68];
-    dryB = [58, 50, 44];
-    pebble = [36, 32, 30];
-  } else if (/hell|weiß|quarz|bleich/.test(p)) {
-    dryA = [228, 214, 186];
-    dryB = [206, 188, 154];
-    pebble = [176, 158, 128];
-  } else if (/rot|laterit|rost|terra/.test(p)) {
-    dryA = [176, 96, 62];
-    dryB = [140, 72, 46];
-    pebble = [98, 52, 36];
-  } else if (/oliv|grün|moos/.test(p)) {
-    dryA = [150, 138, 86];
-    dryB = [112, 108, 64];
-    pebble = [78, 80, 52];
-  }
-
-  if (/grob|kies|körnig|rau/.test(p)) grain = 0.9;
-  if (/fein|mehl|glatt|staub/.test(p)) grain = 0.28;
-  if (/feucht|nass|nass|wet/.test(p)) {
-    dryA = dryA.map((c) => c * 0.72) as [number, number, number];
-    dryB = dryB.map((c) => c * 0.68) as [number, number, number];
-  }
-  return { dryA, dryB, pebble, grain };
-}
-
 function mix(
   a: [number, number, number],
   b: [number, number, number],
@@ -84,67 +58,142 @@ function mix(
   ];
 }
 
-export class ProceduralAssetProvider implements AssetProvider {
-  readonly id = "procedural";
+function writeRgb(
+  data: Uint8ClampedArray,
+  i: number,
+  col: [number, number, number],
+  jitter = 0,
+): void {
+  data[i] = Math.max(0, Math.min(255, col[0] + jitter));
+  data[i + 1] = Math.max(0, Math.min(255, col[1] + jitter * 0.78));
+  data[i + 2] = Math.max(0, Math.min(255, col[2] + jitter * 0.48));
+  data[i + 3] = 255;
+}
 
-  async generate(prompt: string, size = 512): Promise<GeneratedMaps> {
-    const seed = seedFromPrompt(prompt || "quarzsand warm");
-    const pal = parsePrompt(prompt || "feiner Quarzsand, warm, trocken");
-    const rand = mulberry32(seed);
-    const albedo = canvas(size);
-    const normal = canvas(size);
-    const roughness = canvas(size);
-    const aCtx = albedo.getContext("2d")!;
-    const nCtx = normal.getContext("2d")!;
-    const rCtx = roughness.getContext("2d")!;
-    const aImg = aCtx.createImageData(size, size);
-    const nImg = nCtx.createImageData(size, size);
-    const rImg = rCtx.createImageData(size, size);
+/** Two-pass dry/wet albedo + normal + roughness (R dry / G wet) + height. */
+export function paintSandMaps(
+  size: number,
+  pal: SandPalette,
+  seed: number,
+): Omit<GeneratedMaps, "prompt" | "composedPrompt" | "provider"> {
+  const rand = mulberry32(seed);
+  const albedo = canvas(size);
+  const wetAlbedo = canvas(size);
+  const normal = canvas(size);
+  const roughness = canvas(size);
+  const height = canvas(size);
 
-    const freq = 6 + pal.grain * 10;
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const u = x / size;
-        const v = y / size;
-        const n1 = fbm(u * freq, v * freq, 5, seed);
-        const n2 = fbm(u * freq * 3.2 + 4.1, v * freq * 3.2, 3, seed + 3);
-        const speck = hash2(x * 0.37, y * 0.41, seed);
-        const t = Math.min(1, Math.max(0, n1 * 0.75 + n2 * 0.25));
-        let col = mix(pal.dryA, pal.dryB, t);
-        if (speck > 0.93 - pal.grain * 0.08) col = pal.pebble;
-        const jitter = (rand() - 0.5) * 10;
-        const i = (y * size + x) * 4;
-        aImg.data[i] = Math.max(0, Math.min(255, col[0] + jitter));
-        aImg.data[i + 1] = Math.max(0, Math.min(255, col[1] + jitter * 0.8));
-        aImg.data[i + 2] = Math.max(0, Math.min(255, col[2] + jitter * 0.5));
-        aImg.data[i + 3] = 255;
+  const aCtx = albedo.getContext("2d", { willReadFrequently: false })!;
+  const wCtx = wetAlbedo.getContext("2d", { willReadFrequently: false })!;
+  const nCtx = normal.getContext("2d", { willReadFrequently: false })!;
+  const rCtx = roughness.getContext("2d", { willReadFrequently: false })!;
+  const hCtx = height.getContext("2d", { willReadFrequently: false })!;
 
-        const hL = fbm((x - 1) / size * freq, v * freq, 4, seed);
-        const hR = fbm((x + 1) / size * freq, v * freq, 4, seed);
-        const hD = fbm(u * freq, (y - 1) / size * freq, 4, seed);
-        const hU = fbm(u * freq, (y + 1) / size * freq, 4, seed);
-        const nx = (hL - hR) * (1.2 + pal.grain);
-        const ny = (hD - hU) * (1.2 + pal.grain);
-        nImg.data[i] = Math.max(0, Math.min(255, 128 + nx * 180));
-        nImg.data[i + 1] = Math.max(0, Math.min(255, 128 + ny * 180));
-        nImg.data[i + 2] = 255;
-        nImg.data[i + 3] = 255;
+  const aImg = aCtx.createImageData(size, size);
+  const wImg = wCtx.createImageData(size, size);
+  const nImg = nCtx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const hImg = hCtx.createImageData(size, size);
 
-        const rough = 180 + n2 * 50 + pal.grain * 20;
-        rImg.data[i] = rImg.data[i + 1] = rImg.data[i + 2] = Math.min(255, rough);
-        rImg.data[i + 3] = 255;
-      }
+  const freq = 5.5 + pal.grain * 9;
+  const heights = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const n1 = fbm(u * freq, v * freq, 4, seed);
+      const n2 = fbm(u * freq * 3.4 + 4.1, v * freq * 3.4, 3, seed + 3);
+      const cell = hash2(Math.floor(u * freq * 5.2), Math.floor(v * freq * 5.2), seed + 9);
+      const grainBump = (cell - 0.5) * (0.18 + pal.grain * 0.22);
+      heights[y * size + x] = Math.min(1, Math.max(0, n1 * 0.62 + n2 * 0.28 + grainBump + 0.12));
     }
+  }
 
-    aCtx.putImageData(aImg, 0, 0);
-    nCtx.putImageData(nImg, 0, 0);
-    rCtx.putImageData(rImg, 0, 0);
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = (y * size + x) * 4;
+      const h = heights[y * size + x];
+      const n2 = fbm(u * freq * 3.4 + 4.1, v * freq * 3.4, 2, seed + 3);
+      const speck = hash2(x * 0.37, y * 0.41, seed);
+      const sparkle = hash2(x * 0.91, y * 1.17, seed + 21);
 
-    return { albedo, normal, roughness, prompt, provider: this.id };
+      let dry = mix(pal.dryA, pal.dryB, h);
+      let wet = mix(pal.wetA, pal.wetB, h * 0.85 + 0.08);
+      if (speck > 0.935 - pal.grain * 0.07) {
+        dry = pal.pebble;
+        wet = mix(pal.pebble, pal.wetB, 0.55);
+      } else if (sparkle > 0.988) {
+        dry = pal.quartz;
+        wet = mix(pal.quartz, pal.wetA, 0.35);
+      }
+
+      const jitter = (rand() - 0.5) * (8 + pal.grain * 6);
+      writeRgb(aImg.data, i, dry, jitter);
+      writeRgb(wImg.data, i, wet, jitter * 0.45);
+
+      const xL = x === 0 ? size - 1 : x - 1;
+      const xR = x === size - 1 ? 0 : x + 1;
+      const yD = y === 0 ? size - 1 : y - 1;
+      const yU = y === size - 1 ? 0 : y + 1;
+      const nx = (heights[y * size + xL] - heights[y * size + xR]) * (1.35 + pal.grain);
+      const ny = (heights[yD * size + x] - heights[yU * size + x]) * (1.35 + pal.grain);
+      nImg.data[i] = Math.max(0, Math.min(255, 128 + nx * 200));
+      nImg.data[i + 1] = Math.max(0, Math.min(255, 128 + ny * 200));
+      nImg.data[i + 2] = 255;
+      nImg.data[i + 3] = 255;
+
+      const dryRough = 188 + n2 * 42 + pal.grain * 22 + (speck > 0.93 ? 18 : 0);
+      const wetRough = 58 + n2 * 28 + pal.grain * 10;
+      rImg.data[i] = Math.min(255, dryRough);
+      rImg.data[i + 1] = Math.min(255, wetRough);
+      rImg.data[i + 2] = rImg.data[i];
+      rImg.data[i + 3] = 255;
+
+      const h8 = Math.max(0, Math.min(255, h * 255));
+      hImg.data[i] = hImg.data[i + 1] = hImg.data[i + 2] = h8;
+      hImg.data[i + 3] = 255;
+    }
+  }
+
+  aCtx.putImageData(aImg, 0, 0);
+  wCtx.putImageData(wImg, 0, 0);
+  nCtx.putImageData(nImg, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  hCtx.putImageData(hImg, 0, 0);
+
+  return { albedo, wetAlbedo, normal, roughness, height, grain: pal.grain };
+}
+
+/**
+ * Dummy KI: user prompt field → canvas / procedural PBR.
+ * Fixed internal look prompts are composed in; no external API.
+ */
+export class DummyKIAssetProvider implements AssetProvider {
+  readonly id: string = "dummy-ki";
+
+  async generate(userPrompt: string, size = 512): Promise<GeneratedMaps> {
+    const composed = composeUserPrompt(userPrompt);
+    const seed = seedFromPrompt(composed);
+    const pal = parseSandPalette(userPrompt || composed);
+    const maps = paintSandMaps(size, pal, seed);
+    return {
+      ...maps,
+      prompt: userPrompt,
+      composedPrompt: composed,
+      provider: this.id,
+    };
   }
 }
 
-/** Placeholder for a later HTTP image service. Falls back to procedural. */
+/** Kept as a named alias — Sim / App already call createAssetService(). */
+export class ProceduralAssetProvider extends DummyKIAssetProvider {
+  override readonly id = "procedural";
+}
+
+/** Placeholder HTTP slot. Always falls back to Dummy KI unless an endpoint exists. */
 export class HttpAssetProvider implements AssetProvider {
   readonly id = "http-placeholder";
   constructor(
@@ -152,28 +201,28 @@ export class HttpAssetProvider implements AssetProvider {
     private fallback: AssetProvider,
   ) {}
 
-  async generate(prompt: string, size?: number): Promise<GeneratedMaps> {
+  async generate(userPrompt: string, size?: number): Promise<GeneratedMaps> {
     if (!this.endpoint) {
-      const maps = await this.fallback.generate(prompt, size);
+      const maps = await this.fallback.generate(userPrompt, size);
       return { ...maps, provider: this.id };
     }
     try {
       const res = await fetch(this.endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, size: size ?? 512 }),
+        body: JSON.stringify({ prompt: userPrompt, size: size ?? 512 }),
       });
       if (!res.ok) throw new Error("asset api");
-      const maps = await this.fallback.generate(prompt, size);
+      const maps = await this.fallback.generate(userPrompt, size);
       return { ...maps, provider: this.id };
     } catch {
-      return this.fallback.generate(prompt, size);
+      return this.fallback.generate(userPrompt, size);
     }
   }
 }
 
 export function createAssetService(): AssetProvider {
-  const procedural = new ProceduralAssetProvider();
+  const dummy = new DummyKIAssetProvider();
   const endpoint = (import.meta.env.VITE_ASSET_API as string | undefined) ?? null;
-  return new HttpAssetProvider(endpoint, procedural);
+  return new HttpAssetProvider(endpoint, dummy);
 }

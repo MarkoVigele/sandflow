@@ -2,8 +2,9 @@ import * as THREE from "three";
 import sandVert from "../shaders/sand.vert.glsl?raw";
 import sandFrag from "../shaders/sand.frag.glsl?raw";
 import type { QualityId } from "../state/types";
-import { canvasTexture } from "./mapsTexture";
+import { canvasTexture, linearCanvasTexture } from "./mapsTexture";
 import type { GeneratedMaps } from "../assets/AssetService";
+import { applyLookUniforms, LOOK } from "./look";
 
 const MESH_SEGS: Record<QualityId, number> = {
   low: 96,
@@ -12,47 +13,64 @@ const MESH_SEGS: Record<QualityId, number> = {
   ultra: 320,
 };
 
+function pixel(r: number, g: number, b: number, a = 255): THREE.DataTexture {
+  const t = new THREE.DataTexture(new Uint8Array([r, g, b, a]), 1, 1);
+  t.needsUpdate = true;
+  return t;
+}
+
 export class SandMesh {
   mesh: THREE.Mesh;
   material: THREE.ShaderMaterial;
   private albedo?: THREE.CanvasTexture;
+  private wetAlbedo?: THREE.CanvasTexture;
   private normal?: THREE.CanvasTexture;
   private rough?: THREE.CanvasTexture;
+  private height?: THREE.CanvasTexture;
 
   constructor(
     traySize: number,
     maps: THREE.DataTexture,
     quality: QualityId,
     heightScale: number,
+    env?: THREE.Texture,
   ) {
     const segs = MESH_SEGS[quality];
     const geo = new THREE.PlaneGeometry(traySize, traySize, segs, segs);
     geo.rotateX(-Math.PI / 2);
 
-    const fallbackAlbedo = new THREE.DataTexture(new Uint8Array([196, 162, 112, 255]), 1, 1);
-    fallbackAlbedo.needsUpdate = true;
-    const fallbackNormal = new THREE.DataTexture(new Uint8Array([128, 128, 255, 255]), 1, 1);
-    fallbackNormal.needsUpdate = true;
-    const fallbackRough = new THREE.DataTexture(new Uint8Array([220, 220, 220, 255]), 1, 1);
-    fallbackRough.needsUpdate = true;
+    const fallbackAlbedo = pixel(214, 178, 122);
+    const fallbackWet = pixel(108, 82, 52);
+    const fallbackNormal = pixel(128, 128, 255);
+    fallbackNormal.colorSpace = THREE.LinearSRGBColorSpace;
+    const fallbackRough = pixel(220, 90, 220);
+    fallbackRough.colorSpace = THREE.LinearSRGBColorSpace;
+    const fallbackHeight = pixel(128, 128, 128);
+    fallbackHeight.colorSpace = THREE.LinearSRGBColorSpace;
 
     this.material = new THREE.ShaderMaterial({
       uniforms: {
         uMaps: { value: maps },
         uAlbedo: { value: fallbackAlbedo },
+        uWetAlbedo: { value: fallbackWet },
         uNormal: { value: fallbackNormal },
         uRough: { value: fallbackRough },
+        uHeight: { value: fallbackHeight },
+        uEnv: { value: env ?? fallbackAlbedo },
         uHeightScale: { value: heightScale },
         uTexel: { value: 1 / maps.image.width },
-        uSunDir: { value: new THREE.Vector3(0.45, 0.82, 0.28).normalize() },
-        uSunColor: { value: new THREE.Color(1.0, 0.9, 0.72) },
-        uAmbient: { value: new THREE.Color(0.22, 0.2, 0.17) },
+        uSunDir: { value: LOOK.sunDir.clone() },
+        uSunColor: { value: LOOK.sunColor.clone() },
+        uAmbient: { value: LOOK.ambient.clone() },
         uReceiveShadow: { value: 0 },
         uGrain: { value: 0.55 },
+        uEnvAmt: { value: LOOK.envIntensity },
+        uTime: { value: 0 },
       },
       vertexShader: sandVert,
       fragmentShader: sandFrag,
     });
+    applyLookUniforms(this.material);
 
     this.mesh = new THREE.Mesh(geo, this.material);
     this.mesh.receiveShadow = true;
@@ -63,6 +81,10 @@ export class SandMesh {
   setMaps(maps: THREE.DataTexture): void {
     this.material.uniforms.uMaps.value = maps;
     this.material.uniforms.uTexel.value = 1 / maps.image.width;
+  }
+
+  setEnv(tex: THREE.Texture): void {
+    this.material.uniforms.uEnv.value = tex;
   }
 
   setQuality(quality: QualityId, traySize: number): void {
@@ -78,27 +100,37 @@ export class SandMesh {
 
   applyMaps(maps: GeneratedMaps): void {
     this.albedo?.dispose();
+    this.wetAlbedo?.dispose();
     this.normal?.dispose();
     this.rough?.dispose();
+    this.height?.dispose();
     this.albedo = canvasTexture(maps.albedo);
-    this.normal = canvasTexture(maps.normal);
-    this.normal.colorSpace = THREE.LinearSRGBColorSpace;
-    this.rough = canvasTexture(maps.roughness);
-    this.rough.colorSpace = THREE.LinearSRGBColorSpace;
+    this.wetAlbedo = canvasTexture(maps.wetAlbedo ?? maps.albedo);
+    this.normal = linearCanvasTexture(maps.normal);
+    this.rough = linearCanvasTexture(maps.roughness);
+    this.height = linearCanvasTexture(maps.height ?? maps.roughness);
     this.material.uniforms.uAlbedo.value = this.albedo;
+    this.material.uniforms.uWetAlbedo.value = this.wetAlbedo;
     this.material.uniforms.uNormal.value = this.normal;
     this.material.uniforms.uRough.value = this.rough;
+    this.material.uniforms.uHeight.value = this.height;
   }
 
   setGrain(grain: number): void {
     this.material.uniforms.uGrain.value = grain;
   }
 
+  tick(t: number): void {
+    this.material.uniforms.uTime.value = t;
+  }
+
   dispose(): void {
     this.mesh.geometry.dispose();
     this.material.dispose();
     this.albedo?.dispose();
+    this.wetAlbedo?.dispose();
     this.normal?.dispose();
     this.rough?.dispose();
+    this.height?.dispose();
   }
 }

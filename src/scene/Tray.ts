@@ -1,24 +1,19 @@
 import * as THREE from "three";
+import {
+  createLabBenchMaterial,
+  createRimLipMaterial,
+  createUnderBedMaterial,
+  createWoodMaterial,
+} from "../assets/trayMaterials";
 
 export function createTray(traySize: number): THREE.Group {
   const g = new THREE.Group();
   g.name = "tray";
 
-  const wood = new THREE.MeshStandardMaterial({
-    color: 0x5a4632,
-    roughness: 0.82,
-    metalness: 0.04,
-  });
-  const rimDark = new THREE.MeshStandardMaterial({
-    color: 0x2c241c,
-    roughness: 0.7,
-    metalness: 0.08,
-  });
-  const bench = new THREE.MeshStandardMaterial({
-    color: 0x1a1714,
-    roughness: 0.9,
-    metalness: 0.02,
-  });
+  const wood = createWoodMaterial();
+  const rimDark = createRimLipMaterial();
+  const bench = createLabBenchMaterial();
+  const underMat = createUnderBedMaterial();
 
   const wallH = 0.42;
   const wallT = 0.22;
@@ -34,25 +29,29 @@ export function createTray(traySize: number): THREE.Group {
 
   const north = mk(outer, wallH, wallT, wood);
   north.position.set(0, wallH / 2, -inner / 2 - wallT / 2);
+  north.name = "tray-rim-n";
   const south = mk(outer, wallH, wallT, wood);
   south.position.set(0, wallH / 2, inner / 2 + wallT / 2);
+  south.name = "tray-rim-s";
   const west = mk(wallT, wallH, inner, wood);
   west.position.set(-inner / 2 - wallT / 2, wallH / 2, 0);
+  west.name = "tray-rim-w";
   const east = mk(wallT, wallH, inner, wood);
   east.position.set(inner / 2 + wallT / 2, wallH / 2, 0);
+  east.name = "tray-rim-e";
 
   const lip = mk(outer + 0.12, 0.06, outer + 0.12, rimDark);
   lip.position.y = wallH + 0.01;
+  lip.name = "tray-lip";
 
   const table = mk(outer + 3.4, 0.16, outer + 3.4, bench);
   table.position.y = -0.08;
+  table.name = "lab-bench";
 
-  const under = new THREE.Mesh(
-    new THREE.BoxGeometry(inner, 0.12, inner),
-    new THREE.MeshStandardMaterial({ color: 0x3d3226, roughness: 0.95 }),
-  );
+  const under = new THREE.Mesh(new THREE.BoxGeometry(inner, 0.12, inner), underMat);
   under.position.y = -0.02;
   under.receiveShadow = true;
+  under.name = "tray-bed";
 
   g.add(north, south, west, east, lip, table, under);
   return g;
@@ -64,8 +63,9 @@ export function createSourceMarker(): THREE.Group {
     new THREE.CylinderGeometry(0.035, 0.045, 0.28, 12),
     new THREE.MeshStandardMaterial({
       color: 0xb0894a,
-      metalness: 0.55,
-      roughness: 0.35,
+      metalness: 0.58,
+      roughness: 0.32,
+      envMapIntensity: 0.85,
     }),
   );
   stem.position.y = 0.22;
@@ -73,10 +73,11 @@ export function createSourceMarker(): THREE.Group {
     new THREE.SphereGeometry(0.055, 16, 12),
     new THREE.MeshStandardMaterial({
       color: 0x6aa8ba,
-      roughness: 0.2,
-      metalness: 0.1,
+      roughness: 0.16,
+      metalness: 0.08,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.82,
+      envMapIntensity: 1.1,
     }),
   );
   drop.position.y = 0.42;
