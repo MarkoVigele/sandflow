@@ -85,6 +85,7 @@ function overlayMaterial(
  */
 export class AimCursor {
   readonly group = new THREE.Group();
+  readonly hud: HTMLDivElement;
   private disc: THREE.Mesh;
   private ring: THREE.Mesh;
   private halo: THREE.Mesh;
@@ -96,6 +97,7 @@ export class AimCursor {
   private discMap: THREE.CanvasTexture;
   private baseRadius = 0.32;
   private waterish = true;
+  private host: HTMLElement | null = null;
 
   constructor() {
     this.group.name = "aim-cursor";
@@ -134,13 +136,24 @@ export class AimCursor {
     this.pip.renderOrder = 43;
 
     this.group.add(this.halo, this.disc, this.ring, this.pip);
+
+    this.hud = document.createElement("div");
+    this.hud.className = "aim-hud";
+    this.hud.setAttribute("aria-hidden", "true");
+    this.hud.innerHTML = `<span class="aim-hud-disc"></span><span class="aim-hud-ring"></span>`;
+  }
+
+  attachHud(host: HTMLElement): void {
+    this.host = host;
+    host.appendChild(this.hud);
   }
 
   hide(): void {
     this.group.visible = false;
+    this.hud.classList.remove("is-visible");
   }
 
-  show(hit: AimHit, state: AimCursorState): void {
+  show(hit: AimHit, state: AimCursorState, screen?: { clientX: number; clientY: number }): void {
     if (!aimCursorVisible(state)) {
       this.hide();
       return;
@@ -169,6 +182,20 @@ export class AimCursor {
     this.pipMat.opacity = this.waterish ? 1 : 0.75;
     this.pip.visible = true;
     this.group.visible = true;
+    this.placeHud(state, screen);
+  }
+
+  private placeHud(state: AimCursorState, screen?: { clientX: number; clientY: number }): void {
+    if (!this.host || !screen) return;
+    const rect = this.host.getBoundingClientRect();
+    const px = Math.round(48 + this.baseRadius * 42);
+    this.hud.style.setProperty("--aim-r", `${px}px`);
+    this.hud.style.left = `${screen.clientX - rect.left}px`;
+    this.hud.style.top = `${screen.clientY - rect.top}px`;
+    this.hud.classList.toggle("is-water", this.waterish);
+    this.hud.classList.toggle("is-sand", !this.waterish);
+    this.hud.classList.toggle("is-active", state.active);
+    this.hud.classList.add("is-visible");
   }
 
   tick(elapsed: number, active: boolean): void {
@@ -187,5 +214,6 @@ export class AimCursor {
     this.haloMat.dispose();
     this.pipMat.dispose();
     this.discMap.dispose();
+    this.hud.remove();
   }
 }

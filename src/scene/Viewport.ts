@@ -62,6 +62,7 @@ export class Viewport {
   private clock = new THREE.Clock();
   private aim = new AimCursor();
   private lastAimHit: AimHit | null = null;
+  private lastPointer: { clientX: number; clientY: number } | null = null;
   private unsubStore: () => void = () => {};
   private onUi: () => void;
 
@@ -143,6 +144,7 @@ export class Viewport {
     this.scene.add(this.sourceGroup);
 
     this.scene.add(this.aim.group);
+    this.aim.attachHud(host);
     this.syncAimHost();
     this.unsubStore = this.store.subscribe(() => {
       this.syncAimHost();
@@ -402,9 +404,10 @@ export class Viewport {
     };
   }
 
-  private refreshAim(hit: AimHit): void {
+  private refreshAim(hit: AimHit, ev?: PointerEvent): void {
     this.lastAimHit = hit;
-    this.aim.show(hit, this.aimState());
+    if (ev) this.lastPointer = { clientX: ev.clientX, clientY: ev.clientY };
+    this.aim.show(hit, this.aimState(), this.lastPointer ?? undefined);
   }
 
   private syncAimHost(): void {
@@ -449,14 +452,14 @@ export class Viewport {
         await this.pushHistory();
         this.onUi();
         const hit = this.hitUv(ev);
-        if (hit) this.refreshAim(hit);
+        if (hit) this.refreshAim(hit, ev);
         return;
       }
       const hit = this.hitUv(ev);
       if (hit) {
         await this.pushHistory();
         this.addSourceAt(hit.u, hit.v);
-        this.refreshAim(hit);
+        this.refreshAim(hit, ev);
       }
       return;
     }
@@ -466,12 +469,12 @@ export class Viewport {
     await this.pushHistory();
     this.strokeActive = true;
     this.toolAt(tool, hit.u, hit.v);
-    this.refreshAim(hit);
+    this.refreshAim(hit, ev);
   };
 
   private onPointerMove = (ev: PointerEvent): void => {
     const hit = this.hitUv(ev);
-    if (hit) this.refreshAim(hit);
+    if (hit) this.refreshAim(hit, ev);
     else this.hideAim();
 
     if (!this.pointerDown) return;
@@ -514,6 +517,7 @@ export class Viewport {
 
   private hideAim(): void {
     this.lastAimHit = null;
+    this.lastPointer = null;
     this.aim.hide();
   }
 
