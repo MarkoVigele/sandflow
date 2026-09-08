@@ -8,6 +8,7 @@ uniform vec3 uSunColor;
 uniform vec3 uAmbient;
 uniform float uReceiveShadow;
 uniform float uGrain;
+uniform float uUvScale;
 uniform float uHeatMode;
 
 varying vec2 vUv;
@@ -30,9 +31,16 @@ void main() {
   if (!(wet == wet)) wet = 0.0;
   if (!(water == water) || water < 0.0) water = 0.0;
 
-  vec2 tile = vUv * (3.4 + uGrain * 2.0);
-  vec3 dryAlb = texture2D(uAlbedo, tile).rgb;
-  vec3 wetAlb = texture2D(uAlbedoWet, tile).rgb;
+  float uvScale = uUvScale > 0.2 ? uUvScale : (2.05 + uGrain * 1.2);
+  vec2 tile = vUv * uvScale;
+  // Second, rotated sample hides JPEG tile edges without a second normal fetch.
+  vec2 tileB = tile.yx * 0.73 + vec2(0.19, 0.33);
+  vec3 dryA = texture2D(uAlbedo, tile).rgb;
+  vec3 dryB = texture2D(uAlbedo, tileB).rgb;
+  vec3 wetA = texture2D(uAlbedoWet, tile).rgb;
+  vec3 wetB = texture2D(uAlbedoWet, tileB).rgb;
+  vec3 dryAlb = mix(dryA, dryB, 0.22);
+  vec3 wetAlb = mix(wetA, wetB, 0.22);
   vec3 nTex = texture2D(uNormal, tile).rgb * 2.0 - 1.0;
   vec2 roughPair = texture2D(uRough, tile).rg;
   if (!(dryAlb.x == dryAlb.x)) dryAlb = vec3(0.70, 0.58, 0.40);
@@ -40,12 +48,15 @@ void main() {
   if (!(nTex.x == nTex.x)) nTex = vec3(0.0, 0.0, 1.0);
   if (!(roughPair.x == roughPair.x)) roughPair = vec2(0.86, 0.30);
 
-  vec3 albedo = mix(dryAlb, wetAlb, wet);
+  // Keep dry grain in wet patches; the wet photo is a tint, not a second stamp.
+  float wetMask = smoothstep(0.035, 0.58, wet);
+  vec3 moistened = dryAlb * vec3(0.64, 0.58, 0.50);
+  vec3 wetCol = mix(moistened, wetAlb, 0.52);
+  vec3 albedo = mix(dryAlb, wetCol, wetMask);
 
   vec3 N = safeNormalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.09, vec3(0.0, 1.0, 0.0));
 
-  albedo *= mix(1.0, 0.94, wet);
-  albedo = mix(albedo, albedo * vec3(0.90, 0.88, 0.82), smoothstep(0.003, 0.04, water) * 0.12);
+  albedo = mix(albedo, albedo * vec3(0.92, 0.90, 0.84), smoothstep(0.003, 0.04, water) * 0.1);
 
   float roughTex = mix(roughPair.x, roughPair.y, wet);
   float roughness = mix(mix(0.90, 0.82, uGrain), 0.30, wet * 0.78);

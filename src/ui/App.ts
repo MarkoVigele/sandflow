@@ -1,4 +1,5 @@
 import { createAssetService } from "../assets/AssetService";
+import { labTexelBudget } from "../assets/texturePaths";
 import { propsFromShare, propsToShare } from "../scene/PropsLite";
 import { Viewport } from "../scene/Viewport";
 import { resampleHeight } from "../sim/presets";
@@ -17,6 +18,7 @@ import {
   decodeHeightField,
   parseAnyScene,
   parseShareHash,
+  sanitizeQuality,
   SHARE_FILE_GRID,
   shareCamera,
   shareHref,
@@ -39,6 +41,9 @@ export class App {
   readonly viewport: Viewport;
   private assets = createAssetService();
   private fileInput: HTMLInputElement;
+  private texToken = 0;
+  private texKey = "";
+  private lastShareHash: string | null = null;
 
   constructor(root: HTMLElement) {
     root.innerHTML = `
@@ -103,8 +108,8 @@ export class App {
       if (t?.closest(".menu-wrap")) return;
       this.store.patch({ menuOpen: null });
     });
-    void this.loadLabTextures(this.store.state.texturePrompt);
-    void this.bootFromHash();
+    if (parseShareHash(location.hash)) void this.bootFromHash();
+    else void this.loadLabTextures(this.store.state.texturePrompt);
     window.addEventListener("hashchange", () => void this.bootFromHash());
 
     if (!this.viewport.renderer.capabilities.isWebGL2) {
@@ -113,8 +118,18 @@ export class App {
   }
 
   private async loadLabTextures(prompt: string): Promise<void> {
-    const maps = await this.assets.loadLab(prompt);
-    this.viewport.applyGeneratedMaps(maps);
+    const maxSize = labTexelBudget(this.store.state.quality);
+    const key = `${prompt.trim().toLowerCase()}|${maxSize}`;
+    if (key === this.texKey) return;
+    const token = ++this.texToken;
+    this.texKey = key;
+    try {
+      const maps = await this.assets.loadLab(prompt, maxSize);
+      if (token !== this.texToken) return;
+      this.viewport.applyGeneratedMaps(maps);
+    } catch {
+      if (token === this.texToken) this.texKey = "";
+    }
   }
 
   private async saveScene(): Promise<void> {
@@ -186,22 +201,24 @@ export class App {
   private async bootFromHash(): Promise<void> {
     const share = parseShareHash(location.hash);
     if (!share) return;
+    if (this.lastShareHash === location.hash) return;
+    this.lastShareHash = location.hash;
     this.applyShare(share);
     this.toast("Geteilte Szene geladen.");
   }
 
   private applyShare(share: SharePayload): void {
-    const quality = share.quality;
+    const quality = sanitizeQuality(share.quality);
+    const prompt = share.prompt || this.store.state.texturePrompt;
     this.store.patch({
       params: share.params,
       presetId: share.preset,
-      texturePrompt: share.prompt || this.store.state.texturePrompt,
+      texturePrompt: prompt,
       quality,
       speed: SPEEDS.includes(share.speed) ? share.speed : 1,
       selectedSourceId: null,
     });
     this.viewport.applyQuality(quality, false);
-    this.viewport.loadPreset(share.preset, true);
     const grid = QUALITY_GRID[quality];
     const terrain = decodeHeightField(share.h, share.hn, grid);
     const water = decodeHeightField(share.w, share.wn, grid);
@@ -220,13 +237,14 @@ export class App {
       this.viewport.applySnapshot(snap);
       this.store.patch({ selectedSourceId: sources[0]?.id ?? null });
     } else {
+      this.viewport.loadPreset(share.preset, true);
       this.viewport.replaceSources(sources);
     }
     const cam = shareCamera(share);
     if (cam) this.viewport.applyCamera(cam);
     this.viewport.setProps(propsFromShare(share.props));
     this.viewport.applyParams();
-    if (share.prompt) void this.loadLabTextures(share.prompt);
+    void this.loadLabTextures(prompt);
   }
 
   private async shareInput() {
@@ -295,7 +313,7 @@ export class App {
               </div>
               <button class="icon-btn" data-x>${ICONS.close}</button>
             </header>
-            <p>Wasser sucht sich Wege durch Sand: erst dünne Adern, dann ein Bett, später ein verzweigtes Netz. V1 ist der Kern — spielbar, ohne Extra-Firlefanz.</p>
+            <p>Wasser sucht sich Wege durch Sand: erst dünne Adern, dann ein Bett, später ein verzweigtes Netz. V1.x ist der spielbare Kern — Zielring, Werkzeuge, Teilen, Kiesel, gebackene Texturen. WebGPU und eine volle Requisitenbibliothek bleiben später.</p>
             <p>Kurzanleitung: <strong>Sand formen</strong> → <strong>Quelle setzen</strong> → <strong>Abspielen</strong>.</p>
             <p>Rechtsklick oder zwei Finger drehen die Kamera. Ein Finger (oder die linke Taste) bedient das Werkzeug. Unter <em>Kamera</em> geht das Drehen auch mit einem Finger.</p>
             <p>Oben: <em>Tempo</em> und <em>Zeitraffer</em>, Qualität inkl. Auto, Szene oder nur Wasser zurücksetzen, Teilen per Link oder JSON. Kiesel sind kleine Steine — der Radierer nimmt sie weg.</p>

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { MAP_R_TERRAIN } from "../sim/mapsContract";
+import { pebbleSitY } from "../scene/PropsLite";
 import {
   AIM_BRUSH_FILL,
   AIM_POUR_FILL,
@@ -111,6 +112,10 @@ const lifted = surfaceWorld(0.25, 0.75, 0.4, tray, heightScale);
 almost(lifted.x, (0.25 - 0.5) * tray, 1e-6, "surface x from uv");
 almost(lifted.z, (0.5 - 0.75) * tray, 1e-6, "surface z uses flipped v");
 almost(lifted.y, 1.0, 1e-6, "surface y = height * scale");
+
+const sit = pebbleSitY(0.06, -1);
+assert(sit > 0.04 && sit < 0.06, `pebble sits on the surface, not buried, got ${sit}`);
+assert(sit > 0.06 * 0.42, "pebble lift is above the old half-buried offset");
 
 const miss = pickDeformedSand(
   new THREE.Vector3(20, 4, 20),

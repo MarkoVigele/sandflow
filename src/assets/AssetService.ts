@@ -244,15 +244,17 @@ export async function loadLabMaps(
   prompt: string,
   procedural: AssetProvider,
   loadImage: ImageLoader = loadHtmlImage,
+  maxSize = 1024,
 ): Promise<GeneratedMaps> {
   const dryImg = await loadOptionalImage(bakedTextureUrl(BAKED_TEXTURE_FILES.sandDry), loadImage);
   const wetImg = await loadOptionalImage(bakedTextureUrl(BAKED_TEXTURE_FILES.sandWet), loadImage);
   const woodImg = await loadOptionalImage(bakedTextureUrl(BAKED_TEXTURE_FILES.woodRim), loadImage);
 
-  const wood = woodImg ? imageToCanvas(woodImg) : generateWoodCanvas();
+  const wood = woodImg ? imageToCanvas(woodImg, maxSize) : generateWoodCanvas(Math.min(512, maxSize));
   const useBakedDry = preferBakedSand(prompt) && !!dryImg;
-  const dry = useBakedDry ? imageToCanvas(dryImg!) : (await procedural.generate(prompt, 512)).albedo;
-  const wet = wetImg ? imageToCanvas(wetImg) : darkenCanvas(dry);
+  const procSize = Math.min(512, maxSize);
+  const dry = useBakedDry ? imageToCanvas(dryImg!, maxSize) : (await procedural.generate(prompt, procSize)).albedo;
+  const wet = wetImg ? imageToCanvas(wetImg, maxSize) : darkenCanvas(dry);
 
   const bakedCount = Number(!!dryImg) + Number(!!wetImg) + Number(!!woodImg);
   const provider =
@@ -262,7 +264,7 @@ export async function loadLabMaps(
 }
 
 export interface LabAssetService extends AssetProvider {
-  loadLab(prompt: string): Promise<GeneratedMaps>;
+  loadLab(prompt: string, maxSize?: number): Promise<GeneratedMaps>;
 }
 
 export function createAssetService(): LabAssetService {
@@ -272,6 +274,6 @@ export function createAssetService(): LabAssetService {
   return {
     id: http.id,
     generate: (prompt, size) => http.generate(prompt, size),
-    loadLab: (prompt) => loadLabMaps(prompt, procedural),
+    loadLab: (prompt, maxSize) => loadLabMaps(prompt, procedural, loadHtmlImage, maxSize),
   };
 }

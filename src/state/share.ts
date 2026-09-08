@@ -9,10 +9,17 @@ import {
   type WaterSource,
 } from "./types";
 
+const QUALITIES: QualityId[] = ["low", "medium", "high", "ultra"];
+
+export function sanitizeQuality(value: unknown, fallback: QualityId = "high"): QualityId {
+  return QUALITIES.includes(value as QualityId) ? (value as QualityId) : fallback;
+}
+
 export const SHARE_PREFIX = "sf2.";
 export const SHARE_HASH_GRID = 64;
 export const SHARE_FILE_GRID = 128;
-export const SHARE_HASH_SOFT_LIMIT = 7800;
+/** Outer b64 of JSON that already embeds a 64² height. 7.8k dropped typical scenes. */
+export const SHARE_HASH_SOFT_LIMIT = 12000;
 
 export interface ShareProp {
   u: number;
@@ -169,7 +176,7 @@ export function parseSharePayload(data: unknown): SharePayload {
   return {
     v: 2,
     preset: String(raw.preset),
-    quality: (raw.quality as QualityId) ?? "high",
+    quality: sanitizeQuality(raw.quality),
     speed: typeof raw.speed === "number" ? raw.speed : 1,
     params: { ...DEFAULT_PARAMS, ...raw.params },
     sources: raw.sources.map((s) => ({
@@ -188,7 +195,12 @@ export function parseSharePayload(data: unknown): SharePayload {
 }
 
 export function parseShareHash(hash: string): SharePayload | null {
-  const raw = hash.startsWith("#") ? hash.slice(1) : hash;
+  let raw = hash.startsWith("#") ? hash.slice(1) : hash;
+  try {
+    raw = decodeURIComponent(raw);
+  } catch {
+    /* already decoded or malformed — try as-is */
+  }
   if (!raw.startsWith(SHARE_PREFIX)) return null;
   try {
     return parseSharePayload(JSON.parse(b64UrlToText(raw.slice(SHARE_PREFIX.length))));

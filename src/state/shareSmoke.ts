@@ -14,6 +14,7 @@ import {
   parseShareHash,
   parseSharePayload,
   quantizeHeight,
+  sanitizeQuality,
   shareSources,
   textToB64Url,
 } from "./share";
@@ -81,8 +82,15 @@ const hash = encodeShareHash(payload);
 if (!hash.startsWith(SHARE_PREFIX)) fail("prefix");
 const parsed = parseShareHash(`#${hash}`);
 if (!parsed) fail("parse hash");
+const parsedEncoded = parseShareHash(`#${encodeURIComponent(hash)}`);
+if (!parsedEncoded || parsedEncoded.preset !== "slope") fail("encoded hash roundtrip");
 if (parsed.preset !== "slope" || parsed.speed !== 8) fail("hash fields");
 if (parsed.params.grain !== 0.44) fail("params");
+if (parsed.prompt !== "grober Laterit") fail("prompt umlaut/text");
+if (parsed.quality !== "medium") fail("quality");
+if (!parsed.camera || parsed.camera.p[0] !== 6) fail("camera");
+if (sanitizeQuality("nope") !== "high") fail("sanitize quality");
+if (sanitizeQuality("medium") !== "medium") fail("keep quality");
 const srcs = shareSources(parsed);
 if (srcs.length !== 1 || Math.abs(srcs[0].x - 0.5) > 1e-6) fail("sources");
 const decoded = decodeHeightField(parsed.h, parsed.hn, srcSize);
@@ -100,6 +108,25 @@ const compact = compactShareForHash({
 });
 if (compact.omittedHeight) fail("empty height should not omit");
 if (!parseShareHash(compact.hash)) fail("compact hash");
+
+const compactH = compactShareForHash({
+  presetId: "slope",
+  quality: "medium",
+  speed: 1,
+  params: DEFAULT_PARAMS,
+  sources: [{ id: "a", x: 0.5, y: 0.12, rate: 1.7 }],
+  texturePrompt: "feiner Quarzsand, warm, trocken",
+  camera: { position: [6, 5, 7], target: [0, 0.5, 0] },
+  props: [{ u: 0.4, v: 0.6, s: 0.07, r: 1.2, k: 2 }],
+  terrain,
+  size: srcSize,
+});
+if (compactH.omittedHeight) fail("typical 64² height should stay in the hash");
+const kept = parseShareHash(compactH.hash);
+if (!kept?.h || kept.hn !== SHARE_HASH_GRID) fail("compact hash keeps height");
+const keptH = decodeHeightField(kept.h, kept.hn, srcSize);
+if (!keptH) fail("compact height decodes");
+almost(keptH[mid], terrain[mid], 0.1, "compact height mid");
 
 const anyV2 = parseAnyScene(JSON.stringify(payload));
 if (anyV2.kind !== "v2") fail("any v2");
