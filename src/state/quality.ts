@@ -155,6 +155,31 @@ export function qualityChangesSim(a: QualityId, b: QualityId): boolean {
   return qualityProfile(a).grid !== qualityProfile(b).grid;
 }
 
+export type QualityMapsAction = "resample" | "keep" | "allocEmpty";
+
+/**
+ * Live packed terrain must never be replaced with empty maps.
+ * Auto step-down passes `resample: false` so the sim grid stays put.
+ */
+export function planQualityMaps(input: {
+  resample: boolean;
+  hasPacked: boolean;
+  lastSize: number;
+  mapWidth: number;
+  nextGrid: number;
+}): QualityMapsAction {
+  const gridChanged = input.lastSize > 0 && input.lastSize !== input.nextGrid;
+  if (input.hasPacked && input.resample && gridChanged) return "resample";
+  if (input.hasPacked) return "keep";
+  if (input.mapWidth !== input.nextGrid) return "allocEmpty";
+  return "keep";
+}
+
+/** Auto FPS drop only changes look/GPU knobs — never rebuilds the heightfield. */
+export function autoQualityResamplesSim(): boolean {
+  return false;
+}
+
 export function nextLowerQuality(quality: QualityId): QualityId | null {
   const order: QualityId[] = ["ultra", "high", "medium", "low"];
   const i = order.indexOf(quality);

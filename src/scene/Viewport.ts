@@ -10,11 +10,13 @@ import { persistOnboardDone, type Store } from "../state/store";
 import { onboardAfterAction, type OnboardAction } from "../ui/onboard";
 import { effectiveHeight01 } from "./heightDisplace";
 import {
+  autoQualityResamplesSim,
   autoQualityToast,
   isIosWebKit,
   nextLowerQuality,
   particleDrawCount,
   pixelRatioFor,
+  planQualityMaps,
   qualityAntialias,
   qualityProfile,
   rendererPowerPreference,
@@ -368,7 +370,14 @@ export class Viewport {
     }
 
     const grid = profile.grid;
-    if (this.lastPacked && resample && this.lastSize > 0 && this.lastSize !== grid) {
+    const mapsPlan = planQualityMaps({
+      resample,
+      hasPacked: !!this.lastPacked,
+      lastSize: this.lastSize,
+      mapWidth: this.maps.image.width,
+      nextGrid: grid,
+    });
+    if (mapsPlan === "resample" && this.lastPacked) {
       const { terrain, water, wetness, flow } = unpackRgba(this.lastPacked, this.lastSize);
       const t2 = resampleHeight(terrain, this.lastSize, grid);
       const w2 = resampleHeight(water, this.lastSize, grid);
@@ -394,7 +403,7 @@ export class Viewport {
       this.sim.replaceTerrain(t2, this.sources, w2, n2, h2);
       this.syncSourcePins();
       this.paintSection();
-    } else if (!this.lastPacked || this.maps.image.width !== grid) {
+    } else if (mapsPlan === "allocEmpty") {
       this.maps.dispose();
       this.hardTex.dispose();
       this.maps = createMapsTexture(grid);
@@ -1099,7 +1108,7 @@ export class Viewport {
     if (!next) return;
     this.autoDropped = true;
     this.store.patch({ quality: next });
-    this.applyQuality(next, true);
+    this.applyQuality(next, autoQualityResamplesSim());
     this.onToast(autoQualityToast(next));
     this.onUi();
   }

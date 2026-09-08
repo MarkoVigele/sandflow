@@ -5,9 +5,11 @@ import {
   AUTO_FPS_HOLD_MS,
   autoQualityToast,
   isIosWebKit,
+  autoQualityResamplesSim,
   nextLowerQuality,
   particleDrawCount,
   pixelRatioFor,
+  planQualityMaps,
   qualityAntialias,
   qualityChangesSim,
   qualityProfile,
@@ -103,6 +105,23 @@ assert(!recover.shouldDrop && recover.lowFpsMs === 0, "recovery resets");
 const highOk = tickAutoQuality(40, 1500, 500);
 assert(!highOk.shouldDrop && highOk.lowFpsMs === 0, "40 FPS is enough");
 assert(autoQualityToast("medium") === `Qualität automatisch auf ${QUALITY_LABEL.medium} gesenkt.`, "toast copy");
+assert(!autoQualityResamplesSim(), "auto must not rebuild the sim grid");
+assert(
+  planQualityMaps({ resample: false, hasPacked: true, lastSize: 512, mapWidth: 512, nextGrid: 256 }) === "keep",
+  "auto step-down keeps live terrain",
+);
+assert(
+  planQualityMaps({ resample: true, hasPacked: true, lastSize: 512, mapWidth: 512, nextGrid: 256 }) === "resample",
+  "manual quality still resamples",
+);
+assert(
+  planQualityMaps({ resample: true, hasPacked: true, lastSize: 256, mapWidth: 512, nextGrid: 256 }) === "keep",
+  "never wipe packed maps when size already matches",
+);
+assert(
+  planQualityMaps({ resample: true, hasPacked: false, lastSize: 0, mapWidth: 128, nextGrid: 256 }) === "allocEmpty",
+  "boot may allocate empty maps",
+);
 
 const idle = planSimStep(2, 0, 0);
 assert(idle.send === 2 && idle.backlog === 0 && idle.skipped === 0, "idle step sends");
