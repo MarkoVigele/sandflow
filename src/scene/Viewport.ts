@@ -8,6 +8,7 @@ import { getPreset, resampleHeight, type CameraPose } from "../sim/presets";
 import { History } from "../state/history";
 import type { Store } from "../state/store";
 import { effectiveHeight01 } from "./heightDisplace";
+import { particleDrawCount, pixelRatioFor, qualityProfile } from "../state/quality";
 import {
   HEIGHT_WORLD,
   QUALITY_GRID,
@@ -17,6 +18,9 @@ import {
   type ToolId,
   type WaterSource,
 } from "../state/types";
+import { CrossSectionView } from "../ui/crossSection";
+import { claimSourceGesture } from "../ui/sourceGesture";
+import { stepsThisFrame } from "../ui/transport";
 import {
   AimCursor,
   pickDeformedSand,
@@ -97,6 +101,9 @@ export class Viewport {
   private lastStroke: { u: number; v: number } | null = null;
   private unsubStore: () => void = () => {};
   private onUi: () => void;
+  private section: CrossSectionView;
+  /** Hook: keep one-finger orbit off while a source pin is claimed. */
+  private orbitLockedBySource = false;
 
   constructor(host: HTMLElement, store: Store, onUi: () => void) {
     this.host = host;
@@ -112,7 +119,7 @@ export class Viewport {
       alpha: false,
       powerPreference: "high-performance",
     });
-    this.renderer.setPixelRatio(pixelRatioFor(store.state.quality));
+      this.renderer.setPixelRatio(pixelRatioFor(store.state.quality, window.devicePixelRatio || 1));
     this.renderer.setClearColor(0x14110e, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -176,8 +183,13 @@ export class Viewport {
     this.water = new WaterMesh(TRAY_SIZE, this.maps, q, this.heightScale);
     this.particles = new FlowParticles();
     this.scene.add(this.sand.mesh, this.water.mesh, this.particles.points, this.propsLite.group);
+    this.section = new CrossSectionView(host);
     this.sand.setHeatMode(store.state.heatmap);
-    store.subscribe(() => this.sand.setHeatMode(this.store.state.heatmap));
+    this.section.setOpen(store.state.sectionOpen);
+    store.subscribe(() => {
+      this.sand.setHeatMode(this.store.state.heatmap);
+      this.section.setOpen(this.store.state.sectionOpen);
+    });
     this.sourceGroup.name = "sources";
     this.scene.add(this.sourceGroup);
 
@@ -265,11 +277,12 @@ export class Viewport {
   }
 
   applyQuality(quality: QualityId, resample = true): void {
+    const profile = qualityProfile(quality);
     const shadows = quality === "high" || quality === "ultra";
     this.renderer.shadowMap.enabled = shadows;
     this.sun.castShadow = shadows;
     this.sun.shadow.mapSize.set(quality === "ultra" ? 2048 : 1024, quality === "ultra" ? 2048 : 1024);
-    this.renderer.setPixelRatio(pixelRatioFor(quality));
+    this.renderer.setPixelRatio(pixelRatioFor(quality, window.devicePixelRatio || 1));
     this.sand.setQuality(quality, TRAY_SIZE);
     this.water.setQuality(quality, TRAY_SIZE);
     const gpuSize = gpuTexelBudget(quality);
@@ -281,12 +294,13 @@ export class Viewport {
       }
     }
 
-    const grid = QUALITY_GRID[quality];
-    if (this.lastPacked && resample && this.lastSize !== grid) {
-      const { terrain, water, wetness } = unpackRgba(this.lastPacked, this.lastSize);
+    const grid = profile.grid;
+    if (this.lastPacked && resample && this.lastSize > 0 && this.lastSize !== grid) {
+      const { terrain, water, wetness, flow } = unpackRgba(this.lastPacked, this.lastSize);
       const t2 = resampleHeight(terrain, this.lastSize, grid);
       const w2 = resampleHeight(water, this.lastSize, grid);
       const n2 = resampleHeight(wetness, this.lastSize, grid);
+      const f2 = resampleHeight(flow, this.lastSize, grid);
       const h2 = this.lastHard ? resampleMask(this.lastHard, this.lastSize, grid) : undefined;
       this.maps.dispose();
       this.hardTex.dispose();
@@ -295,12 +309,18 @@ export class Viewport {
       this.sand.setMaps(this.maps);
       this.sand.setHard(this.hardTex);
       this.water.setMaps(this.maps);
+      const packed = packMapsRgba(t2, w2, n2, f2);
+      this.lastPacked = packed;
+      this.lastSize = grid;
+      uploadPacked(this.maps, packed, grid);
       if (h2) {
         this.lastHard = h2;
         uploadHard(this.hardTex, h2, grid);
       }
       this.sim.replaceTerrain(t2, this.sources, w2, n2, h2);
-    } else if (!this.lastPacked) {
+      this.syncSourcePins();
+      this.paintSection();
+    } else if (!this.lastPacked || this.maps.image.width !== grid) {
       this.maps.dispose();
       this.hardTex.dispose();
       this.maps = createMapsTexture(grid);
@@ -327,9 +347,16 @@ export class Viewport {
     this.water.setMaps(this.maps);
     this.lastHard = built.hardmask ? built.hardmask.slice() : new Float32Array(grid * grid);
     if (this.lastHard) uploadHard(this.hardTex, this.lastHard, grid);
+    const empty = new Float32Array(grid * grid);
+    const packed = packMapsRgba(built.terrain, empty, empty, empty);
+    this.lastPacked = packed;
+    this.lastSize = grid;
+    uploadPacked(this.maps, packed, grid);
     this.sim.init(grid, this.store.state.params, built.terrain, this.sources, {
       hardmask: built.hardmask,
     });
+    this.syncSourcePins();
+    this.paintSection();
     this.applyCamera(preset.camera);
     this.setProps([]);
     this.store.patch({ presetId: id, selectedSourceId: this.sources[0]?.id ?? null });
@@ -383,6 +410,8 @@ export class Viewport {
     this.lastSize = snap.size;
     uploadPacked(this.maps, packed, snap.size);
     uploadHard(this.hardTex, this.lastHard, snap.size);
+    this.syncSourcePins();
+    this.paintSection();
     this.onUi();
   }
 
@@ -437,6 +466,15 @@ export class Viewport {
 
   resetWater(): void {
     this.sim.resetWater();
+  }
+
+  /** Pin-drag agent hook: keep one-finger orbit off while a source is moved. */
+  lockOrbitForSource(active: boolean): void {
+    this.orbitLockedBySource = active;
+  }
+
+  sourceGestureActive(): boolean {
+    return !!this.draggingSource || !!this.pendingSource || this.orbitLockedBySource;
   }
 
   replaceSources(sources: WaterSource[]): void {
@@ -505,10 +543,12 @@ export class Viewport {
     this.propsLite.dispose();
     this.maps.dispose();
     this.hardTex.dispose();
+    this.section.dispose();
     this.renderer.dispose();
   }
 
   private applyFrame(frame: SimFrame): void {
+    if (this.maps.image.width && frame.size !== this.maps.image.width) return;
     this.lastPacked = frame.packed;
     this.lastSize = frame.size;
     this.waterVolume = frame.waterVolume;
@@ -519,13 +559,22 @@ export class Viewport {
       uploadHard(this.hardTex, frame.hard, frame.size);
     }
     const q = this.store.state.quality;
+    const incoming = frame.particles ? (frame.particles.length / 4) | 0 : 0;
     this.particles.update(
       frame.particles,
       TRAY_SIZE,
       this.heightScale,
-      q === "high" || q === "ultra",
+      qualityProfile(q).particleRatio > 0,
       this.relief,
+      particleDrawCount(incoming, q),
     );
+    this.syncSourcePins();
+    this.paintSection();
+  }
+
+  private paintSection(): void {
+    const src = this.sources.find((s) => s.id === this.store.state.selectedSourceId);
+    this.section.paint(this.lastPacked, this.lastSize, src?.y ?? 0.5);
   }
 
   private rebuildMarkers(): void {
@@ -707,10 +756,18 @@ export class Viewport {
 
   private onPointerDown = async (ev: PointerEvent): Promise<void> => {
     if (ev.button === 2 || ev.button === 1) return;
-    if (this.store.state.cameraMode) return;
     const tool = this.store.state.tool;
+    const hitSource = tool === "source" || this.store.state.cameraMode ? this.pickSource(ev) : null;
+    const claim = claimSourceGesture({
+      tool,
+      cameraMode: this.store.state.cameraMode,
+      hitSourceId: hitSource,
+      draggingSource: this.draggingSource ?? this.pendingSource?.id ?? null,
+    });
+    if (claim.orbit) return;
     this.pointerDown = true;
     this.canvas.setPointerCapture(ev.pointerId);
+    if (claim.tool && claim.sourceId) this.lockOrbitForSource(true);
 
     if (tool === "source") {
       const id = this.pickSource(ev);
@@ -721,6 +778,7 @@ export class Viewport {
           y: ev.clientY,
           pointerType: ev.pointerType,
         };
+        this.lockOrbitForSource(true);
         this.store.patch({ selectedSourceId: id });
         this.syncMarkerStyles();
         this.onUi();
@@ -764,6 +822,7 @@ export class Viewport {
       if (shouldStartSourceDrag(delta, this.pendingSource.pointerType)) {
         this.draggingSource = this.pendingSource.id;
         this.pendingSource = null;
+        this.lockOrbitForSource(true);
         void this.pushHistory();
         this.syncMarkerStyles();
       }
@@ -797,6 +856,7 @@ export class Viewport {
     this.strokeActive = false;
     this.draggingSource = null;
     this.pendingSource = null;
+    this.lockOrbitForSource(false);
     this.lastStroke = null;
     this.syncMarkerStyles();
     if (ev.pointerType === "touch" || ev.pointerType === "pen") {
@@ -833,23 +893,16 @@ export class Viewport {
     this.controls.update();
     this.clampCamera();
 
-    const cam = this.store.state.cameraMode;
+    const cam = this.store.state.cameraMode && !this.sourceGestureActive();
     this.controls.mouseButtons.LEFT = cam ? THREE.MOUSE.ROTATE : (-1 as unknown as THREE.MOUSE);
     this.controls.touches.ONE = cam ? THREE.TOUCH.ROTATE : (-1 as unknown as THREE.TOUCH);
 
     this.syncSourcePins();
 
     if (this.store.state.playing) {
-      const speed = this.store.state.speed;
-      if (speed < 1) {
-        this.stepAccum += speed;
-        if (this.stepAccum >= 1) {
-          this.sim.step(1);
-          this.stepAccum = 0;
-        }
-      } else {
-        this.sim.step(Math.round(speed));
-      }
+      const tick = stepsThisFrame(this.store.state.speed, this.stepAccum);
+      this.stepAccum = tick.accum;
+      if (tick.steps > 0) this.sim.step(tick.steps);
     }
 
     this.water.tick(t);
@@ -860,6 +913,7 @@ export class Viewport {
     }
     this.aim.tick(t, this.strokeActive || !!this.draggingSource);
     this.propsLite.settle((u, v) => this.sampleHeight(u, v), TRAY_SIZE, this.heightScale);
+    this.paintSection();
     this.renderer.render(this.scene, this.camera);
 
     this.fpsFrames++;
@@ -914,8 +968,4 @@ export class Viewport {
   }
 }
 
-function pixelRatioFor(quality: QualityId): number {
-  const cap = quality === "low" ? 1 : quality === "ultra" ? 2 : quality === "medium" && isMobile() ? 1.15 : 1.5;
-  return Math.min(window.devicePixelRatio || 1, cap);
-}
 

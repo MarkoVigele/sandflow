@@ -29,13 +29,16 @@ import {
 } from "../state/share";
 import { persistOnboardDone, Store } from "../state/store";
 import { QUALITY_GRID, SPEEDS } from "../state/types";
+import { qualityProfile } from "../state/quality";
 import { LETTER_HOTKEYS, TOOL_HOTKEYS } from "./tools";
 import { Inspector } from "./Inspector";
 import { Onboarding } from "./Onboarding";
 import { PresetGallery } from "./PresetGallery";
+import { SourceTip } from "./SourceTip";
 import { StatsPanel } from "./StatsPanel";
 import { Toolbar } from "./Toolbar";
 import { TopBar } from "./TopBar";
+import { applyPlay } from "./transport";
 import { ICONS } from "./icons";
 
 export class App {
@@ -53,6 +56,7 @@ export class App {
       <aside id="toolbar" class="toolbar"></aside>
       <main id="viewport" class="viewport">
         <div id="onboard"></div>
+        <div id="source-tip"></div>
       </main>
       <aside id="inspector" class="inspector"></aside>
       <aside id="stats" class="stats"></aside>
@@ -84,8 +88,14 @@ export class App {
       onUndo: () => void this.viewport.undo(),
       onRedo: () => void this.viewport.redo(),
       onStep: () => this.viewport.stepOnce(),
-      onResetScene: () => this.viewport.resetScene(),
-      onResetWater: () => this.viewport.resetWater(),
+      onResetScene: () => {
+        this.viewport.resetScene();
+        this.toast("Szene zurückgesetzt.");
+      },
+      onResetWater: () => {
+        this.viewport.resetWater();
+        this.toast("Wasser geleert.");
+      },
       onShareLink: () => void this.shareLink(),
       onShareJson: () => void this.shareJson(),
     });
@@ -94,6 +104,7 @@ export class App {
     });
     new StatsPanel(this.store, root.querySelector("#stats")!, this.viewport);
     new Onboarding(this.store, root.querySelector("#onboard")!);
+    new SourceTip(this.store, root.querySelector("#source-tip")!);
 
     this.fileInput = document.createElement("input");
     this.fileInput.type = "file";
@@ -149,6 +160,7 @@ export class App {
     });
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
     downloadText(`sandflow-${stamp}.json`, toJson(file), "application/json");
+    this.toast("Szene gespeichert.");
   }
 
   private async loadScene(): Promise<void> {
@@ -164,7 +176,10 @@ export class App {
       }
       const scene = loaded.file;
       const maps = unpackMaps(scene);
-      const grid = QUALITY_GRID[this.store.state.quality];
+      const quality = sanitizeQuality(scene.quality, this.store.state.quality);
+      this.store.patch({ quality, autoQuality: false });
+      this.viewport.applyQuality(quality, false);
+      const grid = qualityProfile(quality).grid;
       const terrain =
         scene.size === grid ? maps.terrain : resampleHeight(maps.terrain, scene.size, grid);
       const water =
@@ -201,6 +216,7 @@ export class App {
       });
       this.viewport.applyParams();
       void this.loadLabTextures(scene.texturePrompt);
+      this.toast("Szene geladen.");
     } catch {
       this.toast("Datei konnte nicht gelesen werden.");
     }
@@ -312,6 +328,7 @@ export class App {
   private screenshot(): void {
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
     downloadDataUrl(`sandflow-${stamp}.png`, this.viewport.screenshotPng());
+    this.toast("Bild gespeichert.");
   }
 
   private bindAbout(host: HTMLElement): void {
@@ -328,7 +345,7 @@ export class App {
               <button class="icon-btn" data-x>${ICONS.close}</button>
             </header>
             <p>Wasser sucht sich Wege durch Sand: erst dünne Adern, dann ein Bett, später ein verzweigtes Netz. V1.x ist der spielbare Kern — Zielring, Werkzeuge, Teilen, Kiesel, Beton, gebackene Texturen. WebGPU und eine volle Requisitenbibliothek bleiben später.</p>
-            <p>Kurzanleitung: <strong>Sand formen</strong> → <strong>Quelle setzen</strong> → <strong>Abspielen</strong>.</p>
+            <p>Kurzanleitung: <strong>Sand formen</strong> → <strong>Quelle setzen</strong> (<em>tippen = wählen, ziehen = verschieben</em>) → <strong>Abspielen</strong>. Pins sitzen auf dem Sand; ziehen verschiebt sie.</p>
             <p>Rechtsklick oder zwei Finger drehen die Kamera. Ein Finger (oder die linke Taste) bedient das Werkzeug. Unter <em>Kamera</em> geht das Drehen auch mit einem Finger.</p>
             <p>Oben: <em>Tempo</em> und <em>Zeitraffer</em>, Qualität inkl. Auto, Szene oder nur Wasser zurücksetzen, Teilen per Link oder JSON. <em>Beton</em> setzt Hartstoff (Platte oder Wand). Kiesel sind kleine Steine — der Radierer nimmt Kiesel und Beton weg.</p>
             <p>Unter <em>Erweitert</em> liegen Heatmap (Fluss oder Tiefe) und <em>Relief</em>, das die Höhen in der Wanne überhöht. Texturen entstehen lokal aus einer kurzen Beschreibung.</p>
@@ -352,13 +369,9 @@ export class App {
       const k = e.key.toLowerCase();
       if (k === " ") {
         e.preventDefault();
-        const playing = !this.store.state.playing;
-        if (playing && this.store.state.onboardStep === 3) {
-          persistOnboardDone();
-          this.store.patch({ playing: true, onboardStep: 0 });
-          return;
-        }
-        this.store.patch({ playing });
+        const next = applyPlay(!this.store.state.playing, this.store.state.onboardStep);
+        if (next.persistOnboard) persistOnboardDone();
+        this.store.patch({ playing: next.playing, onboardStep: next.onboardStep });
       }
       if ((e.metaKey || e.ctrlKey) && k === "z") {
         e.preventDefault();

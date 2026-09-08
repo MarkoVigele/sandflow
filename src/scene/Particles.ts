@@ -67,6 +67,7 @@ export class FlowParticles {
     heightScale: number,
     enabled: boolean,
     relief = 1,
+    drawCount?: number,
   ): void {
     if (!enabled || !particles || particles.length < 3) {
       this.geo.setDrawRange(0, 0);
@@ -75,7 +76,9 @@ export class FlowParticles {
     }
     const stride = particles.length % PARTICLE_STRIDE === 0 ? PARTICLE_STRIDE : 3;
     let count = 0;
-    const incoming = Math.min(this.max, (particles.length / stride) | 0);
+    const available = Math.min(this.max, (particles.length / stride) | 0);
+    const incoming =
+      drawCount === undefined ? available : Math.max(0, Math.min(available, drawCount | 0));
     for (let i = 0; i < incoming; i++) {
       const u = particles[i * stride];
       const v = particles[i * stride + 1];

@@ -1,5 +1,6 @@
 import { persistOnboardDone, type Store } from "../state/store";
 import type { OnboardStep } from "../state/types";
+import { SOURCE_TOOL_TIP } from "./sourceGesture";
 
 const STEPS: Record<Exclude<OnboardStep, 0>, { kicker: string; title: string; body: string }> = {
   1: {
@@ -10,7 +11,7 @@ const STEPS: Record<Exclude<OnboardStep, 0>, { kicker: string; title: string; bo
   2: {
     kicker: "Schritt 2 von 3",
     title: "Quelle setzen",
-    body: "Tippe auf den Sand. Quelle ziehen: Pin halten und über das Gelände schieben.",
+    body: `${SOURCE_TOOL_TIP}. Quelle ziehen: Pin halten und über das Gelände schieben.`,
   },
   3: {
     kicker: "Schritt 3 von 3",

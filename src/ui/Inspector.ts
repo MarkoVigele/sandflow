@@ -9,6 +9,7 @@ import {
   type SimParams,
   type ToolId,
 } from "../state/types";
+import { SOURCE_TOOL_TIP } from "./sourceGesture";
 
 const TOOL_COPY: Record<ToolId, { title: string; body: string }> = {
   pile: { title: "Aufschütten", body: "Kreis = Pinselradius. Ziehen, um Sand anzuhäufen." },
@@ -24,7 +25,7 @@ const TOOL_COPY: Record<ToolId, { title: string; body: string }> = {
   pour: { title: "Gießen", body: "Der Kreis auf dem Sand zeigt die Tropfstelle. Halten zum Gießen." },
   source: {
     title: "Quelle",
-    body: "Quelle ziehen: Pin antippen und auf dem Sand verschieben. Freier Sand setzt eine neue, Löschen nimmt sie weg. Durchfluss nur mit dem Regler.",
+    body: `${SOURCE_TOOL_TIP}. Quelle ziehen: Pin antippen und auf dem Sand verschieben. Freier Sand setzt eine neue, Löschen nimmt sie weg. Durchfluss nur mit dem Regler.`,
   },
 };
 
@@ -60,7 +61,7 @@ export class Inspector {
     let sig = "";
     store.subscribe(() => {
       const st = store.state;
-      const next = `${st.tool}|${st.advancedOpen}|${st.selectedSourceId}|${st.galleryOpen}|${st.heatmap}`;
+      const next = `${st.tool}|${st.advancedOpen}|${st.selectedSourceId}|${st.galleryOpen}|${st.heatmap}|${st.sectionOpen}`;
       if (next !== sig) {
         sig = next;
         this.render();
@@ -95,6 +96,15 @@ export class Inspector {
           <button class="btn" data-reset-water>Nur Wasser zurücksetzen</button>
           <button class="btn" data-reset-all>Szene zurücksetzen</button>
         </div>
+        <fieldset class="seg">
+          <legend>Heatmap</legend>
+          ${segBtn("off", "Aus", s.heatmap)}
+          ${segBtn("flow", "Fluss", s.heatmap)}
+          ${segBtn("depth", "Tiefe", s.heatmap)}
+        </fieldset>
+        <div class="row">
+          <button type="button" class="chip ${s.sectionOpen ? "is-on" : ""}" data-section aria-pressed="${s.sectionOpen}">Querschnitt</button>
+        </div>
         <button class="adv-toggle" data-adv>${s.advancedOpen ? "Erweitert schließen" : "Erweitert"}</button>
         ${
           s.advancedOpen
@@ -108,20 +118,6 @@ export class Inspector {
             ${slider("Ablagerung", 0.05, 0.8, 0.01, s.params.deposition, "deposition")}
             ${slider("Relief", RELIEF_MIN, RELIEF_MAX, 0.05, s.relief, "relief")}
             ${slider("Wellen", WAVES_MIN, WAVES_MAX, 0.05, s.waves, "waves")}
-            <label class="field">
-              <span>Heatmap</span>
-              <select data-heat>
-                <option value="off" ${s.heatmap === "off" ? "selected" : ""}>Aus</option>
-                <option value="flow" ${s.heatmap === "flow" ? "selected" : ""}>Fluss</option>
-                <option value="depth" ${s.heatmap === "depth" ? "selected" : ""}>Tiefe</option>
-              </select>
-            </label>
-            <fieldset class="seg">
-              <legend class="visually-hidden">Heatmap</legend>
-              ${segBtn("off", "Aus", s.heatmap)}
-              ${segBtn("flow", "Fluss", s.heatmap)}
-              ${segBtn("depth", "Tiefe", s.heatmap)}
-            </fieldset>
           </div>`
             : ""
         }
@@ -166,8 +162,8 @@ export class Inspector {
         this.store.patch({ heatmap: btn.dataset.heat as HeatmapMode });
       });
     });
-    this.el.querySelector<HTMLSelectElement>("select[data-heat]")?.addEventListener("change", (e) => {
-      this.store.patch({ heatmap: (e.target as HTMLSelectElement).value as HeatmapMode });
+    this.el.querySelector("[data-section]")?.addEventListener("click", () => {
+      this.store.patch({ sectionOpen: !this.store.state.sectionOpen });
     });
   }
 

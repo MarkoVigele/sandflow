@@ -51,7 +51,8 @@ export interface UiState {
   relief: number;
   waves: number;
   onboardStep: OnboardStep;
-  menuOpen: null | "reset" | "share";
+  menuOpen: null | "reset" | "share" | "more";
+  sectionOpen: boolean;
 }
 
 export const initialUiState = (): UiState => {
@@ -79,6 +80,7 @@ export const initialUiState = (): UiState => {
     waves: DEFAULT_WAVES,
     onboardStep,
     menuOpen: null,
+    sectionOpen: false,
   };
 };
 
