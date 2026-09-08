@@ -185,9 +185,9 @@ export function depthTint(depth: number): [number, number, number] {
 export function waterBodyColor(depth: number, flow = 0): [number, number, number] {
   const d = Number.isFinite(depth) && depth > 0 ? depth : 0;
   const fl = Number.isFinite(flow) && flow > 0 ? Math.min(1, flow) : 0;
-  const film: [number, number, number] = [0.42, 0.7, 0.76];
-  const shallow: [number, number, number] = [0.22, 0.5, 0.58];
-  const deep: [number, number, number] = [0.16, 0.34, 0.4];
+  const film: [number, number, number] = [0.28, 0.72, 0.82];
+  const shallow: [number, number, number] = [0.16, 0.52, 0.62];
+  const deep: [number, number, number] = [0.1, 0.32, 0.4];
   const t = smoothstep(0.005, 0.055, d);
   const t2 = smoothstep(0.04, 0.14, d);
   const body = mix3(mix3(film, shallow, t), deep, t2);

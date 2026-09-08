@@ -166,10 +166,10 @@ void main() {
   vec3 trans = exp(-sigma * optical);
   if (!(trans.x == trans.x)) trans = vec3(0.74, 0.82, 0.84);
 
-  // Films: saturated aqua so rivulets read as water, not wet sand.
-  vec3 film = vec3(0.42, 0.70, 0.76);
-  vec3 shallow = vec3(0.22, 0.50, 0.58);
-  vec3 scatter = vec3(0.16, 0.34, 0.40);
+  // Saturated aqua — must survive alpha-over orange sand or it reads as wet dirt.
+  vec3 film = vec3(0.28, 0.72, 0.82);
+  vec3 shallow = vec3(0.16, 0.52, 0.62);
+  vec3 scatter = vec3(0.10, 0.32, 0.40);
   vec3 silt = vec3(0.50, 0.46, 0.38);
   vec3 foamC = vec3(0.94, 0.95, 0.93);
   vec3 wetSand = vec3(0.36, 0.28, 0.20);
@@ -241,10 +241,10 @@ void main() {
 
   float absorbAlpha = 1.0 - clamp((trans.x + trans.y + trans.z) * 0.333, 0.0, 1.0);
   float lip = smoothstep(0.0007, 0.014, max(rawW, col));
-  float alpha = mix(0.38, 0.64, depth) + absorbAlpha * 0.10 + foam * 0.08 + fresnel * 0.16;
+  float alpha = mix(0.58, 0.78, depth) + absorbAlpha * 0.08 + foam * 0.06 + fresnel * 0.12;
   if (geoArea > 4.0e-4) alpha *= mix(0.35, 1.0, smoothstep(0.28, 0.52, geoUp));
   alpha *= lip;
-  alpha = clamp(alpha, 0.28, 0.70);
+  alpha = clamp(alpha, 0.50, 0.84);
 
   gl_FragColor = vec4(color, alpha);
 }
