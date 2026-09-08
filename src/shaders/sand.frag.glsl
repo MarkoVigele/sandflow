@@ -75,9 +75,10 @@ float heightfieldAO(vec2 uv, float h0, float texel, float steps) {
   return clamp(1.0 - acc * 1.85, 0.52, 1.0);
 }
 
-// Warm beach lift on dry only. Soft-knee so bright grains stay readable.
+// Warm beach lift on dry only. Green leads (cream-gold, not burnt orange).
+// Soft-knee so bright grains stay readable.
 vec3 liftDrySand(vec3 dry) {
-  vec3 lifted = dry * vec3(1.22, 1.20, 1.10);
+  vec3 lifted = dry * vec3(1.18, 1.21, 1.14) + vec3(0.025, 0.022, 0.014);
   float peak = max(lifted.r, max(lifted.g, lifted.b));
   float knee = max(peak - 0.86, 0.0);
   lifted *= peak > 1.0e-5 ? (peak - knee * 0.55) / peak : 1.0;

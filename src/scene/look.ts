@@ -40,8 +40,10 @@ function mix3(
   return [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)];
 }
 
-/** Warm beach gain on dry albedo. Blue is lifted less so gray-brown recedes. */
-export const DRY_SAND_LIFT = [1.22, 1.2, 1.1] as const;
+/** Warm beach gain on dry albedo. Green leads so it goes cream-gold, not burnt orange. */
+export const DRY_SAND_LIFT = [1.18, 1.21, 1.14] as const;
+/** Small cream bias so dark grains lift with the base, not just the highlights. */
+export const DRY_SAND_CREAM = [0.025, 0.022, 0.014] as const;
 /** Soft-knee start; peaks above this compress instead of clipping. */
 export const DRY_SAND_KNEE = 0.86;
 export const DRY_SAND_KNEE_AMT = 0.55;
@@ -59,9 +61,9 @@ export function liftDrySandAlbedo(
   const rr = Number.isFinite(r) ? r : 0.7;
   const gg = Number.isFinite(g) ? g : 0.58;
   const bb = Number.isFinite(b) ? b : 0.4;
-  let lr = rr * DRY_SAND_LIFT[0];
-  let lg = gg * DRY_SAND_LIFT[1];
-  let lb = bb * DRY_SAND_LIFT[2];
+  let lr = rr * DRY_SAND_LIFT[0] + DRY_SAND_CREAM[0];
+  let lg = gg * DRY_SAND_LIFT[1] + DRY_SAND_CREAM[1];
+  let lb = bb * DRY_SAND_LIFT[2] + DRY_SAND_CREAM[2];
   const peak = Math.max(lr, lg, lb);
   const knee = Math.max(peak - DRY_SAND_KNEE, 0);
   const scale = peak > 1e-5 ? (peak - knee * DRY_SAND_KNEE_AMT) / peak : 1;
