@@ -78,7 +78,7 @@ export function placeSourceOnTerrain(
   if (!hereHard && terrain[here.i] > MIN_SOURCE_BED) {
     return { x: u0, y: v0 };
   }
-  const radius = Math.max(4, Math.round(size * 0.045));
+  const radius = Math.max(6, Math.round(size * 0.08));
   let bestU = u0;
   let bestV = v0;
   let bestScore = -Infinity;
@@ -628,8 +628,19 @@ const PRESET_DEFS: PresetDef[] = [
           if (v < 0.08) terrain[i] = 1.02;
         }
       }
+      for (let y = 0; y < size; y++) {
+        const v = y / (size - 1);
+        if (v < 0.055 || v > 0.12) continue;
+        for (let x = 0; x < size; x++) {
+          const u = x / (size - 1);
+          if (u < 0.42 || u > 0.58) continue;
+          const i = idx(x, y, size);
+          hard[i] = 0;
+          terrain[i] = 0.99;
+        }
+      }
       rim(terrain, size, true);
-      return { terrain, hardmask: hard, sources: [source("s-stufen", 0.5, 0.06, 2.2)] };
+      return { terrain, hardmask: hard, sources: [source("s-stufen", 0.5, 0.09, 2.2)] };
     },
   },
   {
