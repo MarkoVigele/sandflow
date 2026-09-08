@@ -8,11 +8,20 @@
  *   B — wetness 0..1
  *   A — flow magnitude (turbidity / particles)
  *
+ * Companion uHard (R32F, size×size) — NOT packed into uMaps RGBA:
+ *   0 — sand (erodible)
+ *   1 — hard / concrete / stone
+ *   Cells with value >= HARD_THRESHOLD skip erosion, deposition and thermal
+ *   creep. Water still routes over them. Sand brushes skip those cells.
+ *   Upload separately; do not steal a uMaps channel.
+ *
  * Required sim uniforms (names stay):
  *   uMaps, uHeightScale, uTexel
  * Optional look uniforms: uTraySize (world width), uRelief, uPivot.
  * Displacement: Y = (uPivot + (R − uPivot) * uRelief) * uHeightScale
  * sand.vert normals: N = (hL-hR, 2·texel·tray, h(v+)-h(v−)) — same as AimCursor.heightfieldNormal.
+ * Optional visual uniforms:
+ *   uHard, uConcrete
  *
  * Particles: triples [u, v, terrain+water] in 0..1 uv, height in sim units.
  */
@@ -67,4 +76,42 @@ export function unpackRgba(packed: Float32Array, size: number): PackedMaps {
     flow[i] = packed[o + MAP_A_FLOW];
   }
   return { terrain, water, wetness, flow };
+}
+
+/** Hard / concrete / stone. Keep out of the RGBA visual pack. */
+export const HARD_SAND = 0;
+export const HARD_ROCK = 1;
+export const HARD_THRESHOLD = 0.5;
+
+export const HARD_UNIFORMS = {
+  hard: "uHard",
+  concrete: "uConcrete",
+} as const;
+
+export function isHardCell(value: number): boolean {
+  return value >= HARD_THRESHOLD;
+}
+
+/** Nearest-neighbor resample so channel walls stay crisp across quality grids. */
+export function resampleMask(src: Float32Array, srcSize: number, dstSize: number): Float32Array {
+  if (srcSize === dstSize) return src.slice();
+  const dst = new Float32Array(dstSize * dstSize);
+  const scale = srcSize / dstSize;
+  for (let y = 0; y < dstSize; y++) {
+    for (let x = 0; x < dstSize; x++) {
+      const sx = Math.min(srcSize - 1, Math.max(0, Math.floor((x + 0.5) * scale)));
+      const sy = Math.min(srcSize - 1, Math.max(0, Math.floor((y + 0.5) * scale)));
+      dst[y * dstSize + x] = src[sy * srcSize + sx] >= HARD_THRESHOLD ? HARD_ROCK : HARD_SAND;
+    }
+  }
+  return dst;
+}
+
+export function countHardCells(mask: Float32Array | undefined | null): number {
+  if (!mask) return 0;
+  let n = 0;
+  for (let i = 0; i < mask.length; i++) {
+    if (mask[i] >= HARD_THRESHOLD) n++;
+  }
+  return n;
 }

@@ -6,6 +6,7 @@ export type ToolId =
   | "tamp"
   | "groove"
   | "flatten"
+  | "concrete"
   | "stone"
   | "erase"
   | "pour"

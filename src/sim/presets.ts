@@ -6,12 +6,18 @@ export interface CameraPose {
   target: [number, number, number];
 }
 
+export interface PresetBuild {
+  terrain: Float32Array;
+  sources: WaterSource[];
+  hardmask?: Float32Array;
+}
+
 export interface PresetDef {
   id: string;
   title: string;
   blurb: string;
   camera: CameraPose;
-  build: (size: number) => { terrain: Float32Array; sources: WaterSource[] };
+  build: (size: number) => PresetBuild;
 }
 
 const BASE = 0.42;
@@ -53,6 +59,49 @@ function grain(terrain: Float32Array, size: number, amp: number, seed: number): 
         (fbm(u * 7.5, v * 7.5, 4, seed) - 0.5) * amp;
     }
   }
+}
+
+function blankHard(size: number): Float32Array {
+  return new Float32Array(size * size);
+}
+
+function fillBox(
+  terrain: Float32Array,
+  hard: Float32Array,
+  size: number,
+  u0: number,
+  v0: number,
+  u1: number,
+  v1: number,
+  height: number | ((u: number, v: number) => number),
+  harden = true,
+): void {
+  const x0 = Math.max(0, Math.floor(Math.min(u0, u1) * (size - 1)));
+  const x1 = Math.min(size - 1, Math.ceil(Math.max(u0, u1) * (size - 1)));
+  const y0 = Math.max(0, Math.floor(Math.min(v0, v1) * (size - 1)));
+  const y1 = Math.min(size - 1, Math.ceil(Math.max(v0, v1) * (size - 1)));
+  for (let y = y0; y <= y1; y++) {
+    const v = y / (size - 1);
+    for (let x = x0; x <= x1; x++) {
+      const u = x / (size - 1);
+      const i = idx(x, y, size);
+      terrain[i] = typeof height === "function" ? height(u, v) : height;
+      if (harden) hard[i] = 1;
+    }
+  }
+}
+
+function paintWallBand(
+  terrain: Float32Array,
+  hard: Float32Array,
+  size: number,
+  u0: number,
+  u1: number,
+  v0: number,
+  v1: number,
+  height: (u: number, v: number) => number,
+): void {
+  fillBox(terrain, hard, size, u0, v0, u1, v1, height, true);
 }
 
 /** Carve a V-channel along u = center(v). width/depth in heightmap units. */
@@ -277,6 +326,190 @@ export const PRESETS: PresetDef[] = [
           source("s-vein-b", 0.62, 0.1, 1.15),
         ],
       };
+    },
+  },
+  {
+    id: "betonkanal",
+    title: "Betonkanal",
+    blurb: "Labor-Rinne: Betonwände, Sandsohle, eine Quelle oben. Wasser bleibt in der Spur — die Wände erodieren nicht.",
+    camera: { position: [0.2, 4.7, -6.15], target: [0, 0.42, 1.05] },
+    build(size) {
+      const terrain = new Float32Array(size * size);
+      const hard = blankHard(size);
+      const bedL = 0.38;
+      const bedR = 0.62;
+      const wallL = 0.22;
+      const wallR = 0.78;
+      for (let y = 0; y < size; y++) {
+        const v = y / (size - 1);
+        const slope = (1 - v) * 0.34;
+        const bed = BASE + 0.02 + slope;
+        const wall = bed + 0.28;
+        for (let x = 0; x < size; x++) {
+          const u = x / (size - 1);
+          const i = idx(x, y, size);
+          if (u >= bedL && u <= bedR) {
+            terrain[i] = bed;
+          } else if (u >= wallL && u < bedL) {
+            terrain[i] = wall;
+            hard[i] = 1;
+          } else if (u > bedR && u <= wallR) {
+            terrain[i] = wall;
+            hard[i] = 1;
+          } else {
+            terrain[i] = wall + 0.06;
+            hard[i] = 1;
+          }
+        }
+      }
+      fillBox(terrain, hard, size, 0.34, 0.0, 0.66, 0.09, (_u, v) => BASE + 0.38 + (1 - v) * 0.04, true);
+      grain(terrain, size, 0.008, 19);
+      for (let i = 0; i < hard.length; i++) {
+        if (hard[i] >= 0.5) {
+          const y = (i / size) | 0;
+          const v = y / (size - 1);
+          const x = i % size;
+          const u = x / (size - 1);
+          const slope = (1 - v) * 0.34;
+          if (u >= bedL && u <= bedR && v > 0.09) continue;
+          terrain[i] = BASE + 0.30 + slope;
+          if (u < wallL || u > wallR) terrain[i] += 0.06;
+        }
+      }
+      rim(terrain, size, true);
+      return { terrain, hardmask: hard, sources: [source("s-flume", 0.5, 0.07, 2.15)] };
+    },
+  },
+  {
+    id: "auffangbecken",
+    title: "Delta ins Becken",
+    blurb: "Sanddelta läuft in ein Beton-Auffangbecken. Wände bleiben stehen, im Becken lagert sich Sand ab.",
+    camera: { position: [3.4, 7.0, 5.6], target: [0, 0.32, 0.55] },
+    build(size) {
+      const terrain = new Float32Array(size * size);
+      const hard = blankHard(size);
+      for (let y = 0; y < size; y++) {
+        const v = y / (size - 1);
+        for (let x = 0; x < size; x++) {
+          terrain[idx(x, y, size)] = BASE + (1 - v) * 0.52;
+        }
+      }
+      carveChannel(terrain, size, () => 0.5, 0.05, 0.13, 0.04, 0.48);
+      carveChannel(terrain, size, (v) => 0.5 - (v - 0.44) * 0.48, 0.045, 0.1, 0.44, 0.62);
+      carveChannel(terrain, size, (v) => 0.5 + (v - 0.44) * 0.46, 0.045, 0.1, 0.44, 0.62);
+      const floor = (_u: number, v: number) => BASE + 0.06 + (1 - v) * 0.04;
+      const wallH = (_u: number, v: number) => BASE + 0.34 + (1 - v) * 0.04;
+      paintWallBand(terrain, hard, size, 0.08, 0.16, 0.56, 0.96, wallH);
+      paintWallBand(terrain, hard, size, 0.84, 0.92, 0.56, 0.96, wallH);
+      paintWallBand(terrain, hard, size, 0.08, 0.92, 0.90, 0.98, wallH);
+      paintWallBand(terrain, hard, size, 0.08, 0.92, 0.54, 0.60, (u, v) => {
+        const notch = Math.abs(u - 0.5) < 0.1;
+        return notch ? BASE + 0.16 + (1 - v) * 0.04 : wallH(u, v);
+      });
+      for (let y = 0; y < size; y++) {
+        const v = y / (size - 1);
+        if (v < 0.60 || v > 0.90) continue;
+        for (let x = 0; x < size; x++) {
+          const u = x / (size - 1);
+          if (u < 0.16 || u > 0.84) continue;
+          const i = idx(x, y, size);
+          if (hard[i] >= 0.5) continue;
+          terrain[i] = floor(u, v);
+        }
+      }
+      grain(terrain, size, 0.014, 61);
+      rim(terrain, size, true);
+      return { terrain, hardmask: hard, sources: [source("s-delta-becken", 0.5, 0.08, 2.05)] };
+    },
+  },
+  {
+    id: "treppenueberlauf",
+    title: "Treppenüberlauf",
+    blurb: "Gestufte Beton-Kaskade, unten ein Sandfang. Die Stufen bleiben, der Sand darunter arbeitet.",
+    camera: { position: [5.6, 5.4, 5.2], target: [0, 0.38, 0.35] },
+    build(size) {
+      const terrain = new Float32Array(size * size);
+      const hard = blankHard(size);
+      for (let y = 0; y < size; y++) {
+        const v = y / (size - 1);
+        for (let x = 0; x < size; x++) {
+          terrain[idx(x, y, size)] = BASE + 0.08 + (1 - v) * 0.18;
+        }
+      }
+      const steps = [
+        { v0: 0.04, v1: 0.16, h: 0.96 },
+        { v0: 0.16, v1: 0.28, h: 0.82 },
+        { v0: 0.28, v1: 0.40, h: 0.68 },
+        { v0: 0.40, v1: 0.52, h: 0.54 },
+        { v0: 0.52, v1: 0.62, h: 0.42 },
+      ];
+      for (const step of steps) {
+        fillBox(terrain, hard, size, 0.28, step.v0, 0.72, step.v1, step.h, true);
+        fillBox(terrain, hard, size, 0.22, step.v0, 0.28, step.v1, step.h + 0.16, true);
+        fillBox(terrain, hard, size, 0.72, step.v0, 0.78, step.v1, step.h + 0.16, true);
+      }
+      fillBox(terrain, hard, size, 0.22, 0.02, 0.78, 0.08, 1.02, true);
+      grain(terrain, size, 0.012, 41);
+      for (let i = 0; i < hard.length; i++) {
+        if (hard[i] >= 0.5) {
+          const y = (i / size) | 0;
+          const v = y / (size - 1);
+          const x = i % size;
+          const u = x / (size - 1);
+          for (const step of steps) {
+            if (v >= step.v0 && v < step.v1) {
+              terrain[i] = step.h + (u < 0.28 || u > 0.72 ? 0.16 : 0);
+            }
+          }
+          if (v < 0.08) terrain[i] = 1.02;
+        }
+      }
+      rim(terrain, size, true);
+      return { terrain, hardmask: hard, sources: [source("s-stufen", 0.5, 0.06, 2.2)] };
+    },
+  },
+  {
+    id: "betonwehr",
+    title: "Betonwehr",
+    blurb: "Ein Betonwehr quert die Sandstrecke. Oben staut sich Wasser, der Überlauf frisst unten weiter.",
+    camera: { position: [5.5, 5.8, 6.1], target: [0, 0.4, 0.25] },
+    build(size) {
+      const terrain = new Float32Array(size * size);
+      const hard = blankHard(size);
+      for (let y = 0; y < size; y++) {
+        const v = y / (size - 1);
+        for (let x = 0; x < size; x++) {
+          terrain[idx(x, y, size)] = BASE + (1 - v) * 0.46;
+        }
+      }
+      carveChannel(
+        terrain,
+        size,
+        (v) => 0.5 + Math.sin(v * Math.PI * 0.8) * 0.03,
+        0.09,
+        0.12,
+        0.04,
+        0.96,
+      );
+      fillBox(terrain, hard, size, 0.12, 0.42, 0.88, 0.52, (u) => {
+        const notch = Math.abs(u - 0.5) < 0.07;
+        return notch ? BASE + 0.36 : BASE + 0.62;
+      }, true);
+      fillBox(terrain, hard, size, 0.12, 0.40, 0.18, 0.54, BASE + 0.7, true);
+      fillBox(terrain, hard, size, 0.82, 0.40, 0.88, 0.54, BASE + 0.7, true);
+      grain(terrain, size, 0.014, 73);
+      for (let i = 0; i < hard.length; i++) {
+        if (hard[i] < 0.5) continue;
+        const y = (i / size) | 0;
+        const v = y / (size - 1);
+        const x = i % size;
+        const u = x / (size - 1);
+        const notch = Math.abs(u - 0.5) < 0.07 && v > 0.42 && v < 0.52;
+        terrain[i] = notch ? BASE + 0.36 : BASE + 0.62;
+        if (u < 0.18 || u > 0.82) terrain[i] = BASE + 0.7;
+      }
+      rim(terrain, size, true);
+      return { terrain, hardmask: hard, sources: [source("s-wehr", 0.5, 0.08, 2.1)] };
     },
   },
 ];

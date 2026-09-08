@@ -3,6 +3,8 @@ uniform sampler2D uAlbedo;
 uniform sampler2D uAlbedoWet;
 uniform sampler2D uNormal;
 uniform sampler2D uRough;
+uniform sampler2D uHard;
+uniform sampler2D uConcrete;
 uniform vec3 uSunDir;
 uniform vec3 uSunColor;
 uniform vec3 uAmbient;
@@ -99,6 +101,19 @@ void main() {
   vec3 wetCol = mix(moistened, wetAlb, 0.34);
   vec3 albedo = mix(dryAlb, wetCol, wetMask);
 
+  float hard = texture2D(uHard, vUv).r;
+  if (!(hard == hard) || hard < 0.0) hard = 0.0;
+  float hardMask = smoothstep(0.20, 0.68, hard);
+  if (hardMask > 0.001) {
+    vec3 concA = texture2D(uConcrete, tile * 0.82).rgb;
+    vec3 concB = texture2D(uConcrete, tileB * 0.82).rgb;
+    vec3 conc = mix(concA, concB, 0.26);
+    if (!(conc.x == conc.x)) conc = vec3(0.54, 0.53, 0.50);
+    vec3 concWet = conc * vec3(0.70, 0.72, 0.74);
+    conc = mix(conc, concWet, wetMask * 0.55);
+    albedo = mix(albedo, conc, hardMask);
+  }
+
   vec3 N = safeNormalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.12, vec3(0.0, 1.0, 0.0));
 
   albedo = mix(albedo, albedo * vec3(0.92, 0.90, 0.84), smoothstep(0.003, 0.04, water) * 0.1);
@@ -106,6 +121,7 @@ void main() {
   float roughTex = mix(roughPair.x, roughPair.y, wet);
   float roughness = mix(mix(0.90, 0.82, uGrain), 0.30, wet * 0.78);
   roughness = mix(roughness, roughTex, 0.58);
+  roughness = mix(roughness, mix(0.64, 0.40, wetMask), hardMask);
   roughness = clamp(roughness, 0.22, 0.96);
 
   vec3 V = safeNormalize(vViewDir, vec3(0.0, 1.0, 0.0));

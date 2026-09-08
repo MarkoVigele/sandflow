@@ -1,5 +1,6 @@
 import { History } from "../state/history";
 import { DEFAULT_PARAMS } from "../state/types";
+import { countHardCells, HARD_THRESHOLD, resampleMask } from "./mapsContract";
 import { ErosionSim } from "./erosionCore";
 import { PRESETS, getPreset } from "./presets";
 import type { SimSnapshot } from "./SimClient";
@@ -60,7 +61,22 @@ if (Math.abs(brushFlat.terrain[local] - brushFlat.terrain[neighbor]) > 0.04) {
   fail("Einebnen-Pinsel lässt die Auswahl zu rau");
 }
 
-const needed = ["canyon", "delta", "referenz", "veins", "meet"];
+const slab = new ErosionSim(size, DEFAULT_PARAMS, flat.slice());
+slab.brush("concrete", 0.5, 0.5, 0.08, 0.7);
+if (slab.hardmask[mid] < HARD_THRESHOLD) fail(`Beton setzt Hartmaske nicht: ${slab.hardmask[mid]}`);
+const slabH = slab.terrain[mid];
+if (slabH <= 0.52) fail("Beton-Platte sollte leicht anheben");
+slab.brush("soft", 0.5, 0.5, 0.1, 1.6);
+if (slab.hardmask[mid] >= HARD_THRESHOLD) fail("Radierer lässt Beton stehen");
+
+const wall = new ErosionSim(size, DEFAULT_PARAMS, flat.slice());
+wall.brush("concrete", 0.5, 0.5, 0.07, 1.8);
+if (wall.terrain[mid] <= slabH + 0.01) fail("Hohe Stärke sollte eine Wand bauen");
+const wallBefore = wall.terrain[mid];
+wall.brush("dig", 0.5, 0.5, 0.1, 2);
+if (Math.abs(wall.terrain[mid] - wallBefore) > 1e-6) fail("Graben darf Beton nicht abtragen");
+
+const needed = ["canyon", "delta", "referenz", "veins", "meet", "betonkanal", "auffangbecken", "treppenueberlauf", "betonwehr"];
 for (const id of needed) {
   const p = getPreset(id);
   if (p.id !== id) fail(`Preset fehlt: ${id}`);
@@ -77,6 +93,24 @@ for (const id of needed) {
   if (max - min < 0.12) fail(`Preset ${id} zu flach: ${max - min}`);
 }
 
+const hardPresets = ["betonkanal", "auffangbecken", "treppenueberlauf", "betonwehr"];
+for (const id of hardPresets) {
+  const built = getPreset(id).build(size);
+  const nHard = countHardCells(built.hardmask);
+  if (nHard < size * 6) fail(`Preset ${id} zu wenig Beton: ${nHard}`);
+  if (nHard > size * size * 0.92) fail(`Preset ${id} fast nur Beton: ${nHard}`);
+}
+
+const mask = new Float32Array(16 * 16);
+for (let y = 0; y < 16; y++) {
+  for (let x = 0; x < 16; x++) {
+    mask[y * 16 + x] = x < 8 ? 1 : 0;
+  }
+}
+const up = resampleMask(mask, 16, 32);
+if (up[0] < HARD_THRESHOLD || up[31] >= HARD_THRESHOLD) fail("resampleMask nearest");
+if (countHardCells(up) < 32 * 14) fail("resampleMask lost hard band");
+
 for (const p of PRESETS) {
   if (!p.camera?.position || !p.camera?.target) fail(`Kamera fehlt: ${p.id}`);
 }
@@ -88,6 +122,7 @@ const snap: SimSnapshot = {
   wetness: tamp.wetness.slice(),
   sediment: tamp.sediment.slice(),
   cohesion: tamp.cohesion.slice(),
+  hardmask: tamp.hardmask.slice(),
   sources: [],
   erodedSand: 0,
 };
@@ -114,6 +149,7 @@ console.log(
     grooveCut: +gCut.toFixed(3),
     flattenVar: [+beforeVar.toFixed(5), +afterVar.toFixed(5)],
     presets: PRESETS.map((p) => p.id),
+    concrete: +slab.hardmask[mid].toFixed(3),
     undoOk: true,
   }),
 );

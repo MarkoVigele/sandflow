@@ -28,6 +28,11 @@ assert(BAKED_TEXTURE_FILES.sandDry === "sand-dry-albedo.jpg", "dry albedo filena
 assert(BAKED_TEXTURE_FILES.sandWet === "sand-wet-albedo.jpg", "wet albedo filename");
 assert(BAKED_TEXTURE_FILES.woodRim === "wood-rim.jpg", "wood rim filename");
 assert(BAKED_TEXTURE_FILES.labRim === "concrete-albedo.jpg", "lab rim filename");
+assert(BAKED_TEXTURE_FILES.concrete === "concrete-albedo.jpg", "concrete albedo filename");
+assert(
+  BAKED_TEXTURE_FILES.concrete === BAKED_TEXTURE_FILES.labRim,
+  "rim and Beton share the same jpg",
+);
 
 const url = bakedTextureUrl(BAKED_TEXTURE_FILES.sandDry, "./");
 assert(url === "./textures/sand-dry-albedo.jpg", `baked url, got ${url}`);
@@ -39,6 +44,10 @@ assert(
 assert(
   bakedTextureUrl(BAKED_TEXTURE_FILES.labRim, "./") === "./textures/concrete-albedo.jpg",
   "lab rim url",
+);
+assert(
+  bakedTextureUrl(BAKED_TEXTURE_FILES.concrete, "./") === "./textures/concrete-albedo.jpg",
+  "concrete url",
 );
 
 assert(preferBakedSand(DEFAULT_TEXTURE_PROMPT), "default prompt uses baked sand");

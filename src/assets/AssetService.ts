@@ -1,6 +1,7 @@
 import {
   darkenCanvas,
   deriveCanvasMaps,
+  generateConcreteCanvas,
   generateLabRimCanvas,
   imageToCanvas,
   packRoughnessCanvas,
@@ -20,6 +21,7 @@ export interface GeneratedMaps {
   wood?: HTMLCanvasElement;
   woodNormal?: HTMLCanvasElement;
   woodRough?: HTMLCanvasElement;
+  concrete?: HTMLCanvasElement;
   prompt: string;
   provider: string;
 }
@@ -224,6 +226,7 @@ function withDerivedSand(
   dry: HTMLCanvasElement,
   wet: HTMLCanvasElement,
   wood: HTMLCanvasElement,
+  concrete: HTMLCanvasElement,
   prompt: string,
   provider: string,
 ): GeneratedMaps {
@@ -238,6 +241,7 @@ function withDerivedSand(
     wood,
     woodNormal: woodMaps.normal,
     woodRough: woodMaps.roughness,
+    concrete,
     prompt,
     provider,
   };
@@ -257,6 +261,7 @@ export async function loadLabMaps(
 
   const rimSize = Math.min(512, maxSize);
   const wood = rimImg ? prepareLabRimCanvas(imageToCanvas(rimImg, maxSize)) : generateLabRimCanvas(rimSize);
+  const concrete = labRimImg ? wood : generateConcreteCanvas(rimSize);
   const useBakedDry = preferBakedSand(prompt) && !!dryImg;
   const procSize = Math.min(512, maxSize);
   const dry = useBakedDry
@@ -269,7 +274,7 @@ export async function loadLabMaps(
   const provider =
     bakedCount === 3 && useBakedDry ? "baked" : bakedCount > 0 ? "baked+procedural" : "procedural";
 
-  return withDerivedSand(dry, wet, wood, prompt, provider);
+  return withDerivedSand(dry, wet, wood, concrete, prompt, provider);
 }
 
 export interface LabAssetService extends AssetProvider {

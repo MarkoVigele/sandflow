@@ -3,7 +3,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { GeneratedMaps } from "../assets/AssetService";
 import { SimClient, type SimFrame, type SimSnapshot } from "../sim/SimClient";
 import type { BrushKind } from "../sim/types";
-import { packMapsRgba, unpackRgba } from "../sim/mapsContract";
+import { packMapsRgba, resampleMask, unpackRgba } from "../sim/mapsContract";
 import { getPreset, resampleHeight, type CameraPose } from "../sim/presets";
 import { History } from "../state/history";
 import type { Store } from "../state/store";
@@ -25,7 +25,7 @@ import {
   type AimHit,
 } from "../ui/AimCursor";
 import { gpuTexelBudget } from "../assets/texturePaths";
-import { createMapsTexture, uploadPacked } from "./mapsTexture";
+import { createHardTexture, createMapsTexture, uploadHard, uploadPacked } from "./mapsTexture";
 import { FlowParticles } from "./Particles";
 import { PropsLite, type PropLite } from "./PropsLite";
 import { SandMesh } from "./SandMesh";
@@ -45,6 +45,7 @@ export class Viewport {
 
   sources: WaterSource[] = [];
   lastPacked: Float32Array | null = null;
+  lastHard: Float32Array | null = null;
   lastSize = 0;
   waterVolume = 0;
   erodedSand = 0;
@@ -55,6 +56,7 @@ export class Viewport {
   private store: Store;
   private host: HTMLElement;
   private maps: THREE.DataTexture;
+  private hardTex: THREE.DataTexture;
   private sand: SandMesh;
   private tray: TrayHandle;
   private water: WaterMesh;
@@ -157,7 +159,9 @@ export class Viewport {
     const q = store.state.quality;
     const grid = QUALITY_GRID[q];
     this.maps = createMapsTexture(grid);
+    this.hardTex = createHardTexture(grid);
     this.sand = new SandMesh(TRAY_SIZE, this.maps, q, this.heightScale);
+    this.sand.setHard(this.hardTex);
     this.water = new WaterMesh(TRAY_SIZE, this.maps, q, this.heightScale);
     this.particles = new FlowParticles();
     this.scene.add(this.sand.mesh, this.water.mesh, this.particles.points, this.propsLite.group);
@@ -266,15 +270,26 @@ export class Viewport {
       const t2 = resampleHeight(terrain, this.lastSize, grid);
       const w2 = resampleHeight(water, this.lastSize, grid);
       const n2 = resampleHeight(wetness, this.lastSize, grid);
+      const h2 = this.lastHard ? resampleMask(this.lastHard, this.lastSize, grid) : undefined;
       this.maps.dispose();
+      this.hardTex.dispose();
       this.maps = createMapsTexture(grid);
+      this.hardTex = createHardTexture(grid);
       this.sand.setMaps(this.maps);
+      this.sand.setHard(this.hardTex);
       this.water.setMaps(this.maps);
-      this.sim.replaceTerrain(t2, this.sources, w2, n2);
+      if (h2) {
+        this.lastHard = h2;
+        uploadHard(this.hardTex, h2, grid);
+      }
+      this.sim.replaceTerrain(t2, this.sources, w2, n2, h2);
     } else if (!this.lastPacked) {
       this.maps.dispose();
+      this.hardTex.dispose();
       this.maps = createMapsTexture(grid);
+      this.hardTex = createHardTexture(grid);
       this.sand.setMaps(this.maps);
+      this.sand.setHard(this.hardTex);
       this.water.setMaps(this.maps);
     }
   }
@@ -287,10 +302,17 @@ export class Viewport {
     this.erodedSand = 0;
     this.rebuildMarkers();
     this.maps.dispose();
+    this.hardTex.dispose();
     this.maps = createMapsTexture(grid);
+    this.hardTex = createHardTexture(grid);
     this.sand.setMaps(this.maps);
+    this.sand.setHard(this.hardTex);
     this.water.setMaps(this.maps);
-    this.sim.init(grid, this.store.state.params, built.terrain, this.sources);
+    this.lastHard = built.hardmask ? built.hardmask.slice() : new Float32Array(grid * grid);
+    if (this.lastHard) uploadHard(this.hardTex, this.lastHard, grid);
+    this.sim.init(grid, this.store.state.params, built.terrain, this.sources, {
+      hardmask: built.hardmask,
+    });
     this.applyCamera(preset.camera);
     this.setProps([]);
     this.store.patch({ presetId: id, selectedSourceId: this.sources[0]?.id ?? null });
@@ -319,8 +341,11 @@ export class Viewport {
     this.rebuildMarkers();
     if (snap.size !== this.maps.image.width) {
       this.maps.dispose();
+      this.hardTex.dispose();
       this.maps = createMapsTexture(snap.size);
+      this.hardTex = createHardTexture(snap.size);
       this.sand.setMaps(this.maps);
+      this.sand.setHard(this.hardTex);
       this.water.setMaps(this.maps);
     }
     this.sim.init(snap.size, this.store.state.params, snap.terrain, this.sources, {
@@ -328,6 +353,7 @@ export class Viewport {
       wetness: snap.wetness,
       sediment: snap.sediment,
       cohesion: snap.cohesion,
+      hardmask: snap.hardmask ?? new Float32Array(snap.size * snap.size),
     });
     const packed = packMapsRgba(
       snap.terrain,
@@ -336,8 +362,10 @@ export class Viewport {
       new Float32Array(snap.size * snap.size),
     );
     this.lastPacked = packed;
+    this.lastHard = (snap.hardmask ?? new Float32Array(snap.size * snap.size)).slice();
     this.lastSize = snap.size;
     uploadPacked(this.maps, packed, snap.size);
+    uploadHard(this.hardTex, this.lastHard, snap.size);
     this.onUi();
   }
 
@@ -459,6 +487,7 @@ export class Viewport {
     this.aim.dispose();
     this.propsLite.dispose();
     this.maps.dispose();
+    this.hardTex.dispose();
     this.renderer.dispose();
   }
 
@@ -468,6 +497,10 @@ export class Viewport {
     this.waterVolume = frame.waterVolume;
     this.erodedSand = frame.erodedSand;
     uploadPacked(this.maps, frame.packed, frame.size);
+    if (frame.hard) {
+      this.lastHard = frame.hard;
+      uploadHard(this.hardTex, frame.hard, frame.size);
+    }
     const q = this.store.state.quality;
     this.particles.update(
       frame.particles,
@@ -566,6 +599,11 @@ export class Viewport {
     }
     if (tool === "erase") {
       this.propsLite.removeNear(u, v, brushRadius);
+      this.strokeBrush("soft", u, v, brushRadius, brushStrength);
+      return;
+    }
+    if (tool === "concrete") {
+      this.strokeBrush("concrete", u, v, brushRadius, brushStrength);
       return;
     }
     const stroke = tool === "groove" || tool === "tamp" || tool === "flatten";
@@ -586,6 +624,23 @@ export class Viewport {
     if (this.store.state.onboardStep === 1) {
       this.store.patch({ onboardStep: 2, tool: "source" });
     }
+  }
+
+  private strokeBrush(kind: BrushKind, u: number, v: number, radius: number, strength: number): void {
+    if (this.lastStroke) {
+      const du = u - this.lastStroke.u;
+      const dv = v - this.lastStroke.v;
+      const dist = Math.hypot(du, dv);
+      const steps = Math.max(1, Math.ceil(dist / Math.max(0.008, radius * 0.32)));
+      for (let s = 1; s <= steps; s++) {
+        const t = s / steps;
+        this.sim.brush(kind, this.lastStroke.u + du * t, this.lastStroke.v + dv * t, radius, strength);
+      }
+      this.lastStroke = { u, v };
+      return;
+    }
+    this.sim.brush(kind, u, v, radius, strength);
+    this.lastStroke = { u, v };
   }
 
   private placeStone(u: number, v: number): void {

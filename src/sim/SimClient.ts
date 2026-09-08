@@ -7,6 +7,7 @@ export interface SimFrame {
   particles: Float32Array;
   waterVolume: number;
   erodedSand: number;
+  hard?: Float32Array;
 }
 
 export interface SimSnapshot {
@@ -16,6 +17,7 @@ export interface SimSnapshot {
   wetness: Float32Array;
   sediment: Float32Array;
   cohesion: Float32Array;
+  hardmask?: Float32Array;
   sources: WaterSource[];
   erodedSand: number;
 }
@@ -40,6 +42,7 @@ export class SimClient {
           particles: msg.particles,
           waterVolume: msg.waterVolume,
           erodedSand: msg.erodedSand,
+          hard: msg.hard,
         };
         for (const h of this.frameHandlers) h(frame);
       } else if (msg.type === "snapshot") {
@@ -50,6 +53,7 @@ export class SimClient {
           wetness: msg.wetness,
           sediment: msg.sediment,
           cohesion: msg.cohesion,
+          hardmask: msg.hardmask,
           sources: msg.sources,
           erodedSand: msg.erodedSand,
         };
@@ -78,6 +82,7 @@ export class SimClient {
       wetness?: Float32Array;
       sediment?: Float32Array;
       cohesion?: Float32Array;
+      hardmask?: Float32Array;
     },
   ): void {
     this.busy = true;
@@ -90,6 +95,7 @@ export class SimClient {
       wetness: extras?.wetness,
       sediment: extras?.sediment,
       cohesion: extras?.cohesion,
+      hardmask: extras?.hardmask,
       sources,
     });
   }
@@ -141,9 +147,10 @@ export class SimClient {
     sources: WaterSource[],
     water?: Float32Array,
     wetness?: Float32Array,
+    hardmask?: Float32Array,
   ): void {
     this.busy = true;
-    this.send({ type: "replaceTerrain", terrain, sources, water, wetness });
+    this.send({ type: "replaceTerrain", terrain, sources, water, wetness, hardmask });
   }
 
   requestSnapshot(): Promise<SimSnapshot> {

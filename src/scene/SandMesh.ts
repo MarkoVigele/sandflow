@@ -19,6 +19,7 @@ export class SandMesh {
   material: THREE.ShaderMaterial;
   private albedo?: THREE.CanvasTexture;
   private albedoWet?: THREE.CanvasTexture;
+  private concrete?: THREE.CanvasTexture;
   private normal?: THREE.CanvasTexture;
   private rough?: THREE.CanvasTexture;
 
@@ -34,6 +35,10 @@ export class SandMesh {
 
     const fallbackAlbedo = new THREE.DataTexture(new Uint8Array([196, 162, 112, 255]), 1, 1);
     fallbackAlbedo.needsUpdate = true;
+    const fallbackConcrete = new THREE.DataTexture(new Uint8Array([138, 136, 130, 255]), 1, 1);
+    fallbackConcrete.needsUpdate = true;
+    const fallbackHard = new THREE.DataTexture(new Float32Array([0]), 1, 1, THREE.RedFormat, THREE.FloatType);
+    fallbackHard.needsUpdate = true;
     const fallbackNormal = new THREE.DataTexture(new Uint8Array([128, 128, 255, 255]), 1, 1);
     fallbackNormal.needsUpdate = true;
     const fallbackRough = new THREE.DataTexture(new Uint8Array([220, 220, 220, 255]), 1, 1);
@@ -44,6 +49,8 @@ export class SandMesh {
         uMaps: { value: maps },
         uAlbedo: { value: fallbackAlbedo },
         uAlbedoWet: { value: fallbackAlbedo },
+        uHard: { value: fallbackHard },
+        uConcrete: { value: fallbackConcrete },
         uNormal: { value: fallbackNormal },
         uRough: { value: fallbackRough },
         uHeightScale: { value: heightScale },
@@ -79,6 +86,10 @@ export class SandMesh {
     this.material.uniforms.uTexel.value = 1 / maps.image.width;
   }
 
+  setHard(hard: THREE.DataTexture): void {
+    this.material.uniforms.uHard.value = hard;
+  }
+
   setQuality(quality: QualityId, traySize: number): void {
     const segs = MESH_SEGS[quality];
     this.mesh.geometry.dispose();
@@ -107,6 +118,11 @@ export class SandMesh {
     this.material.uniforms.uAlbedoWet.value = this.albedoWet;
     this.material.uniforms.uNormal.value = this.normal;
     this.material.uniforms.uRough.value = this.rough;
+    if (maps.concrete) {
+      this.concrete?.dispose();
+      this.concrete = canvasTexture(fitCanvas(maps.concrete, size), aniso);
+      this.material.uniforms.uConcrete.value = this.concrete;
+    }
     this.material.uniforms.uUvScale.value = sandUvScale(this.material.uniforms.uGrain.value);
   }
 
@@ -138,6 +154,7 @@ export class SandMesh {
     this.material.dispose();
     this.albedo?.dispose();
     this.albedoWet?.dispose();
+    this.concrete?.dispose();
     this.normal?.dispose();
     this.rough?.dispose();
   }
