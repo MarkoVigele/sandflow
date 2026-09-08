@@ -16,7 +16,8 @@
     "share:smoke": "npx --yes vite-node src/state/shareSmoke.ts",
     "assets:smoke": "npx --yes vite-node src/assets/textureMapsSmoke.ts",
     "water:smoke": "npx --yes vite-node src/scene/waterQualitySmoke.ts",
-    "flowfx:smoke": "npx --yes vite-node src/sim/flowFxSmoke.ts"
+    "flowfx:smoke": "npx --yes vite-node src/sim/flowFxSmoke.ts",
+    "vision:smoke": "npx --yes vite-node src/ui/visionSmoke.ts"
   },
   "dependencies": {
     "three": "^0.170.0"

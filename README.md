@@ -29,7 +29,7 @@ Der Build landet in `docs/` (relativer Basispfad, bereit für GitHub Pages). Ein
 | Kiesel / Radierer / Beton | `K` / `R` / `B` | Symbolleiste |
 | Rückgängig / Wiederholen | `Strg+Z` / `Strg+Y` | Symbole oben |
 
-Oben: Vorlagen, Qualität (inkl. **Auto**), Tempo (0,25×–8×) und **Zeitraffer**, Zurücksetzen (Szene oder nur Wasser), Teilen, Speichern, Laden, Bild. Rechts (am Telefon unten): Kontext zum aktiven Werkzeug. Unter **Erweitert** liegen Körnung, Kohäsion, Infiltration, Erosionsrate, Sedimentkapazität, **Relief** (Überhöhung von Rücken und Rinnen, ohne die Wanne anzuheben), **Wellen** (flussgetriebene Kräusel, ruhige Stellen leise; Detail folgt der Qualität) und eine optionale Heatmap (Fluss oder Tiefe). Beim ersten Start führt eine Kurzanleitung in drei Schritten: Sand formen → Quelle → Abspielen.
+Oben: Vorlagen, Qualität (inkl. **Auto**), Tempo (0,25×–8×) und **Zeitraffer**, Zurücksetzen (Szene oder nur Wasser), Teilen, Speichern, Laden, Bild. Am Telefon wandert das in **Mehr**. Rechts (am Telefon unten): Kontext zum aktiven Werkzeug, inklusive Heatmap und einem optionalen **Querschnitt**. Beim ersten Start führt eine Kurzanleitung in drei Schritten: Sand formen → Quelle → Abspielen. Quelle: **tippen = wählen, ziehen = verschieben**.
 
 ## Vorlagen
 
@@ -52,7 +52,7 @@ Zusätzliche Werkzeuge: **Feststampfen** (Kohäsion lokal), **Rinne** vorzeichne
 
 - **Mittel** ist die Vorgabe auf dem Telefon, **Hoch** am Rechner.
 - **Auto** bleibt an, bis eine feste Stufe gewählt wird. Unter 25 Bildern/s rutscht die Qualität eine Stufe tiefer (Toast).
-- Gitter: Niedrig 128², Mittel 256², Hoch/Ultra 512². Schatten und Partikel nur auf Hoch und Ultra.
+- Gitter: Niedrig 128², Mittel 256², Hoch/Ultra 512². Pixelverhältnis und sichtbare Strömungspartikel steigen mit der Stufe (Niedrig 0, Mittel ~⅓, Hoch ~¾, Ultra voll). Schatten ab Hoch.
 - Texturen: Mittel/Niedrig bleiben bei 512er- (bzw. 256er-) Karten und niedriger Anisotropie, damit ein Qualitätswechsel die Albedo nicht neu ableitet.
 - Wenn es hakelt: Qualität senken, Tempo auf 0,5×, weniger Quellen, Ultra meiden.
 

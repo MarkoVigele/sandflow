@@ -1,11 +1,13 @@
 import type { Store } from "../state/store";
 import { QUALITY_LABEL, type QualityId } from "../state/types";
 
+import { QUALITY_PROFILE } from "../state/quality";
+
 const LEVELS: { id: QualityId; label: string }[] = [
-  { id: "low", label: "Niedrig" },
-  { id: "medium", label: "Mittel" },
-  { id: "high", label: "Hoch" },
-  { id: "ultra", label: "Ultra" },
+  { id: "low", label: `Niedrig · ${QUALITY_PROFILE.low.grid}²` },
+  { id: "medium", label: `Mittel · ${QUALITY_PROFILE.medium.grid}²` },
+  { id: "high", label: `Hoch · ${QUALITY_PROFILE.high.grid}²` },
+  { id: "ultra", label: `Ultra · ${QUALITY_PROFILE.ultra.grid}²` },
 ];
 
 export class QualitySwitcher {

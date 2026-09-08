@@ -1,6 +1,7 @@
 import type { Store } from "../state/store";
 import type { ToolId } from "../state/types";
 import { ICONS } from "./icons";
+import { SOURCE_TOOL_TIP } from "./sourceGesture";
 import { TOOLBAR_TOOLS } from "./tools";
 
 export class Toolbar {
@@ -24,7 +25,7 @@ export class Toolbar {
       <div class="toolbar-inner" role="toolbar" aria-label="Werkzeuge">
         ${TOOLBAR_TOOLS.map(
           (t) => `
-          <button class="tool ${tool === t.id && !cameraMode ? "is-active" : ""} ${hintClass(t.id, onboardStep)}" data-tool="${t.id}" title="${t.hint}" aria-pressed="${tool === t.id}">
+          <button class="tool ${tool === t.id && !cameraMode ? "is-active" : ""} ${hintClass(t.id, onboardStep)}" data-tool="${t.id}" title="${t.id === "source" ? SOURCE_TOOL_TIP : t.hint}" ${t.id === "source" ? `data-source-tip="${SOURCE_TOOL_TIP}"` : ""} aria-pressed="${tool === t.id}">
             <span class="icon">${ICONS[t.id]}</span>
             <span class="tool-label">${t.label}</span>
           </button>`,
