@@ -2,11 +2,12 @@ import {
   darkenCanvas,
   deriveCanvasMaps,
   generateConcreteCanvas,
-  generateLabRimCanvas,
+  generateWoodCanvas,
   imageToCanvas,
   packRoughnessCanvas,
   prepareLabRimCanvas,
   prepareSandCanvas,
+  prepareWoodRimCanvas,
 } from "./deriveMaps";
 import { fbmTiled, hash2, mulberry32 } from "./noise";
 import { BAKED_TEXTURE_FILES, bakedTextureUrl, preferBakedSand } from "./texturePaths";
@@ -232,7 +233,7 @@ function withDerivedSand(
 ): GeneratedMaps {
   const dryMaps = deriveCanvasMaps(dry, 1.65);
   const wetMaps = deriveCanvasMaps(wet, 1.05);
-  const woodMaps = deriveCanvasMaps(wood, 0.85);
+  const woodMaps = deriveCanvasMaps(wood, 1.35);
   return {
     albedo: dry,
     albedoWet: wet,
@@ -257,11 +258,14 @@ export async function loadLabMaps(
   const wetImg = await loadOptionalImage(bakedTextureUrl(BAKED_TEXTURE_FILES.sandWet), loadImage);
   const labRimImg = await loadOptionalImage(bakedTextureUrl(BAKED_TEXTURE_FILES.labRim), loadImage);
   const woodImg = await loadOptionalImage(bakedTextureUrl(BAKED_TEXTURE_FILES.woodRim), loadImage);
-  const rimImg = labRimImg ?? woodImg;
 
   const rimSize = Math.min(512, maxSize);
-  const wood = rimImg ? prepareLabRimCanvas(imageToCanvas(rimImg, maxSize)) : generateLabRimCanvas(rimSize);
-  const concrete = labRimImg ? wood : generateConcreteCanvas(rimSize);
+  const wood = woodImg
+    ? prepareWoodRimCanvas(imageToCanvas(woodImg, maxSize))
+    : generateWoodCanvas(rimSize);
+  const concrete = labRimImg
+    ? prepareLabRimCanvas(imageToCanvas(labRimImg, maxSize))
+    : generateConcreteCanvas(rimSize);
   const useBakedDry = preferBakedSand(prompt) && !!dryImg;
   const procSize = Math.min(512, maxSize);
   const dry = useBakedDry
@@ -270,9 +274,9 @@ export async function loadLabMaps(
   const wet =
     useBakedDry && wetImg ? prepareSandCanvas(imageToCanvas(wetImg, maxSize), "wet") : darkenCanvas(dry);
 
-  const bakedCount = Number(!!dryImg) + Number(!!wetImg) + Number(!!rimImg);
+  const bakedCount = Number(!!dryImg) + Number(!!wetImg) + Number(!!woodImg) + Number(!!labRimImg);
   const provider =
-    bakedCount === 3 && useBakedDry ? "baked" : bakedCount > 0 ? "baked+procedural" : "procedural";
+    bakedCount >= 4 && useBakedDry ? "baked" : bakedCount > 0 ? "baked+procedural" : "procedural";
 
   return withDerivedSand(dry, wet, wood, concrete, prompt, provider);
 }

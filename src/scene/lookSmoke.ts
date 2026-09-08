@@ -3,6 +3,7 @@ import type { QualityId } from "../state/types";
 import {
   albedoMicroGrain,
   contactShadow,
+  heightMicroRelief,
   depthTint,
   lookAoSteps,
   ridgeAO,
@@ -29,8 +30,12 @@ for (let i = 1; i < order.length; i++) {
   if (next.lookGrain < prev.lookGrain) fail(`${next.id} grain should not drop`);
   if (next.lookSpecCap < prev.lookSpecCap) fail(`${next.id} spec cap should not drop`);
   if (next.lookShoreFoam < prev.lookShoreFoam) fail(`${next.id} shore foam should not drop`);
+  if (next.lookHeightMicro < prev.lookHeightMicro) fail(`${next.id} height micro should not drop`);
+  if (next.lookWoodNormal < prev.lookWoodNormal) fail(`${next.id} wood normal should not drop`);
 }
 
+if (QUALITY_PROFILE.low.lookHeightMicro !== 0) fail("Low must skip height micro-relief");
+if (QUALITY_PROFILE.low.lookWoodNormal !== 0) fail("Low must skip tray wood normals");
 if (QUALITY_PROFILE.low.lookAoSteps !== 0) fail("Low must skip the contact-shadow march");
 if (QUALITY_PROFILE.low.lookSpecCap >= 0.1) fail("Low spec cap must stay mobile-safe");
 if (QUALITY_PROFILE.medium.lookSpecCap >= QUALITY_PROFILE.high.lookSpecCap) {
@@ -56,6 +61,16 @@ almost(flatGrain, 1, 1e-6, "neutral luma grain");
 if (brightGrain <= flatGrain) fail("bright grains should lift albedo");
 if (darkGrain >= flatGrain) fail("dark grains should settle albedo");
 almost(albedoMicroGrain(0.8, 0), 1, 1e-6, "zero strength is identity");
+
+const noMicro = heightMicroRelief(0.04, -0.03, 0);
+almost(noMicro.nx, 0, 1e-8, "zero height micro");
+almost(noMicro.nz, 0, 1e-8, "zero height micro z");
+const slopeMicro = heightMicroRelief(0.04, 0, 0.3);
+if (slopeMicro.nx >= 0) fail(`+X height rise should tilt −X, nx=${slopeMicro.nx}`);
+if (Math.abs(slopeMicro.nz) > 1e-8) fail("no Z slope stays flat in Z");
+const steep = heightMicroRelief(0.4, 0, 1);
+const mild = heightMicroRelief(0.04, 0, 1);
+if (Math.abs(steep.nx) <= Math.abs(mild.nx)) fail("clamped dH should still exceed a mild slope");
 
 const flatAo = ridgeAO(0.5, [0.5, 0.5, 0.5, 0.5]);
 const valleyAo = ridgeAO(0.4, [0.55, 0.56, 0.54, 0.58], true);

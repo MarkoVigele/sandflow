@@ -26,6 +26,10 @@ export type QualityProfile = {
   lookSpecCap: number;
   /** Soft shore foam from flow velocity. */
   lookShoreFoam: number;
+  /** Height-normal micro-relief (dFdx of bed height). 0 = skip. */
+  lookHeightMicro: number;
+  /** Tray wood normal scale. 0 = albedo only (Low). */
+  lookWoodNormal: number;
 };
 
 export const QUALITY_ORDER: QualityId[] = ["low", "medium", "high", "ultra"];
@@ -57,6 +61,8 @@ export const QUALITY_PROFILE: Record<QualityId, QualityProfile> = {
     lookGrain: 0.22,
     lookSpecCap: 0.07,
     lookShoreFoam: 0.28,
+    lookHeightMicro: 0,
+    lookWoodNormal: 0,
   },
   medium: {
     id: "medium",
@@ -72,6 +78,8 @@ export const QUALITY_PROFILE: Record<QualityId, QualityProfile> = {
     lookGrain: 0.38,
     lookSpecCap: 0.1,
     lookShoreFoam: 0.42,
+    lookHeightMicro: 0.14,
+    lookWoodNormal: 0.28,
   },
   high: {
     id: "high",
@@ -87,6 +95,8 @@ export const QUALITY_PROFILE: Record<QualityId, QualityProfile> = {
     lookGrain: 0.55,
     lookSpecCap: 0.15,
     lookShoreFoam: 0.62,
+    lookHeightMicro: 0.26,
+    lookWoodNormal: 0.52,
   },
   ultra: {
     id: "ultra",
@@ -102,6 +112,8 @@ export const QUALITY_PROFILE: Record<QualityId, QualityProfile> = {
     lookGrain: 0.72,
     lookSpecCap: 0.18,
     lookShoreFoam: 0.78,
+    lookHeightMicro: 0.36,
+    lookWoodNormal: 0.68,
   },
 };
 

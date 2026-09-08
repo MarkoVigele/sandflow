@@ -385,6 +385,85 @@ export function prepareLabRimRgba(
   return makeSeamlessRgba(graded, cropped.width, cropped.height, 0.05);
 }
 
+/**
+ * Keep plank seams and grain. The lab-rim grade lifts dark joints toward
+ * pale concrete — the opposite of a readable wood frame.
+ */
+export function gradeWoodRimRgba(
+  rgba: Uint8Array | Uint8ClampedArray,
+  width: number,
+  height: number,
+): Uint8Array {
+  const n = width * height;
+  let mr = 0;
+  let mg = 0;
+  let mb = 0;
+  for (let i = 0; i < n; i++) {
+    const p = i * 4;
+    mr += rgba[p] ?? 0;
+    mg += rgba[p + 1] ?? 0;
+    mb += rgba[p + 2] ?? 0;
+  }
+  mr /= n;
+  mg /= n;
+  mb /= n;
+  const out = new Uint8Array(n * 4);
+  for (let i = 0; i < n; i++) {
+    const p = i * 4;
+    let r = mr + ((rgba[p] ?? 0) - mr) * 1.24;
+    let g = mg + ((rgba[p + 1] ?? 0) - mg) * 1.22;
+    let b = mb + ((rgba[p + 2] ?? 0) - mb) * 1.18;
+    r *= 1.04;
+    g *= 1.01;
+    b *= 0.94;
+    setPix(out, width, i % width, Math.floor(i / width), r, g, b, 255);
+  }
+  return out;
+}
+
+export function prepareWoodRimRgba(
+  rgba: Uint8Array | Uint8ClampedArray,
+  width: number,
+  height: number,
+): Uint8Array {
+  const cropped = width >= 256 && height >= 256 ? insetCropRgba(rgba, width, height, 0.02) : { data: rgba, width, height };
+  const flat = flattenMacroRgba(cropped.data, cropped.width, cropped.height, 10);
+  const graded = gradeWoodRimRgba(flat, cropped.width, cropped.height);
+  return makeSeamlessRgba(graded, cropped.width, cropped.height, 0.04);
+}
+
+/** Oak planks with visible seams — fallback when wood-rim.jpg is missing. */
+export function fillWoodRimRgba(size: number, seed = 0x51a7d): Uint8Array {
+  const out = new Uint8Array(size * size * 4);
+  const rand = mulberry32(seed);
+  const plankH = Math.max(8, size / 6);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const v = y / size;
+      const row = Math.floor(y / plankH);
+      const stagger = (row % 2) * 0.37;
+      const localU = (u + stagger) % 1;
+      const grain = fbmTiled(u * 1.8, v * 0.28 + u * 0.02, 12, 5, seed + row);
+      const ring = fbmTiled(u * 0.7, v * 0.4, 7, 3, seed + 9);
+      const yIn = (y % plankH) / plankH;
+      const seamY = yIn < 0.045 || yIn > 0.955;
+      const seamX = localU < 0.012 || localU > 0.988;
+      let r = 178 + grain * 42 + ring * 14;
+      let g = 132 + grain * 32 + ring * 10;
+      let b = 78 + grain * 20 + ring * 7;
+      if (seamY || seamX) {
+        r *= 0.52;
+        g *= 0.48;
+        b *= 0.42;
+      }
+      const jitter = (rand() - 0.5) * 7;
+      setPix(out, size, x, y, r + jitter, g + jitter * 0.8, b + jitter * 0.55, 255);
+    }
+  }
+  return out;
+}
+
 function wrappedBoxBlur(src: Float32Array, w: number, h: number, radius: number): Float32Array {
   if (radius < 1) return src.slice();
   const tmp = new Float32Array(w * h);
@@ -572,36 +651,14 @@ export function generateLabRimCanvas(size = 512, seed = 0x51a7d): HTMLCanvasElem
   return canvasFromRgba(rgba, size, size);
 }
 
-/** Same albedo as the tray rim — Beton cells share `concrete-albedo.jpg`. */
+/** In-sim Beton fallback when `concrete-albedo.jpg` is missing. */
 export function generateConcreteCanvas(size = 512, seed = 0xc0c0e): HTMLCanvasElement {
   return generateLabRimCanvas(size, seed);
 }
 
-/** Pale ash fallback — no floorboard seams. */
+/** Oak plank fallback when `wood-rim.jpg` is missing. */
 export function generateWoodCanvas(size = 512, seed = 0x51a7d): HTMLCanvasElement {
-  const c = makeCanvas(size);
-  const ctx = c.getContext("2d")!;
-  const img = ctx.createImageData(size, size);
-  const rand = mulberry32(seed);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const u = x / size;
-      const v = y / size;
-      const grain = fbmTiled(u, v * 0.45 + u * 0.02, 10, 5, seed);
-      const ring = fbmTiled(u * 0.5, v, 6, 3, seed + 9);
-      let r = 196 + grain * 28 + ring * 10;
-      let g = 184 + grain * 22 + ring * 8;
-      let b = 166 + grain * 16 + ring * 6;
-      const jitter = (rand() - 0.5) * 6;
-      const i = (y * size + x) * 4;
-      img.data[i] = Math.max(0, Math.min(255, r + jitter));
-      img.data[i + 1] = Math.max(0, Math.min(255, g + jitter * 0.8));
-      img.data[i + 2] = Math.max(0, Math.min(255, b + jitter * 0.55));
-      img.data[i + 3] = 255;
-    }
-  }
-  ctx.putImageData(img, 0, 0);
-  return c;
+  return canvasFromRgba(fillWoodRimRgba(size, seed), size, size);
 }
 
 export function prepareSandCanvas(src: HTMLCanvasElement, kind: "dry" | "wet"): HTMLCanvasElement {
@@ -613,6 +670,12 @@ export function prepareSandCanvas(src: HTMLCanvasElement, kind: "dry" | "wet"): 
 export function prepareLabRimCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
   const { data, width, height } = readRgba(src);
   const prepared = prepareLabRimRgba(data, width, height);
+  return canvasFromRgba(prepared, width, height);
+}
+
+export function prepareWoodRimCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
+  const { data, width, height } = readRgba(src);
+  const prepared = prepareWoodRimRgba(data, width, height);
   return canvasFromRgba(prepared, width, height);
 }
 

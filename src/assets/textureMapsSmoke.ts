@@ -1,14 +1,17 @@
 import {
   deriveNormalRoughnessRgba,
   flattenMacroRgba,
+  gradeLabRimRgba,
   gradeSandRgba,
+  gradeWoodRimRgba,
   luma01,
   makeSeamlessRgba,
   packRoughnessRG,
   prepareSandRgba,
 } from "./deriveMaps";
+import * as THREE from "three";
+import { applyBoxPlankUVs, TRAY_SAND_CLEARANCE } from "../scene/Tray";
 import { fbmTiled } from "./noise";
-import { TRAY_SAND_CLEARANCE } from "../scene/Tray";
 import {
   BAKED_TEXTURE_FILES,
   bakedTextureUrl,
@@ -31,7 +34,7 @@ assert(BAKED_TEXTURE_FILES.labRim === "concrete-albedo.jpg", "lab rim filename")
 assert(BAKED_TEXTURE_FILES.concrete === "concrete-albedo.jpg", "concrete albedo filename");
 assert(
   BAKED_TEXTURE_FILES.concrete === BAKED_TEXTURE_FILES.labRim,
-  "rim and Beton share the same jpg",
+  "lab rim and Beton share the same jpg",
 );
 
 const url = bakedTextureUrl(BAKED_TEXTURE_FILES.sandDry, "./");
@@ -63,6 +66,32 @@ assert(gpuAnisotropy("ultra") >= 8, "ultra aniso");
 assert(sandUvScale(0.55) < 3.0, "UV scale below the old stamp repeat");
 assert(sandUvScale(0) >= 1.8 && sandUvScale(1) <= 3.0, "UV scale in a grainy but tileable band");
 assert(TRAY_SAND_CLEARANCE > 0.02, "rim sits outside the sand plane");
+
+const seamPlank = new Uint8Array(16 * 16 * 4);
+for (let y = 0; y < 16; y++) {
+  for (let x = 0; x < 16; x++) {
+    const i = (y * 16 + x) * 4;
+    const dark = x < 3;
+    seamPlank[i] = dark ? 48 : 196;
+    seamPlank[i + 1] = dark ? 36 : 152;
+    seamPlank[i + 2] = dark ? 22 : 96;
+    seamPlank[i + 3] = 255;
+  }
+}
+const woodG = gradeWoodRimRgba(seamPlank, 16, 16);
+const labG = gradeLabRimRgba(seamPlank, 16, 16);
+const woodSeam = luma01(woodG[0]!, woodG[1]!, woodG[2]!);
+const labSeam = luma01(labG[0]!, labG[1]!, labG[2]!);
+const woodPlankL = luma01(woodG[12 * 4]!, woodG[12 * 4 + 1]!, woodG[12 * 4 + 2]!);
+assert(woodSeam < labSeam - 0.04, `wood keeps plank seams (${woodSeam} vs ${labSeam})`);
+assert(woodPlankL > woodSeam + 0.12, "wood grade keeps grain contrast");
+
+const box = new THREE.BoxGeometry(4.4, 1.18, 0.3);
+applyBoxPlankUVs(box, 4.4, 1.18, 0.3, 2.2, 0.85);
+const uv = box.getAttribute("uv");
+assert(!!uv && uv.count >= 24, "box plank UVs");
+const faceZU = Math.max(uv.getX(16), uv.getX(17), uv.getX(19));
+assert(faceZU > 1.5, `long wall U should span planks, got ${faceZU}`);
 
 const wrapA = fbmTiled(0, 0.37, 8, 4, 99);
 const wrapB = fbmTiled(1, 0.37, 8, 4, 99);

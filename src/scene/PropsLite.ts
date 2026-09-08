@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import { qualityProfile } from "../state/quality";
+import type { QualityId } from "../state/types";
 import { surfaceWorld } from "../ui/AimCursor";
 import type { ShareProp } from "../state/share";
 
@@ -45,6 +47,7 @@ export class PropsLite {
   private items = new Map<string, { prop: PropLite; mesh: THREE.Mesh }>();
   private geos: THREE.BufferGeometry[];
   private mats: THREE.MeshStandardMaterial[];
+  private shadows = false;
 
   constructor() {
     this.group.name = "props-lite";
@@ -83,8 +86,8 @@ export class PropsLite {
   add(prop: PropLite, heightAt: (u: number, v: number) => number, tray: number, heightScale: number): void {
     if (this.items.has(prop.id)) this.remove(prop.id);
     const mesh = new THREE.Mesh(this.geos[prop.kind], this.mats[prop.kind]);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    mesh.castShadow = this.shadows;
+    mesh.receiveShadow = this.shadows;
     mesh.userData.propId = prop.id;
     mesh.scale.setScalar(prop.scale);
     mesh.rotation.set(0.18 + prop.kind * 0.11, prop.rot, 0.08);
@@ -108,6 +111,14 @@ export class PropsLite {
     }
     for (const id of gone) this.remove(id);
     return gone.length;
+  }
+
+  setQuality(quality: QualityId): void {
+    this.shadows = qualityProfile(quality).shadows;
+    for (const { mesh } of this.items.values()) {
+      mesh.castShadow = this.shadows;
+      mesh.receiveShadow = this.shadows;
+    }
   }
 
   settle(heightAt: (u: number, v: number) => number, tray: number, heightScale: number): void {

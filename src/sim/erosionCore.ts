@@ -29,7 +29,7 @@ import {
   sedimentCapacity,
   updatePipeFlux,
 } from "./hydraulic";
-import { HARD_THRESHOLD, packMapsRgba } from "./mapsContract";
+import { HARD_CONCRETE_VIS, HARD_STONE, HARD_THRESHOLD, packMapsRgba } from "./mapsContract";
 import { thermalSlip } from "./thermalErosion";
 import type { BrushKind } from "./types";
 
@@ -63,7 +63,7 @@ export class ErosionSim {
   flow: Float32Array;
   /** Local cohesion boost 0–0.85. Not packed into visual maps. */
   cohesion: Float32Array;
-  /** Companion hardmask. 1 = concrete/stone: no erosion, no deposition. */
+  /** Companion hardmask. 1 = concrete, ~0.72 = stone island: no erosion, no deposition. */
   hardmask: Float32Array;
   sources: WaterSource[] = [];
   erodedSand = 0;
@@ -694,6 +694,12 @@ export class ErosionSim {
           const slab = fall * strength * 0.018;
           const wall = fall * Math.max(0, strength - 0.85) * 0.055;
           this.terrain[i] += slab + wall;
+          continue;
+        }
+        if (kind === "stone") {
+          // Pebble island: hard, no slab. Never weaken an existing concrete cell.
+          if (this.hardmask[i] >= HARD_CONCRETE_VIS) continue;
+          if (fall >= 0.22) this.hardmask[i] = Math.max(this.hardmask[i], HARD_STONE);
           continue;
         }
         if (kind === "soft") {

@@ -23,6 +23,7 @@ uniform float uTexel;
 uniform float uTraySize;
 uniform float uAoSteps;
 uniform float uLookGrain;
+uniform float uHeightMicro;
 
 varying vec2 vUv;
 varying vec3 vWorldPos;
@@ -134,14 +135,18 @@ void main() {
   float hard = texture2D(uHard, vUv).r;
   if (!(hard == hard) || hard < 0.0) hard = 0.0;
   float hardMask = smoothstep(0.20, 0.68, hard);
-  if (hardMask > 0.001) {
+  float concMask = smoothstep(0.82, 0.94, hard);
+  float stoneMask = hardMask * (1.0 - concMask);
+  if (concMask > 0.001) {
     vec3 concA = texture2D(uConcrete, tile * 0.82).rgb;
     vec3 concB = texture2D(uConcrete, tileB * 0.82).rgb;
     vec3 conc = mix(concA, concB, 0.26);
     if (!(conc.x == conc.x)) conc = vec3(0.54, 0.53, 0.50);
     vec3 concWet = conc * vec3(0.70, 0.72, 0.74);
     conc = mix(conc, concWet, wetMask * 0.55);
-    albedo = mix(albedo, conc, hardMask);
+    albedo = mix(albedo, conc, concMask);
+  } else if (stoneMask > 0.001) {
+    albedo = mix(albedo, albedo * vec3(0.70, 0.66, 0.60), stoneMask * 0.35);
   }
 
   float lookG = clamp(uLookGrain, 0.0, 1.0);
@@ -150,18 +155,29 @@ void main() {
   float micro = 1.0 + (luma - 0.5) * lookG * 0.22;
   albedo *= mix(1.0, micro, 1.0 - hardMask * 0.65);
 
+  float texel = max(uTexel, 1.0e-4);
+  float tray = uTraySize > 0.5 ? uTraySize : 8.0;
+  float h0 = heightAt(vUv);
+
   float nAmt = mix(0.10, 0.20, lookG);
   vec3 N = safeNormalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * nAmt, vec3(0.0, 1.0, 0.0));
   float gdx = dFdx(luma);
   float gdy = dFdy(luma);
   N = safeNormalize(N + vec3(-gdx, 0.0, -gdy) * (0.35 * lookG), vec3(0.0, 1.0, 0.0));
+  float hMicro = uHeightMicro;
+  if (!(hMicro == hMicro) || hMicro < 0.0) hMicro = 0.0;
+  if (hMicro > 0.001) {
+    float hx = clamp(dFdx(h0), -0.06, 0.06);
+    float hz = clamp(dFdy(h0), -0.06, 0.06);
+    N = safeNormalize(N + vec3(-hx, 0.0, -hz) * (hMicro * 2.4), N);
+  }
 
   albedo = mix(albedo, albedo * vec3(0.92, 0.90, 0.84), smoothstep(0.003, 0.04, water) * 0.1);
 
   float roughTex = mix(roughPair.x, roughPair.y, wet);
   float roughness = mix(mix(0.90, 0.82, uGrain), 0.30, wet * 0.78);
   roughness = mix(roughness, roughTex, 0.58);
-  roughness = mix(roughness, mix(0.64, 0.40, wetMask), hardMask);
+  roughness = mix(roughness, mix(0.64, 0.40, wetMask), concMask);
   roughness += (0.48 - luma) * lookG * 0.12;
   roughness = clamp(roughness, 0.22, 0.96);
 
@@ -173,10 +189,6 @@ void main() {
   float wrap = mix(ndl, clamp((dot(N, L) + 0.22) / 1.22, 0.0, 1.0), 0.42);
   float fillN = max(dot(N, Fdir), 0.0);
   float fillWrap = mix(fillN, clamp((dot(N, Fdir) + 0.45) / 1.45, 0.0, 1.0), 0.55);
-
-  float texel = max(uTexel, 1.0e-4);
-  float tray = uTraySize > 0.5 ? uTraySize : 8.0;
-  float h0 = heightAt(vUv);
   float ao = heightfieldAO(vUv, h0, texel, uAoSteps);
   float contact = heightfieldContact(vUv, h0, L, texel, tray, uAoSteps);
   float slopeShade = mix(0.72, 1.0, clamp(N.y, 0.0, 1.0));

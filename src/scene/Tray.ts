@@ -1,11 +1,16 @@
 import * as THREE from "three";
 import { fitCanvas } from "../assets/deriveMaps";
 import { gpuAnisotropy, gpuTexelBudget } from "../assets/texturePaths";
+import { qualityProfile } from "../state/quality";
 import type { QualityId } from "../state/types";
 import { canvasTexture } from "./mapsTexture";
 
 /** Inner wall sits outside the sand plane so the rim does not z-fight the bed. */
 export const TRAY_SAND_CLEARANCE = 0.05;
+
+/** World metres of grain per texture repeat along U / V. */
+export const WOOD_PLANK_U = 2.2;
+export const WOOD_PLANK_V = 0.85;
 
 export type TrayHandle = {
   group: THREE.Group;
@@ -14,22 +19,58 @@ export type TrayHandle = {
   maps: THREE.Texture[];
 };
 
+/**
+ * Scale default 0–1 BoxGeometry UVs so grain density is consistent
+ * across long walls, short ends, and the lip. Face order: +X −X +Y −Y +Z −Z.
+ */
+export function applyBoxPlankUVs(
+  geo: THREE.BoxGeometry,
+  w: number,
+  h: number,
+  d: number,
+  uWorld = WOOD_PLANK_U,
+  vWorld = WOOD_PLANK_V,
+): void {
+  const uv = geo.getAttribute("uv");
+  if (!uv) return;
+  const faces: [number, number][] = [
+    [d, h],
+    [d, h],
+    [w, d],
+    [w, d],
+    [w, h],
+    [w, h],
+  ];
+  const n = uv.count;
+  const per = Math.max(1, Math.floor(n / 6));
+  for (let f = 0; f < 6; f++) {
+    const su = faces[f]![0] / uWorld;
+    const sv = faces[f]![1] / vWorld;
+    for (let i = 0; i < per; i++) {
+      const idx = f * per + i;
+      if (idx >= n) break;
+      uv.setXY(idx, uv.getX(idx) * su, uv.getY(idx) * sv);
+    }
+  }
+  uv.needsUpdate = true;
+}
+
 export function createTray(traySize: number): TrayHandle {
   const g = new THREE.Group();
   g.name = "tray";
 
   const wood = new THREE.MeshStandardMaterial({
-    color: 0x6a6560,
-    roughness: 0.86,
-    metalness: 0.05,
+    color: 0x8a6a48,
+    roughness: 0.78,
+    metalness: 0.03,
     polygonOffset: true,
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1,
   });
   const rimDark = new THREE.MeshStandardMaterial({
-    color: 0x3a3834,
-    roughness: 0.74,
-    metalness: 0.06,
+    color: 0x5c4632,
+    roughness: 0.7,
+    metalness: 0.04,
     polygonOffset: true,
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 2,
@@ -47,7 +88,9 @@ export function createTray(traySize: number): TrayHandle {
   const outer = inner + wallT * 2;
 
   const mk = (w: number, h: number, d: number, mat: THREE.Material) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    const geo = new THREE.BoxGeometry(w, h, d);
+    applyBoxPlankUVs(geo, w, h, d);
+    const m = new THREE.Mesh(geo, mat);
     m.castShadow = true;
     m.receiveShadow = true;
     return m;
@@ -101,39 +144,47 @@ export function applyTrayWood(
   for (const tex of tray.maps) tex.dispose();
   tray.maps.length = 0;
 
+  const look = qualityProfile(quality);
   const size = gpuTexelBudget(quality);
   const aniso = gpuAnisotropy(quality);
   const map = canvasTexture(fitCanvas(albedo, size), aniso);
-  map.repeat.set(1.15, 0.72);
+  map.repeat.set(1, 1);
   tray.maps.push(map);
   tray.wood.map = map;
-  tray.wood.color.set(0xe8e4dc);
-  tray.wood.roughness = 0.78;
-  tray.wood.metalness = 0.04;
-  tray.wood.envMapIntensity = 0.28;
+  tray.wood.color.set(0xf6ecdf);
+  tray.wood.roughness = 0.7;
+  tray.wood.metalness = 0.025;
+  tray.wood.envMapIntensity = 0.22;
 
   tray.lip.map = map;
-  tray.lip.color.set(0xc9c4ba);
-  tray.lip.roughness = 0.72;
-  tray.lip.envMapIntensity = 0.24;
+  tray.lip.color.set(0xd4b896);
+  tray.lip.roughness = 0.64;
+  tray.lip.envMapIntensity = 0.18;
 
-  if (normal) {
+  const woodN = look.lookWoodNormal;
+  if (normal && woodN > 0.01) {
     const n = canvasTexture(fitCanvas(normal, size), aniso);
     n.colorSpace = THREE.LinearSRGBColorSpace;
     n.repeat.copy(map.repeat);
     tray.maps.push(n);
     tray.wood.normalMap = n;
-    tray.wood.normalScale.set(0.22, 0.22);
+    tray.wood.normalScale.set(woodN, woodN);
     tray.lip.normalMap = n;
-    tray.lip.normalScale.set(0.16, 0.16);
+    tray.lip.normalScale.set(woodN * 0.72, woodN * 0.72);
+  } else {
+    tray.wood.normalMap = null;
+    tray.lip.normalMap = null;
   }
-  if (roughness) {
+  if (roughness && woodN > 0.01) {
     const r = canvasTexture(fitCanvas(roughness, size), aniso);
     r.colorSpace = THREE.LinearSRGBColorSpace;
     r.repeat.copy(map.repeat);
     tray.maps.push(r);
     tray.wood.roughnessMap = r;
     tray.lip.roughnessMap = r;
+  } else {
+    tray.wood.roughnessMap = null;
+    tray.lip.roughnessMap = null;
   }
 
   tray.wood.needsUpdate = true;

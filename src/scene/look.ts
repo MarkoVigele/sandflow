@@ -32,6 +32,22 @@ function mix(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+/**
+ * Cheap screen-space bump from height derivatives (dFdx/dFdy of the bed).
+ * Strength 0 is a no-op so Low can skip the mix.
+ */
+export function heightMicroRelief(
+  dHx: number,
+  dHz: number,
+  strength: number,
+): { nx: number; nz: number } {
+  const s = Number.isFinite(strength) ? clamp01(strength) : 0;
+  if (s <= 1e-5) return { nx: 0, nz: 0 };
+  const hx = Math.max(-0.06, Math.min(0.06, Number.isFinite(dHx) ? dHx : 0));
+  const hz = Math.max(-0.06, Math.min(0.06, Number.isFinite(dHz) ? dHz : 0));
+  return { nx: -hx * s * 2.4, nz: -hz * s * 2.4 };
+}
+
 /** Albedo luma → lighting/roughness grain. 1 = neutral. */
 export function albedoMicroGrain(luma: number, strength: number): number {
   const y = Number.isFinite(luma) ? luma : 0.5;
