@@ -168,7 +168,7 @@ if (!scene.terrain || scene.sources.length !== 2) fail("decodeShareScene maps+so
 if (!scene.camera || scene.camera.position[1] !== 5) fail("decodeShareScene camera");
 almost(scene.terrain[mid], terrain[mid], 0.1, "decodeShareScene height mid");
 
-const presets = ["flat", "slope", "bed", "meet", "canyon", "delta", "referenz", "veins"];
+const presets = ["flat", "slope", "bed", "meet", "canyon", "delta", "referenz", "veins", "regen-hang", "staudamm"];
 for (const id of presets) {
   const { hash } = compactShareForHash({
     presetId: id,

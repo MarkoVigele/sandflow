@@ -25,6 +25,7 @@ import {
   shouldStartSourceDrag,
   sourceDragThresholdPx,
   sourcePickRadiusPx,
+  sourcePinHeadWorld,
   sourcePinPlantedY,
   sourcePinWorld,
 } from "./sourcePins";
@@ -104,6 +105,9 @@ assert(!shouldStartSourceDrag(11, "touch"), "finger tap slack");
 assert(shouldStartSourceDrag(12, "touch"), "finger drag after slack");
 almost(pointerPixelDelta({ x: 10, y: 10 }, { x: 14, y: 13 }), 5, 1e-6, "pixel delta");
 assert(sourcePickRadiusPx("touch") > sourcePickRadiusPx("mouse"), "finger pick is generous");
+assert(sourcePickRadiusPx("mouse", true) > sourcePickRadiusPx("mouse"), "camera-mode pick is wider");
+const head = sourcePinHeadWorld(0.5, 0.5, 0.42, tray, heightScale);
+assert(head.y > sourcePinWorld(0.5, 0.5, 0.42, tray, heightScale).y + 0.2, "drop head sits above the plant");
 
 const camera = new THREE.PerspectiveCamera(48, 1, 0.12, 80);
 camera.position.set(0, 8, 0.15);
