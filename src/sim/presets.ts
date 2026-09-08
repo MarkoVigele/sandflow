@@ -11,6 +11,8 @@ export interface PresetBuild {
   terrain: Float32Array;
   sources: WaterSource[];
   hardmask?: Float32Array;
+  /** Optional seed water (Staudamm puddle). Worker / Viewport apply it on load. */
+  water?: Float32Array;
 }
 
 export interface PresetDef {
@@ -151,6 +153,7 @@ function showcase(def: PresetDef): PresetDef {
         terrain: built.terrain,
         hardmask: built.hardmask,
         sources: plantSources(built.terrain, built.sources, built.hardmask),
+        water: built.water,
       };
     },
   };
@@ -752,16 +755,17 @@ const PRESET_DEFS: PresetDef[] = [
     id: "staudamm",
     title: "Staudamm",
     blurb: "Staumauer staut den See. Ist er voll, läuft er über die Krone.",
-    camera: { position: [5.6, 5.9, 5.8], target: [0, 0.42, 0.2] },
+    camera: { position: [5.4, 6.2, 5.4], target: [0, 0.48, 0.35] },
     build(size) {
       const terrain = new Float32Array(size * size);
       const hard = blankHard(size);
       const damV0 = 0.46;
       const damV1 = 0.54;
       const notchHalf = 0.07;
-      const crest = BASE + 0.26;
+      const crest = BASE + 0.24;
       const wall = BASE + 0.78;
       const abutment = BASE + 0.86;
+      const basinFloor = BASE + 0.02;
       for (let y = 0; y < size; y++) {
         const v = y / (size - 1);
         for (let x = 0; x < size; x++) {
@@ -779,6 +783,21 @@ const PRESET_DEFS: PresetDef[] = [
         0.04,
         0.96,
       );
+      // Compact bowl behind the wall — enough head that a lake can rise.
+      for (let y = 0; y < size; y++) {
+        const v = y / (size - 1);
+        if (v < 0.2 || v > damV0 - 0.008) continue;
+        const along = (v - 0.2) / Math.max(1e-4, damV0 - 0.008 - 0.2);
+        for (let x = 0; x < size; x++) {
+          const u = x / (size - 1);
+          const side = Math.abs(u - 0.5) / 0.28;
+          if (side >= 1) continue;
+          const bowl = (1 - side * side) * (0.35 + 0.65 * along);
+          const i = idx(x, y, size);
+          const target = basinFloor + (1 - bowl) * 0.14;
+          if (terrain[i] > target) terrain[i] = target;
+        }
+      }
       // Notch cuts the full dam thickness — no sealing lips on the faces.
       fillBox(terrain, hard, size, 0.02, damV0, 0.98, damV1, (u) => {
         return Math.abs(u - 0.5) < notchHalf ? crest : wall;
@@ -800,8 +819,27 @@ const PRESET_DEFS: PresetDef[] = [
       paintWallBand(terrain, hard, size, 0.04, 0.16, 0.12, damV0, (_u, v) => abutment - (1 - v) * 0.04);
       paintWallBand(terrain, hard, size, 0.84, 0.96, 0.12, damV0, (_u, v) => abutment - (1 - v) * 0.04);
       rim(terrain, size, true);
+      const water = new Float32Array(size * size);
+      for (let y = 0; y < size; y++) {
+        const v = y / (size - 1);
+        if (v < 0.22 || v > damV0 - 0.012) continue;
+        for (let x = 0; x < size; x++) {
+          const u = x / (size - 1);
+          if (Math.abs(u - 0.5) > 0.22) continue;
+          const i = idx(x, y, size);
+          if (hard[i] >= HARD_THRESHOLD) continue;
+          const head = crest - terrain[i];
+          if (head < 0.04) continue;
+          water[i] = Math.min(0.045, head * 0.22);
+        }
+      }
       const inlet = placeSourceOnTerrain(terrain, hard, size, 0.5, 0.16);
-      return { terrain, hardmask: hard, sources: [source("s-stau", inlet.x, inlet.y, 1.85)] };
+      return {
+        terrain,
+        hardmask: hard,
+        water,
+        sources: [source("s-stau", inlet.x, inlet.y, 1.85, "flood")],
+      };
     },
   },
 ];

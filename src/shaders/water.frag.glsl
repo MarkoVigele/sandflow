@@ -31,6 +31,9 @@ varying float vWave;
 varying float vComparePick;
 
 const float SHEET_CAP_DEFAULT = 0.012;
+const float POND_LIFT_START = 0.022;
+const float POND_LIFT_FULL = 0.055;
+const float POND_LIFT_CAP = 0.42;
 
 vec3 safeNormalize(vec3 v, vec3 fallback) {
   float len2 = dot(v, v);
@@ -68,6 +71,14 @@ float sheetFromColumn(float column) {
   float body = smoothstep(0.008, 0.10, w);
   float cap = uSheetCap > 1.0e-5 ? uSheetCap : SHEET_CAP_DEFAULT;
   return min((0.0030 + body * 0.0065) * cover, cap);
+}
+
+float visualLift(float column) {
+  float film = sheetFromColumn(column);
+  float w = max(column, 0.0);
+  float pond = smoothstep(POND_LIFT_START, POND_LIFT_FULL, w);
+  float rise = min(w, POND_LIFT_CAP);
+  return mix(film, rise, pond);
 }
 
 float displaceY(float h01, float relief) {
@@ -111,11 +122,11 @@ void main() {
   float wVm = wat(vUv + vec2(0.0, -texel));
   float wVp = wat(vUv + vec2(0.0, texel));
 
-  // Normals from the same thin sheet the vertices use — never raw SWE depth.
-  float hL = displaceY(tL + sheetFromColumn(wL), relief);
-  float hR = displaceY(tR + sheetFromColumn(wR), relief);
-  float hVp = displaceY(tVp + sheetFromColumn(wVp), relief);
-  float hVm = displaceY(tVm + sheetFromColumn(wVm), relief);
+  // Same lift the vertices use — ponds are flat, streams stay a film.
+  float hL = displaceY(tL + visualLift(wL), relief);
+  float hR = displaceY(tR + visualLift(wR), relief);
+  float hVp = displaceY(tVp + visualLift(wVp), relief);
+  float hVm = displaceY(tVm + visualLift(wVm), relief);
 
   float dx = texel * tray;
   vec2 grad = vec2(hL - hR, hVp - hVm);

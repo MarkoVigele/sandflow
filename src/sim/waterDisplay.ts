@@ -3,8 +3,8 @@
  *
  * Physics (`ErosionSim.water` / `.flow`) stays unsmoothed. Shaders own look
  * (Gerstner, foam, beer). This module owns G/A field data: despike, a strong
- * channel-preserving blur, and flow damping so vertex displacement cannot
- * grow 1-cell needles.
+ * channel-preserving blur, terrain-aware Lipschitz (lakes keep their column;
+ * water cannot climb a dam), and flow damping so veins stay needles-free.
  */
 
 import { packMapsRgba } from "./mapsContract";
@@ -37,7 +37,8 @@ export const INLET_NEIGHBOR_PAD = 0.006;
 /** Physics pour/source: kill columns, leave threads. */
 export const PHYSICS_LIPSCHITZ_RATIO = 1.35;
 export const PHYSICS_LIPSCHITZ_PAD = 0.006;
-export const DISPLAY_WATER_CAP = 0.2;
+/** Display G ceiling — deep enough for a Staudamm lake, below SWE blow-ups. */
+export const DISPLAY_WATER_CAP = 0.42;
 
 export function clamp01(x: number): number {
   return x < 0 ? 0 : x > 1 ? x : x;
@@ -162,11 +163,85 @@ function neighborMax4(src: Float32Array, size: number, x: number, y: number): nu
   return Math.max(src[i - 1], src[i + 1], src[i - size], src[i + size]);
 }
 
+function hydroNeighborMax(
+  src: Float32Array,
+  terrain: Float32Array | undefined,
+  size: number,
+  x: number,
+  y: number,
+): number {
+  const i = idx(x, y, size);
+  if (!terrain) return neighborMax4(src, size, x, y);
+  const eta = terrain[i] + src[i];
+  const neigh = [i - 1, i + 1, i - size, i + size];
+  let nMax = 0;
+  let found = false;
+  for (let k = 0; k < 4; k++) {
+    const j = neigh[k];
+    if (terrain[j] >= eta - 1e-5) continue;
+    found = true;
+    if (src[j] > nMax) nMax = src[j];
+  }
+  return found ? nMax : 0;
+}
+
+function canReceive(
+  terrain: Float32Array | undefined,
+  j: number,
+  eta: number,
+): boolean {
+  if (!terrain) return true;
+  return terrain[j] < eta;
+}
+
+/**
+ * Beds that sit above a nearby wet free surface cannot hold water.
+ * Kills display films that Lipschitz/blur walked up a dam face.
+ */
+export function clearBedsAboveSurface(
+  water: Float32Array,
+  terrain: Float32Array,
+  size: number,
+): void {
+  if (size < 3) return;
+  for (let y = 1; y < size - 1; y++) {
+    const row = y * size;
+    for (let x = 1; x < size - 1; x++) {
+      const i = row + x;
+      const w = water[i];
+      if (w < WET_EPS) continue;
+      let maxEta = -Infinity;
+      let found = false;
+      for (let oy = -2; oy <= 2; oy++) {
+        for (let ox = -2; ox <= 2; ox++) {
+          if (ox === 0 && oy === 0) continue;
+          const xx = x + ox;
+          const yy = y + oy;
+          if (xx < 0 || yy < 0 || xx >= size || yy >= size) continue;
+          const j = idx(xx, yy, size);
+          if (water[j] < WET_EPS) continue;
+          // Same wall / same slope — ignore. Only a lower basin can prove this bed is a climb.
+          if (terrain[j] > terrain[i] - 0.045) continue;
+          const eta = terrain[j] + water[j];
+          if (eta > maxEta) maxEta = eta;
+          found = true;
+        }
+      }
+      if (found && terrain[i] > maxEta + 0.008) water[i] = 0;
+    }
+  }
+}
+
 /**
  * Flatten isolated columns (center ≫ 4-neighbors) into a 3×3 mound.
  * Display only — does not write the physics field.
  */
-export function despikeWater(src: Float32Array, dst: Float32Array, size: number): void {
+export function despikeWater(
+  src: Float32Array,
+  dst: Float32Array,
+  size: number,
+  terrain?: Float32Array,
+): void {
   dst.set(src);
   if (size < 3) return;
   for (let y = 1; y < size - 1; y++) {
@@ -175,17 +250,27 @@ export function despikeWater(src: Float32Array, dst: Float32Array, size: number)
       const i = row + x;
       const w = src[i];
       if (w < WET_EPS) continue;
-      const nMax = neighborMax4(src, size, x, y);
+      const eta = (terrain ? terrain[i] : 0) + w;
+      const nMax = hydroNeighborMax(src, terrain, size, x, y);
       const ceil = nMax * DESPIKE_RATIO + DESPIKE_PAD;
       if (w <= ceil) continue;
       const keep = Math.max(nMax + DESPIKE_PAD * 0.45, ceil * 0.72);
       const excess = w - keep;
-      dst[i] = keep;
-      const share = excess / 8;
+      let dests = 0;
       for (let oy = -1; oy <= 1; oy++) {
         for (let ox = -1; ox <= 1; ox++) {
           if (ox === 0 && oy === 0) continue;
-          dst[idx(x + ox, y + oy, size)] += share;
+          if (canReceive(terrain, idx(x + ox, y + oy, size), eta)) dests++;
+        }
+      }
+      if (dests === 0) continue;
+      dst[i] = keep;
+      const share = excess / dests;
+      for (let oy = -1; oy <= 1; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          if (ox === 0 && oy === 0) continue;
+          const j = idx(x + ox, y + oy, size);
+          if (canReceive(terrain, j, eta)) dst[j] += share;
         }
       }
     }
@@ -242,6 +327,7 @@ export function clampWaterLipschitz(
   ratio = LIPSCHITZ_RATIO,
   pad = LIPSCHITZ_PAD,
   iters = LIPSCHITZ_ITERS,
+  terrain?: Float32Array,
 ): void {
   if (size < 3) return;
   const n = Math.max(1, iters | 0);
@@ -255,16 +341,26 @@ export function clampWaterLipschitz(
         const i = row + x;
         const w = scratch[i];
         if (w < WET_EPS) continue;
-        const nMax = neighborMax4(scratch, size, x, y);
+        const eta = (terrain ? terrain[i] : 0) + w;
+        const nMax = hydroNeighborMax(scratch, terrain, size, x, y);
         const ceil = nMax * r + p;
         if (w <= ceil) continue;
         const excess = w - ceil;
-        field[i] = ceil;
-        const share = excess / 8;
+        let dests = 0;
         for (let oy = -1; oy <= 1; oy++) {
           for (let ox = -1; ox <= 1; ox++) {
             if (ox === 0 && oy === 0) continue;
-            field[idx(x + ox, y + oy, size)] += share;
+            if (canReceive(terrain, idx(x + ox, y + oy, size), eta)) dests++;
+          }
+        }
+        if (dests === 0) continue;
+        field[i] = ceil;
+        const share = excess / dests;
+        for (let oy = -1; oy <= 1; oy++) {
+          for (let ox = -1; ox <= 1; ox++) {
+            if (ox === 0 && oy === 0) continue;
+            const j = idx(x + ox, y + oy, size);
+            if (canReceive(terrain, j, eta)) field[j] += share;
           }
         }
       }
@@ -298,6 +394,7 @@ export function flattenInletCones(
   field: Float32Array,
   scratch: Float32Array,
   size: number,
+  terrain?: Float32Array,
 ): void {
   if (size < 3) return;
   scratch.set(field);
@@ -307,18 +404,28 @@ export function flattenInletCones(
       const i = row + x;
       const w = scratch[i];
       if (w < WET_EPS) continue;
-      const nMax = neighborMax4(scratch, size, x, y);
+      const eta = (terrain ? terrain[i] : 0) + w;
+      const nMax = hydroNeighborMax(scratch, terrain, size, x, y);
       const ceil = nMax * INLET_ISOLATED_RATIO + INLET_ISOLATED_PAD;
       if (w <= ceil) continue;
       const keep = Math.min(w, nMax + INLET_NEIGHBOR_PAD);
       const excess = w - keep;
       field[i] = keep;
       if (!(excess > 1e-9)) continue;
-      const share = excess / 8;
+      let dests = 0;
       for (let oy = -1; oy <= 1; oy++) {
         for (let ox = -1; ox <= 1; ox++) {
           if (ox === 0 && oy === 0) continue;
-          field[idx(x + ox, y + oy, size)] += share;
+          if (canReceive(terrain, idx(x + ox, y + oy, size), eta)) dests++;
+        }
+      }
+      if (dests === 0) continue;
+      const share = excess / dests;
+      for (let oy = -1; oy <= 1; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          if (ox === 0 && oy === 0) continue;
+          const j = idx(x + ox, y + oy, size);
+          if (canReceive(terrain, j, eta)) field[j] += share;
         }
       }
     }
@@ -407,16 +514,19 @@ export function prepareDisplayMaps(
   scratch: Float32Array,
   prevWater?: Float32Array,
   prevFlow?: Float32Array,
+  terrain?: Float32Array,
 ): void {
   const n = size * size;
   if (outWater.length !== n || outFlow.length !== n || scratch.length !== n) {
     throw new Error("prepareDisplayMaps: buffer size mismatch");
   }
-  despikeWater(water, outWater, size);
-  flattenInletCones(outWater, scratch, size);
+  despikeWater(water, outWater, size, terrain);
+  flattenInletCones(outWater, scratch, size, terrain);
   blurWaterField(outWater, outWater, scratch, size);
-  flattenInletCones(outWater, scratch, size);
-  clampWaterLipschitz(outWater, scratch, size);
+  if (terrain) clearBedsAboveSurface(outWater, terrain, size);
+  flattenInletCones(outWater, scratch, size, terrain);
+  clampWaterLipschitz(outWater, scratch, size, LIPSCHITZ_RATIO, LIPSCHITZ_PAD, LIPSCHITZ_ITERS, terrain);
+  if (terrain) clearBedsAboveSurface(outWater, terrain, size);
   for (let i = 0; i < n; i++) {
     let w = outWater[i];
     if (!(w > WET_EPS) || !Number.isFinite(w)) {
@@ -443,7 +553,7 @@ export function packDisplayMapsRgba(
   const dw = new Float32Array(n);
   const df = new Float32Array(n);
   const scratch = new Float32Array(n);
-  prepareDisplayMaps(water, flow, size, dw, df, scratch);
+  prepareDisplayMaps(water, flow, size, dw, df, scratch, undefined, undefined, terrain);
   return packMapsRgba(terrain, dw, wetness, df);
 }
 

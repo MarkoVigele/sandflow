@@ -16,6 +16,7 @@ import {
   addWaterKernelCapped,
   blurWaterField,
   clampWaterLipschitz,
+  clearBedsAboveSurface,
   dampFlowField,
   despikeWater,
   flattenInletCones,
@@ -253,6 +254,43 @@ function almost(a: number, b: number, eps: number, label: string): void {
     (dw[12 * size + 11] + dw[12 * size + 13] + dw[11 * size + 12] + dw[13 * size + 12]) / 4;
   if (c > n * 1.32 + 0.004) fail(`display pour still a cone: ${c} vs n=${n}`);
   if (peakNeighborRatio(dw, size, 0.003) > 1.35) fail(`display inlet spiked: ${peakNeighborRatio(dw, size, 0.003)}`);
+}
+
+{
+  // Lake against a high wall must keep its column and not wet the crest.
+  const size = 28;
+  const terrain = new Float32Array(size * size);
+  const water = new Float32Array(size * size);
+  const flow = new Float32Array(size * size);
+  const wallX = 16;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      terrain[y * size + x] = x === wallX ? 0.95 : 0.48;
+    }
+  }
+  for (let y = 4; y < size - 4; y++) {
+    for (let x = 4; x < wallX; x++) water[y * size + x] = 0.18;
+  }
+  water[10 * size + wallX] = 0.12;
+  const dw = new Float32Array(size * size);
+  const df = new Float32Array(size * size);
+  const scratch = new Float32Array(size * size);
+  prepareDisplayMaps(water, flow, size, dw, df, scratch, undefined, undefined, terrain);
+  let lake = 0;
+  let nLake = 0;
+  let onWall = 0;
+  for (let y = 6; y < size - 6; y++) {
+    for (let x = 6; x < wallX; x++) {
+      lake += dw[y * size + x];
+      nLake++;
+    }
+    if (dw[y * size + wallX] > 0.008) onWall++;
+  }
+  const mean = nLake ? lake / nLake : 0;
+  if (mean < 0.1) fail(`display flattened the lake against the wall: ${mean}`);
+  if (onWall > 2) fail(`display wetted the dam face: ${onWall}`);
+  clearBedsAboveSurface(water, terrain, size);
+  if (water[10 * size + wallX] > 0.01) fail("clearBeds left water on the crest");
 }
 
 console.log("waterDisplaySmoke ok");

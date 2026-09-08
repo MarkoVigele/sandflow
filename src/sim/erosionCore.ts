@@ -14,7 +14,7 @@ import {
   clusterJitter,
   grainSpawnScore,
   packParticleAttr,
-  visualWaterSheet,
+  visualWaterLift,
   type ParticleKind,
 } from "./flowFx";
 import {
@@ -169,7 +169,7 @@ export class ErosionSim {
     this.addSources();
     this.virtualPipes();
     this.virtualPipes();
-    equalizePondSurface(this.terrain, this.water, this.waterDelta, this.size, 2);
+    equalizePondSurface(this.terrain, this.water, this.waterDelta, this.size, 5);
     clampWaterField(this.water, maxWaterDepthFor(this.size));
     this.threadConcentrate();
     this.erodeDeposit();
@@ -184,24 +184,25 @@ export class ErosionSim {
   private addSources(): void {
     for (const src of this.sources) {
       if (src.kind === "rain") this.addRain(src);
-      else this.addPointSource(src);
+      else this.addPointSource(src, src.kind === "flood");
     }
     relaxPhysicsSpikesHydro(this.water, this.terrain, this.visScratch, this.size, 2);
     clampWaterField(this.water, maxWaterDepthFor(this.size));
   }
 
-  private addPointSource(src: WaterSource): void {
+  private addPointSource(src: WaterSource, flood = false): void {
     const { size } = this;
     const x = Math.max(1, Math.min(size - 2, Math.round(src.x * (size - 1))));
     const y = Math.max(1, Math.min(size - 2, Math.round(src.y * (size - 1))));
+    const area = flood ? Math.min(16, (size / 128) ** 2) : 1;
     addWaterKernelCapped(
       this.water,
       size,
       x,
       y,
-      src.rate * 0.048,
-      0.95,
-      1,
+      src.rate * (flood ? 0.07 : 0.048) * Math.max(1, area),
+      flood ? 0.42 : 0.95,
+      flood ? Math.max(2, Math.round(size * 0.018)) : 1,
       0.62,
       SOURCE_CELL_ADD_CAP,
     );
@@ -357,8 +358,8 @@ export class ErosionSim {
         const head = Math.max(0, h - minHn);
         const ponded = maxDrop < MIN_SURFACE_SLOPE;
         const bedFall = Math.max(0, terrain[i] - minBed);
-        // A water mound in a hole is not a stream — leave it for the pipes.
-        if (ponded || bedFall < 0.0014) {
+        // A water mound in a hole / filling lake is not a stream.
+        if (ponded || w > POND_DEPTH || bedFall < 0.0014) {
           lastDir[i] = 255;
           continue;
         }
@@ -835,6 +836,7 @@ export class ErosionSim {
       this.visScratch,
       this.visReady ? this.visPrevWater : undefined,
       this.visReady ? this.visPrevFlow : undefined,
+      this.terrain,
     );
     this.visReady = true;
     return packMapsRgba(this.terrain, this.visWater, this.wetness, this.visFlow);
@@ -862,7 +864,7 @@ export class ErosionSim {
       const o = w * PARTICLE_STRIDE;
       out[o] = x / (size - 1);
       out[o + 1] = y / (size - 1);
-      out[o + 2] = this.terrain[i] + visualWaterSheet(this.visReady ? this.visWater[i] : this.water[i]);
+      out[o + 2] = this.terrain[i] + visualWaterLift(this.visReady ? this.visWater[i] : this.water[i]);
       out[o + 3] = packParticleAttr(KIND_FOAM, 1);
       w++;
     }
@@ -911,7 +913,7 @@ export class ErosionSim {
         this.fxH[k] = this.terrain[i] + Math.min(w * 0.14, 0.005);
       } else {
         const lift = 0.35 + (this.fxU[k] * 17 + this.fxV[k] * 9) % 0.5;
-        this.fxH[k] = this.terrain[i] + visualWaterSheet(w) * Math.min(0.92, lift);
+        this.fxH[k] = this.terrain[i] + visualWaterLift(w) * Math.min(0.92, lift);
       }
       if (keep !== k) {
         this.fxU[keep] = this.fxU[k];
@@ -962,7 +964,7 @@ export class ErosionSim {
         const j = clusterJitter(x, y, k, this.tick + k * 13);
         const u = Math.min(0.99, Math.max(0.01, x / denom + j.du));
         const v = Math.min(0.99, Math.max(0.01, y / denom + j.dv));
-        const h = this.terrain[i] + visualWaterSheet(w) * j.lift;
+        const h = this.terrain[i] + visualWaterLift(w) * j.lift;
         const life = 8 + ((hash2(x, k, this.tick + 29) * 7) | 0);
         this.pushFx(u, v, h, KIND_BUBBLE, life);
         bubbles++;

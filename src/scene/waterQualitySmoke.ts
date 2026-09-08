@@ -8,6 +8,8 @@ import {
   gerstnerHeight,
   schlickFresnel,
   sheetHeight,
+  visualWaterLift,
+  POND_LIFT_CAP,
   suppressWaterPeak,
   waterFresnelCap,
   waterQualityIndex,
@@ -95,10 +97,14 @@ if (flowWaveAmp(0.0004, 0.2, ultra.waveDisplace) > ampUltra * 0.25) {
 const filmSheet = sheetHeight(0.01, 0);
 const poolSheet = sheetHeight(0.1, 0);
 const spikeSheet = sheetHeight(1.15, 0);
+const pondLift = visualWaterLift(0.16);
+const spikeLift = visualWaterLift(1.15);
 if (filmSheet > 0.008) fail(`film sheet should stay thin: ${filmSheet}`);
 if (poolSheet <= filmSheet) fail(`pools should lift a hair more than films (${poolSheet} vs ${filmSheet})`);
-if (poolSheet > WATER_SHEET_CAP) fail(`pool sheet blew the cap: ${poolSheet}`);
+if (poolSheet > WATER_SHEET_CAP) fail(`stream sheet blew the cap: ${poolSheet}`);
 if (spikeSheet > WATER_SHEET_CAP + 1e-6) fail(`SWE column must not become a needle: ${spikeSheet}`);
+if (pondLift < 0.12) fail(`pond must rise with the column: ${pondLift}`);
+if (spikeLift > POND_LIFT_CAP + 1e-6) fail(`pond lift must still cap: ${spikeLift}`);
 if (low.sheetCap > WATER_SHEET_CAP + 1e-6 || ultra.sheetCap > WATER_SHEET_CAP + 1e-6) {
   fail("quality sheetCap must stay at the hard ceiling");
 }

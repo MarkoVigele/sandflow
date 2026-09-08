@@ -208,16 +208,28 @@ export function gerstnerHeight(
 }
 
 export const WATER_SHEET_CAP = 0.012;
+export const POND_LIFT_START = 0.022;
+export const POND_LIFT_FULL = 0.055;
+export const POND_LIFT_CAP = 0.42;
 
 /**
- * Visual sheet height above the bed. Thin continuous coating — pool depth
- * is a shading problem, not a vertex spike (matches water.vert.glsl).
+ * Visual sheet height above the bed for streams / films.
+ * Ponds use `visualWaterLift` so a reservoir can rise.
  */
 export function sheetHeight(water: number, _flow = 0, cap = WATER_SHEET_CAP): number {
   const w = Number.isFinite(water) && water > 0 ? water : 0;
   const cover = smoothstep(0.0006, 0.014, w);
   const body = smoothstep(0.008, 0.1, w);
   return Math.min((0.003 + body * 0.0065) * cover, cap);
+}
+
+/** Free-surface lift: thin film on threads, hydrostatic column on ponds. */
+export function visualWaterLift(water: number, cap = POND_LIFT_CAP): number {
+  const film = sheetHeight(water);
+  const w = Number.isFinite(water) && water > 0 ? water : 0;
+  const pond = smoothstep(POND_LIFT_START, POND_LIFT_FULL, w);
+  const rise = Math.min(w, cap);
+  return film + (rise - film) * pond;
 }
 
 /** How much the water normal tilts from reconstructed flow. Still water ≈ 0. */

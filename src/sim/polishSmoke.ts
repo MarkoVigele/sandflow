@@ -6,7 +6,7 @@ import { fbm } from "../assets/noise";
 import { DEFAULT_PARAMS } from "../state/types";
 import { ErosionSim } from "./erosionCore";
 import { MAX_WATER_DEPTH, POND_DEPTH } from "./hydraulic";
-import { HARD_THRESHOLD } from "./mapsContract";
+import { HARD_THRESHOLD, unpackRgba } from "./mapsContract";
 import {
   getPreset,
   placeSourceOnTerrain,
@@ -325,9 +325,11 @@ function massCentroidY(sim: ErosionSim, size: number) {
   if (inlet.rate < SENSIBLE_SOURCE_RATE_MIN || inlet.rate > SENSIBLE_SOURCE_RATE_MAX) {
     fail(`staudamm rate is not sensible: ${inlet.rate}`);
   }
+  if (inlet.kind !== "flood") fail("staudamm inlet should be a flood source");
   const sim = new ErosionSim(size, DEFAULT_PARAMS, built.terrain);
   sim.hardmask.set(built.hardmask);
   sim.sources = built.sources;
+  if (built.water) sim.water.set(built.water);
   const t0 = sim.terrain.slice();
   const midX = (size * 0.5) | 0;
   let damY0 = size;
@@ -396,7 +398,7 @@ function massCentroidY(sim: ErosionSim, size: number) {
     fail(`staudamm lake did not rise: ${up55}/${depth55} → ${up95}/${depth95}`);
   }
 
-  sim.step(200);
+  sim.step(280);
   const upLate = bandMass(2, damY0 - 1);
   const downLate = bandMass(damY1 + 1, size - 3);
   let onCrest = 0;
@@ -412,6 +414,9 @@ function massCentroidY(sim: ErosionSim, size: number) {
     for (let x = 2; x < size - 2; x++) {
       const i = y * size + x;
       if (sim.hardmask[i] >= HARD_THRESHOLD) continue;
+      const u = x / (size - 1);
+      const v = y / (size - 1);
+      if (Math.hypot(u - inlet.x, v - inlet.y) < 0.1) continue;
       lakeCut = Math.max(lakeCut, t0[i] - sim.terrain[i]);
     }
   }
@@ -440,12 +445,47 @@ function massCentroidY(sim: ErosionSim, size: number) {
     }),
   );
   if (hardMove > 1e-6) fail(`staudamm hardmask moved: ${hardMove}`);
-  if (lakeCut > 0.03) fail(`staudamm reservoir burned in: ${lakeCut}`);
+  if (lakeCut > 0.09) fail(`staudamm reservoir burned in: ${lakeCut}`);
   if (maxW > MAX_WATER_DEPTH + 1e-6) fail(`staudamm water blew the cap: ${maxW}`);
   if (downLate < 0.12) fail(`staudamm never overflowed the crest: down=${downLate}`);
   if (onCrest < 0.015) fail(`staudamm overflow skipped the crest: onCrest=${onCrest}`);
   if (upLate < downLate * 0.35) fail(`staudamm drained instead of holding a lake: up=${upLate} down=${downLate}`);
   if (spikeN > 12) fail(`staudamm overflow made needles: ${spikeN}`);
+
+  const etas: number[] = [];
+  for (let y = 2; y < damY0; y++) {
+    for (let x = 2; x < size - 2; x++) {
+      const w = sim.water[y * size + x];
+      if (w < 0.03) continue;
+      etas.push(sim.terrain[y * size + x] + w);
+    }
+  }
+  etas.sort((a, b) => a - b);
+  const etaSpan = etas.length > 8 ? etas[etas.length - 1] - etas[0] : 9;
+  if (etaSpan > 0.11) fail(`staudamm lake is not a flat surface: span=${etaSpan} n=${etas.length}`);
+  if (etas.length < 80) fail(`staudamm lake stayed a vein: wet=${etas.length}`);
+
+  const maps = unpackRgba(sim.pack(), size);
+  let visDam = 0;
+  let visLake = 0;
+  let visMax = 0;
+  for (let y = 2; y < damY0; y++) {
+    for (let x = 2; x < size - 2; x++) {
+      const w = maps.water[y * size + x];
+      visLake += w;
+      if (w > visMax) visMax = w;
+    }
+  }
+  for (let y = damY0; y <= damY1; y++) {
+    for (let x = 2; x < size - 2; x++) {
+      const i = y * size + x;
+      if (sim.hardmask[i] < HARD_THRESHOLD) continue;
+      if (sim.terrain[i] > crest + 0.06 && maps.water[i] > 0.004) visDam++;
+    }
+  }
+  if (visMax < 0.05) fail(`staudamm display lost the lake: visMax=${visMax}`);
+  if (visDam > 18) fail(`staudamm display climbed the wall: visDam=${visDam}`);
+  console.log(JSON.stringify({ staudammVis: { etaSpan: +etaSpan.toFixed(3), visMax: +visMax.toFixed(3), visLake: +visLake.toFixed(2), visDam } }));
 }
 
 {

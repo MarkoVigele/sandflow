@@ -34,12 +34,25 @@ function smoothstep(e0: number, e1: number, x: number): number {
 
 /** Must match `sheetFromColumn` in the water shaders — foam sits on the coating. */
 export const VISUAL_WATER_SHEET_CAP = 0.012;
+/** Pond free-surface lift. Must match water.vert / waterQuality.visualWaterLift. */
+export const POND_LIFT_START = 0.022;
+export const POND_LIFT_FULL = 0.055;
+export const POND_LIFT_CAP = 0.42;
 
 export function visualWaterSheet(water: number): number {
   const w = Number.isFinite(water) && water > 0 ? water : 0;
   const cover = smoothstep(0.0006, 0.014, w);
   const body = smoothstep(0.008, 0.1, w);
   return Math.min((0.003 + body * 0.0065) * cover, VISUAL_WATER_SHEET_CAP);
+}
+
+/** Streams stay a thin sheet. Ponds rise with the hydrostatic column. */
+export function visualWaterLift(water: number): number {
+  const film = visualWaterSheet(water);
+  const w = Number.isFinite(water) && water > 0 ? water : 0;
+  const pond = smoothstep(POND_LIFT_START, POND_LIFT_FULL, w);
+  const rise = Math.min(w, POND_LIFT_CAP);
+  return film + (rise - film) * pond;
 }
 
 /** attr = kind + life∈[0,1). Foam uses life≈1 so it stays fully visible. */

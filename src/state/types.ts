@@ -49,7 +49,7 @@ export interface SimParams {
   flowRate: number;
 }
 
-export type SourceKind = "point" | "rain";
+export type SourceKind = "point" | "rain" | "flood";
 
 export interface WaterSource {
   id: string;
@@ -63,7 +63,9 @@ export interface WaterSource {
 }
 
 export function sourceKindOf(src: WaterSource): SourceKind {
-  return src.kind === "rain" ? "rain" : "point";
+  if (src.kind === "rain") return "rain";
+  if (src.kind === "flood") return "flood";
+  return "point";
 }
 
 export interface SimStats {
