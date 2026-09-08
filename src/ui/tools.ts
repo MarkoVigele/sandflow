@@ -191,6 +191,19 @@ export function toolInterpolates(id: ToolId): boolean {
   return !!BY_ID[id]?.interpolates;
 }
 
+/**
+ * Worker snapshot must not block the first stamps. On touch the finger
+ * already moved (or lifted) by the time requestSnapshot returns.
+ */
+export function strokeWaitsForHistory(): boolean {
+  return false;
+}
+
+/** Captured strokes keep painting when the finger leaves the canvas. */
+export function pointerLeaveEndsStroke(hasCapture: boolean): boolean {
+  return !hasCapture;
+}
+
 /** Sand-shaping tools that finish onboarding step 1. */
 export function isShapeTool(id: ToolId): boolean {
   return id === "pile" || id === "dig" || id === "smooth" || id === "dam" || id === "tamp" || id === "groove" || id === "flatten";
