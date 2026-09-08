@@ -6,8 +6,10 @@ import {
   heightMicroRelief,
   depthTint,
   lookAoSteps,
+  lookVignette,
   ridgeAO,
   shoreFoamFromVelocity,
+  trayShadowOpacity,
   waterSpecCap,
   wetDryMask,
 } from "./look";
@@ -32,10 +34,17 @@ for (let i = 1; i < order.length; i++) {
   if (next.lookShoreFoam < prev.lookShoreFoam) fail(`${next.id} shore foam should not drop`);
   if (next.lookHeightMicro < prev.lookHeightMicro) fail(`${next.id} height micro should not drop`);
   if (next.lookWoodNormal < prev.lookWoodNormal) fail(`${next.id} wood normal should not drop`);
+  if (next.lookVignette < prev.lookVignette) fail(`${next.id} vignette should not drop`);
+  if (next.lookTrayShadow < prev.lookTrayShadow) fail(`${next.id} tray shadow should not drop`);
 }
 
 if (QUALITY_PROFILE.low.lookHeightMicro !== 0) fail("Low must skip height micro-relief");
 if (QUALITY_PROFILE.low.lookWoodNormal !== 0) fail("Low must skip tray wood normals");
+if (QUALITY_PROFILE.low.lookVignette !== 0) fail("Low must skip the screen vignette");
+if (QUALITY_PROFILE.low.lookTrayShadow !== 0) fail("Low must skip the tray contact blob");
+if (lookVignette("low") !== 0 || trayShadowOpacity("low") !== 0) fail("Low look helpers stay off");
+if (lookVignette("high") <= lookVignette("medium")) fail("High vignette should exceed Medium");
+if (trayShadowOpacity("ultra") <= trayShadowOpacity("high")) fail("Ultra tray shadow should exceed High");
 if (QUALITY_PROFILE.low.lookAoSteps !== 0) fail("Low must skip the contact-shadow march");
 if (QUALITY_PROFILE.low.lookSpecCap >= 0.1) fail("Low spec cap must stay mobile-safe");
 if (QUALITY_PROFILE.medium.lookSpecCap >= QUALITY_PROFILE.high.lookSpecCap) {
