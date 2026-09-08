@@ -1,11 +1,14 @@
 import {
   WATER_QUALITY,
+  WATER_SHEET_CAP,
   beerTransmittance,
   contactLineFoam,
   flowWaveAmp,
   flowWaveNormalScale,
   schlickFresnel,
   sheetHeight,
+  suppressWaterPeak,
+  waterFresnelCap,
   waterQualityIndex,
   waterQualityTier,
 } from "./waterQuality";
@@ -33,6 +36,7 @@ for (let i = 1; i < order.length; i++) {
   if (next.waveDisplace < prev.waveDisplace) fail(`${next.id} displace should not drop`);
   if (next.foamDetail < prev.foamDetail) fail(`${next.id} foam should not drop`);
   if (next.beerStrength < prev.beerStrength) fail(`${next.id} beer should not drop`);
+  if (next.fresnelCap < prev.fresnelCap) fail(`${next.id} fresnel cap should not drop`);
 }
 
 const low = waterQualityTier("low");
@@ -86,9 +90,23 @@ if (flowWaveAmp(0.0004, 0.2, ultra.waveDisplace) > ampUltra * 0.25) {
 
 const filmSheet = sheetHeight(0.01, 0);
 const poolSheet = sheetHeight(0.1, 0);
+const spikeSheet = sheetHeight(1.15, 0);
 if (filmSheet > 0.008) fail(`film sheet should stay thin: ${filmSheet}`);
-if (poolSheet < filmSheet * 2.4) fail(`pools should lift more than films (${poolSheet} vs ${filmSheet})`);
-if (poolSheet < 0.035) fail(`deep pool sheet too flat: ${poolSheet}`);
+if (poolSheet <= filmSheet) fail(`pools should lift a hair more than films (${poolSheet} vs ${filmSheet})`);
+if (poolSheet > WATER_SHEET_CAP) fail(`pool sheet blew the cap: ${poolSheet}`);
+if (spikeSheet > WATER_SHEET_CAP + 1e-6) fail(`SWE column must not become a needle: ${spikeSheet}`);
+if (low.sheetCap > WATER_SHEET_CAP + 1e-6 || ultra.sheetCap > WATER_SHEET_CAP + 1e-6) {
+  fail("quality sheetCap must stay at the hard ceiling");
+}
+
+const inlet = suppressWaterPeak(0.9, [0.02, 0.018, 0.022, 0.02]);
+if (inlet > 0.05) fail(`source/pour peak must flatten to a mound: ${inlet}`);
+if (inlet < 0.02) fail(`inlet should keep a soft mound, not vanish: ${inlet}`);
+const flat = suppressWaterPeak(0.08, [0.08, 0.079, 0.081, 0.08]);
+if (Math.abs(flat - 0.08) > 0.01) fail(`still pool should keep its column: ${flat}`);
+
+if (waterFresnelCap("low") >= waterFresnelCap("ultra")) fail("ultra may fresnel more than low");
+if (waterFresnelCap("ultra") > 0.42) fail(`fresnel cap too hot: ${waterFresnelCap("ultra")}`);
 
 const nStill = flowWaveNormalScale(0.004);
 const nFlow = flowWaveNormalScale(0.12);
@@ -101,6 +119,6 @@ console.log("waterQualitySmoke ok", {
   beer: { shallow, deep },
   fresnel: { facing, grazing },
   foam: { calmShore, midShore, turbShore, velShore },
-  sheet: { filmSheet, poolSheet },
+  sheet: { filmSheet, poolSheet, spikeSheet, inlet, cap: WATER_SHEET_CAP },
   waveN: { nStill, nFlow },
 });

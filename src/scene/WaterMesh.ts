@@ -39,8 +39,10 @@ export class WaterMesh {
         uWaveDisplace: { value: tier.waveDisplace },
         uWaveOctaves: { value: tier.waveOctaves },
         uWaveAmp: { value: 1 },
+        uSheetCap: { value: tier.sheetCap },
         uBeerStrength: { value: tier.beerStrength },
         uFresnelScale: { value: tier.fresnelScale },
+        uFresnelCap: { value: tier.fresnelCap },
         uFoamDetail: { value: tier.foamDetail },
         uSpecPower: { value: tier.specPower },
         uSpecCap: { value: waterSpecCap(quality) },
@@ -68,8 +70,10 @@ export class WaterMesh {
     this.material.uniforms.uQuality.value = waterQualityIndex(quality);
     this.material.uniforms.uWaveDisplace.value = tier.waveDisplace;
     this.material.uniforms.uWaveOctaves.value = tier.waveOctaves;
+    this.material.uniforms.uSheetCap.value = tier.sheetCap;
     this.material.uniforms.uBeerStrength.value = tier.beerStrength;
     this.material.uniforms.uFresnelScale.value = tier.fresnelScale;
+    this.material.uniforms.uFresnelCap.value = tier.fresnelCap;
     this.material.uniforms.uFoamDetail.value = tier.foamDetail;
     this.material.uniforms.uSpecPower.value = tier.specPower;
     this.material.uniforms.uSpecCap.value = waterSpecCap(quality);

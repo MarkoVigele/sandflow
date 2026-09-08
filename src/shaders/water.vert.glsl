@@ -8,6 +8,7 @@ uniform float uQuality;
 uniform float uWaveDisplace;
 uniform float uWaveOctaves;
 uniform float uWaveAmp;
+uniform float uSheetCap;
 
 varying vec2 vUv;
 varying vec3 vWorldPos;
@@ -17,6 +18,10 @@ varying float vDepth;
 varying float vFlow;
 varying float vWave;
 
+// Hard ceiling in heightmap units. Relief × world must never grow a needle.
+// 0.012 × 1.5 × 2.5 ≈ 4.5 cm on the tray — a coating, not a column.
+const float SHEET_CAP_DEFAULT = 0.012;
+
 vec2 safeDir(vec2 g, vec2 fallback) {
   if (!(g.x == g.x && g.y == g.y)) return fallback;
   float len2 = dot(g, g);
@@ -24,63 +29,105 @@ vec2 safeDir(vec2 g, vec2 fallback) {
   return g * inversesqrt(len2);
 }
 
-float flowWave(vec2 uv, float water, float flow) {
+float wat(vec2 p) {
+  float w = texture2D(uMaps, p).g;
+  return (w == w && w > 0.0) ? w : 0.0;
+}
+
+float ter(vec2 p, float fallback) {
+  float t = texture2D(uMaps, p).r;
+  return t == t ? t : fallback;
+}
+
+// Wide blur + neighbor clamp. Isolated pour/source/rain cells cannot spike.
+float smoothWater(vec2 uv, float texel) {
+  float t = texel;
+  float t2 = texel * 2.25;
+  float c = wat(uv);
+  float wL = wat(uv + vec2(-t, 0.0));
+  float wR = wat(uv + vec2(t, 0.0));
+  float wD = wat(uv + vec2(0.0, -t));
+  float wU = wat(uv + vec2(0.0, t));
+  float n1 = wL + wR + wD + wU;
+  float n1d =
+    wat(uv + vec2(-t, -t)) + wat(uv + vec2(t, -t)) +
+    wat(uv + vec2(-t, t)) + wat(uv + vec2(t, t));
+  float n2 =
+    wat(uv + vec2(-t2, 0.0)) + wat(uv + vec2(t2, 0.0)) +
+    wat(uv + vec2(0.0, -t2)) + wat(uv + vec2(0.0, t2));
+  float avg = (c * 4.0 + n1 * 2.0 + n1d * 1.2 + n2 * 0.7) / 19.6;
+  float nMax = max(max(wL, wR), max(wD, wU));
+  // Soft mound at an inlet — never the raw SWE column.
+  return min(avg, nMax + 0.014);
+}
+
+// Thin continuous coating. Depth is a color problem, not a vertex spike.
+float sheetFromColumn(float column) {
+  float w = max(column, 0.0);
+  float cover = smoothstep(0.0006, 0.014, w);
+  float body = smoothstep(0.008, 0.10, w);
+  float cap = uSheetCap > 1.0e-5 ? uSheetCap : SHEET_CAP_DEFAULT;
+  return min((0.0030 + body * 0.0065) * cover, cap);
+}
+
+// Flume ripples: long, flow-aligned, only where velocity is high.
+float flowWave(vec2 uv, float water, float flow, vec2 dir) {
   float ampScale = uWaveAmp > 0.0 ? uWaveAmp : 0.0;
   if (!(ampScale == ampScale)) ampScale = 1.0;
-  if (uWaveDisplace <= 1.0e-6 || uQuality < 0.5 || water < 0.004 || ampScale <= 1.0e-5) return 0.0;
-  float body = smoothstep(0.005, 0.05, water);
-  float fl = clamp(flow, 0.0, 0.4);
-  float stream = smoothstep(0.012, 0.10, fl);
-  float amp = uWaveDisplace * ampScale * body * stream * (0.22 + fl * 3.2);
+  if (uWaveDisplace <= 1.0e-6 || uQuality < 0.5 || water < 0.006 || ampScale <= 1.0e-5) return 0.0;
+  float body = smoothstep(0.008, 0.055, water);
+  float fl = clamp(flow, 0.0, 0.35);
+  float stream = smoothstep(0.038, 0.15, fl);
+  float amp = uWaveDisplace * ampScale * body * stream * (0.18 + fl * 1.8);
+  float cap = uSheetCap > 1.0e-5 ? uSheetCap : SHEET_CAP_DEFAULT;
+  amp = min(amp, cap * 0.45);
   if (amp < 1.0e-6) return 0.0;
 
-  float texel = max(uTexel, 0.0015);
-  vec4 sL = texture2D(uMaps, uv + vec2(-texel, 0.0));
-  vec4 sR = texture2D(uMaps, uv + vec2(texel, 0.0));
-  vec4 sVm = texture2D(uMaps, uv + vec2(0.0, -texel));
-  vec4 sVp = texture2D(uMaps, uv + vec2(0.0, texel));
-  vec2 dir = safeDir(
-    vec2((sL.r + sL.g) - (sR.r + sR.g), (sVp.r + sVp.g) - (sVm.r + sVm.g)),
-    vec2(0.72, 0.42)
-  );
   vec2 dir2 = vec2(-dir.y, dir.x);
-
-  float h = sin(dot(uv, dir) * 28.0 + uTime * 1.65 + flow * 3.4) * amp;
+  float h = sin(dot(uv, dir) * 11.0 + uTime * 1.15 + flow * 1.6) * amp;
   if (uWaveOctaves > 1.5) {
-    h += sin(dot(uv, dir2) * 46.0 - uTime * 2.12 + flow * 2.1) * amp * 0.46;
+    h += sin(dot(uv, dir2) * 18.5 - uTime * 1.55 + flow * 1.1) * amp * 0.38;
   }
   if (uWaveOctaves > 2.5) {
-    h += sin(dot(uv, dir * 0.85 + dir2 * 0.55) * 71.0 + uTime * 2.85) * amp * 0.24;
+    h += sin(dot(uv, dir * 0.82 + dir2 * 0.42) * 26.0 + uTime * 2.05) * amp * 0.18;
   }
   if (uWaveOctaves > 3.5) {
-    h += sin((uv.x * 1.4 - uv.y) * 108.0 + uTime * 3.9 + flow * 5.5) * amp * 0.13;
+    h += sin(dot(uv, dir * 0.35 - dir2 * 0.9) * 34.0 + uTime * 2.45 + flow * 2.2) * amp * 0.08;
   }
   if (!(h == h)) return 0.0;
-  return h;
+  return clamp(h, -amp, amp);
 }
 
 void main() {
   vUv = uv;
+  float texel = max(uTexel, 0.0015);
   vec4 sampleH = texture2D(uMaps, uv);
   float terrain = sampleH.r;
-  float water = sampleH.g;
   if (!(terrain == terrain)) terrain = 0.0;
-  if (!(water == water) || water < 0.0) water = 0.0;
-  vDepth = water;
+
+  float wSmooth = smoothWater(uv, texel);
+  vDepth = wSmooth;
+
   float flow = sampleH.a;
   vFlow = (flow == flow && flow > 0.0) ? flow : 0.0;
-  float sheet = 0.0;
+
+  // Every vertex gets the same continuous sheet — no wet/dry cliff walls.
+  float cap = uSheetCap > 1.0e-5 ? uSheetCap : SHEET_CAP_DEFAULT;
+  float sheet = sheetFromColumn(wSmooth);
   float wave = 0.0;
-  if (water > 0.0008) {
-    // Films stay a lab sheet; carved / ponded beds lift so pools read as volume.
-    float film = min(water, 0.02);
-    float pool = max(0.0, min(water, 0.24) - 0.02);
-    float deep = smoothstep(0.022, 0.13, water);
-    sheet = 0.0034 + film * 0.22 + pool * 0.44 + deep * 0.016 + min(vFlow, 0.18) * 0.008;
-    wave = flowWave(uv, water, vFlow);
-    sheet += wave;
-  }
+  vec2 dir = safeDir(
+    vec2(
+      (ter(uv + vec2(-texel, 0.0), terrain) + wat(uv + vec2(-texel, 0.0))) -
+        (ter(uv + vec2(texel, 0.0), terrain) + wat(uv + vec2(texel, 0.0))),
+      (ter(uv + vec2(0.0, texel), terrain) + wat(uv + vec2(0.0, texel))) -
+        (ter(uv + vec2(0.0, -texel), terrain) + wat(uv + vec2(0.0, -texel)))
+    ),
+    vec2(0.72, 0.42)
+  );
+  wave = flowWave(uv, wSmooth, vFlow, dir);
+  sheet = min(max(sheet + wave, 0.0), cap);
   vWave = wave;
+
   float h01 = terrain + sheet;
   float relief = uRelief > 0.05 ? uRelief : 1.0;
   float h = (uPivot + (h01 - uPivot) * relief) * uHeightScale;
