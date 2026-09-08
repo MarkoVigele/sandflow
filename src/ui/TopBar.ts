@@ -102,6 +102,7 @@ export class TopBar {
           ${
             s.menuOpen === "more"
               ? `<div class="menu menu-more" role="menu">
+                  <button type="button" data-presets>Vorlagen</button>
                   <button type="button" data-step>Einzelschritt</button>
                   <button type="button" data-lapse>${lapseOn ? "Zeitraffer aus" : "Zeitraffer 8×"}</button>
                   <button type="button" data-trail>${s.trailFade ? "Höhenspur aus" : "Höhenspur an"}</button>
@@ -125,8 +126,10 @@ export class TopBar {
     const slot = this.el.querySelector<HTMLElement>(".q-slot")!;
     new QualitySwitcher(this.store, slot, this.actions.onQuality, this.actions.onAutoQuality);
 
-    this.el.querySelector("[data-presets]")?.addEventListener("click", () => {
-      this.store.patch({ galleryOpen: true, menuOpen: null });
+    this.el.querySelectorAll("[data-presets]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this.store.patch({ galleryOpen: true, menuOpen: null });
+      });
     });
     this.el.querySelector("[data-play]")?.addEventListener("click", () => {
       const next = applyPlay(!this.store.state.playing, this.store.state.onboardStep);
