@@ -39,10 +39,11 @@ float ter(vec2 p, float fallback) {
   return t == t ? t : fallback;
 }
 
-// Wide blur + neighbor clamp. Isolated pour/source/rain cells cannot spike.
+// Wide blur + inlet flatten. Isolated pour/source/rain cells cannot cone.
 float smoothWater(vec2 uv, float texel) {
   float t = texel;
-  float t2 = texel * 2.25;
+  float t2 = texel * 2.35;
+  float t3 = texel * 3.4;
   float c = wat(uv);
   float wL = wat(uv + vec2(-t, 0.0));
   float wR = wat(uv + vec2(t, 0.0));
@@ -55,10 +56,14 @@ float smoothWater(vec2 uv, float texel) {
   float n2 =
     wat(uv + vec2(-t2, 0.0)) + wat(uv + vec2(t2, 0.0)) +
     wat(uv + vec2(0.0, -t2)) + wat(uv + vec2(0.0, t2));
-  float avg = (c * 4.0 + n1 * 2.0 + n1d * 1.2 + n2 * 0.7) / 19.6;
+  float n3 =
+    wat(uv + vec2(-t3, 0.0)) + wat(uv + vec2(t3, 0.0)) +
+    wat(uv + vec2(0.0, -t3)) + wat(uv + vec2(0.0, t3));
+  float avg = (c * 4.0 + n1 * 2.2 + n1d * 1.3 + n2 * 0.8 + n3 * 0.35) / 22.15;
   float nMax = max(max(wL, wR), max(wD, wU));
-  // Soft mound at an inlet — never the raw SWE column.
-  return min(avg, nMax + 0.014);
+  float isolated = smoothstep(nMax * 1.28 + 0.006, nMax * 1.7 + 0.02, c);
+  float pad = mix(0.014, 0.0055, isolated);
+  return min(avg, nMax + pad);
 }
 
 // Thin continuous coating. Depth is a color problem, not a vertex spike.
@@ -70,7 +75,7 @@ float sheetFromColumn(float column) {
   return min((0.0030 + body * 0.0065) * cover, cap);
 }
 
-// Flume ripples: long, flow-aligned, only where velocity is high.
+// Flow-aligned Gerstner ripples. Still water stays flat. Cap is the sheet.
 float flowWave(vec2 uv, float water, float flow, vec2 dir) {
   float ampScale = uWaveAmp > 0.0 ? uWaveAmp : 0.0;
   if (!(ampScale == ampScale)) ampScale = 1.0;
@@ -84,15 +89,16 @@ float flowWave(vec2 uv, float water, float flow, vec2 dir) {
   if (amp < 1.0e-6) return 0.0;
 
   vec2 dir2 = vec2(-dir.y, dir.x);
-  float h = sin(dot(uv, dir) * 11.0 + uTime * 1.15 + flow * 1.6) * amp;
+  float spd = 0.85 + fl * 2.1;
+  float h = sin(dot(uv, dir) * 10.5 + uTime * spd + flow * 1.5) * amp;
   if (uWaveOctaves > 1.5) {
-    h += sin(dot(uv, dir2) * 18.5 - uTime * 1.55 + flow * 1.1) * amp * 0.38;
+    h += sin(dot(uv, dir2) * 17.5 - uTime * (spd * 1.15) + flow * 1.1) * amp * 0.36;
   }
   if (uWaveOctaves > 2.5) {
-    h += sin(dot(uv, dir * 0.82 + dir2 * 0.42) * 26.0 + uTime * 2.05) * amp * 0.18;
+    h += sin(dot(uv, dir * 0.78 + dir2 * 0.4) * 25.0 + uTime * (spd * 1.45)) * amp * 0.16;
   }
   if (uWaveOctaves > 3.5) {
-    h += sin(dot(uv, dir * 0.35 - dir2 * 0.9) * 34.0 + uTime * 2.45 + flow * 2.2) * amp * 0.08;
+    h += sin(dot(uv, dir * 0.32 - dir2 * 0.92) * 33.0 + uTime * (spd * 1.7) + flow * 2.0) * amp * 0.07;
   }
   if (!(h == h)) return 0.0;
   return clamp(h, -amp, amp);

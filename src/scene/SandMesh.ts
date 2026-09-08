@@ -74,6 +74,8 @@ export class SandMesh {
         uAoSteps: { value: lookAoSteps(quality) },
         uLookGrain: { value: qualityProfile(quality).lookGrain },
         uHeightMicro: { value: qualityProfile(quality).lookHeightMicro },
+        uTime: { value: 0 },
+        uCaustic: { value: qualityProfile(quality).lookCaustic },
         uUvScale: { value: sandUvScale(0.55) },
         uHeatMode: { value: 0 },
       },
@@ -120,6 +122,7 @@ export class SandMesh {
     this.material.uniforms.uAoSteps.value = lookAoSteps(quality);
     this.material.uniforms.uLookGrain.value = qualityProfile(quality).lookGrain;
     this.material.uniforms.uHeightMicro.value = qualityProfile(quality).lookHeightMicro;
+    this.material.uniforms.uCaustic.value = qualityProfile(quality).lookCaustic;
     this.mesh.receiveShadow = shadows;
   }
 
@@ -177,6 +180,10 @@ export class SandMesh {
 
   setHeatMode(mode: HeatmapMode): void {
     this.material.uniforms.uHeatMode.value = mode === "off" ? 0 : mode === "depth" ? 2 : 1;
+  }
+
+  tick(t: number): void {
+    this.material.uniforms.uTime.value = t;
   }
 
   dispose(): void {

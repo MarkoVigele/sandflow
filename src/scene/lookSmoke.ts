@@ -4,8 +4,11 @@ import {
   albedoMicroGrain,
   contactShadow,
   heightMicroRelief,
+  bedCausticGain,
   depthTint,
+  flowStreakAmp,
   liftDrySandAlbedo,
+  waterBodyColor,
   lookAoSteps,
   lookVignette,
   ridgeAO,
@@ -34,12 +37,14 @@ for (let i = 1; i < order.length; i++) {
   if (next.lookGrain < prev.lookGrain) fail(`${next.id} grain should not drop`);
   if (next.lookSpecCap < prev.lookSpecCap) fail(`${next.id} spec cap should not drop`);
   if (next.lookShoreFoam < prev.lookShoreFoam) fail(`${next.id} shore foam should not drop`);
+  if (next.lookCaustic < prev.lookCaustic) fail(`${next.id} caustic should not drop`);
   if (next.lookHeightMicro < prev.lookHeightMicro) fail(`${next.id} height micro should not drop`);
   if (next.lookWoodNormal < prev.lookWoodNormal) fail(`${next.id} wood normal should not drop`);
   if (next.lookVignette < prev.lookVignette) fail(`${next.id} vignette should not drop`);
   if (next.lookTrayShadow < prev.lookTrayShadow) fail(`${next.id} tray shadow should not drop`);
 }
 
+if (QUALITY_PROFILE.low.lookCaustic !== 0) fail("Low must skip bed caustics");
 if (QUALITY_PROFILE.low.lookHeightMicro !== 0) fail("Low must skip height micro-relief");
 if (QUALITY_PROFILE.low.lookWoodNormal !== 0) fail("Low must skip tray wood normals");
 if (QUALITY_PROFILE.low.lookVignette !== 0) fail("Low must skip the screen vignette");
@@ -133,9 +138,31 @@ const poolTint = depthTint(0.16);
 if (filmTint[0] < 0.97 || filmTint[2] < 0.97) fail(`shallow tint should stay clear: ${filmTint}`);
 if (deepTint[0] >= filmTint[0]) fail("deep water should tint more");
 if (deepTint[0] <= deepTint[2]) fail("depth tint is sand-brown (red stays above blue)");
-if (deepTint[2] < 0.7) fail(`deep tint must not go ink-black: ${deepTint}`);
+if (deepTint[2] < 0.55) fail(`deep tint must not go ink-black: ${deepTint}`);
 if (poolTint[0] >= deepTint[0]) fail("deeper pools should tint further");
-if (poolTint[2] < 0.52) fail(`pool tint must keep the bed readable: ${poolTint}`);
+if (poolTint[2] < 0.42) fail(`pool tint must keep the bed readable: ${poolTint}`);
+if (deepTint[0] > 0.78) fail(`#45 film tint was too weak; deep should read: ${deepTint}`);
+
+const filmBody = waterBodyColor(0.004, 0);
+const poolBody = waterBodyColor(0.12, 0);
+const stillMid = waterBodyColor(0.06, 0);
+const siltBody = waterBodyColor(0.06, 0.2);
+if (filmBody[1] <= filmBody[0]) fail(`film body should read cool/water, not sand: ${filmBody}`);
+if (poolBody[0] + poolBody[1] + poolBody[2] >= filmBody[0] + filmBody[1] + filmBody[2] - 0.15) {
+  fail(`pools should be clearly darker than films (${poolBody} vs ${filmBody})`);
+}
+if (siltBody[0] <= stillMid[0]) fail("flow should warm the body a little with silt");
+
+almost(flowStreakAmp(0.004), 0, 0.02, "still streak");
+if (flowStreakAmp(0.12) <= flowStreakAmp(0.03) + 0.08) fail("high flow should streak");
+
+almost(bedCausticGain(0.002, 1, 1.2), 1, 1e-6, "dry/thin caustic");
+almost(bedCausticGain(0.05, 0, 1.2), 1, 1e-6, "zero strength caustic");
+const cauHi = bedCausticGain(0.05, 1, Math.PI * 0.5);
+const cauLo = bedCausticGain(0.05, 1, Math.PI * 1.5);
+if (cauHi <= 1) fail(`caustic peak should lift the bed: ${cauHi}`);
+if (cauLo >= 1) fail(`caustic trough should dim the bed: ${cauLo}`);
+if (cauHi > 1.2) fail(`caustic must stay subtle: ${cauHi}`);
 
 const still = shoreFoamFromVelocity(0.01, 2.2, 0.01, 1);
 const midFlow = shoreFoamFromVelocity(0.01, 2.2, 0.03, 1);
@@ -158,7 +185,7 @@ console.log("lookSmoke ok", {
   dryLift: { muddyL, liftedL, wetL, lifted, bright },
   grain: { flatGrain, brightGrain, darkGrain },
   ao: { flatAo, valleyAo, blocked },
-  tint: { filmTint, deepTint, poolTint },
+  tint: { filmTint, deepTint, poolTint, filmBody, poolBody },
   foam: { still, midFlow, moving },
   spec: { lowCap, medMobile, highDesk },
 });

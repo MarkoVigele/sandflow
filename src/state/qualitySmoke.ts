@@ -36,6 +36,7 @@ for (let i = 1; i < order.length; i++) {
   if (next.pixelRatioCap < prev.pixelRatioCap) fail(`${next.id} dpr cap should not drop`);
   if (next.lookHeightMicro < prev.lookHeightMicro) fail(`${next.id} height micro should not drop`);
   if (next.lookWoodNormal < prev.lookWoodNormal) fail(`${next.id} wood normal should not drop`);
+  if (next.lookCaustic < prev.lookCaustic) fail(`${next.id} caustic should not drop`);
 }
 
 const low = qualityProfile("low");
@@ -58,6 +59,7 @@ assert(particleDrawCount(40, "high") === 40, "draw does not invent particles");
 assert(particleDrawCount(10, "low") === 0, "low draw 0");
 
 assert(low.lookHeightMicro === 0, "low skips height micro-relief");
+assert(low.lookCaustic === 0, "low skips bed caustics");
 assert(low.lookWoodNormal === 0, "low skips wood normals");
 assert(med.lookHeightMicro > 0 && ultra.lookHeightMicro > med.lookHeightMicro, "height micro scales");
 assert(med.lookWoodNormal > 0 && ultra.lookWoodNormal > med.lookWoodNormal, "wood normal scales");

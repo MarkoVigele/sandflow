@@ -5,6 +5,7 @@ import {
   contactLineFoam,
   flowWaveAmp,
   flowWaveNormalScale,
+  gerstnerHeight,
   schlickFresnel,
   sheetHeight,
   suppressWaterPeak,
@@ -37,11 +38,14 @@ for (let i = 1; i < order.length; i++) {
   if (next.foamDetail < prev.foamDetail) fail(`${next.id} foam should not drop`);
   if (next.beerStrength < prev.beerStrength) fail(`${next.id} beer should not drop`);
   if (next.fresnelCap < prev.fresnelCap) fail(`${next.id} fresnel cap should not drop`);
+  if (next.caustic < prev.caustic) fail(`${next.id} caustic should not drop`);
 }
 
 const low = waterQualityTier("low");
 const ultra = waterQualityTier("ultra");
 if (low.waveDisplace !== 0) fail("Low must skip vertex wave displacement");
+if (low.caustic !== 0) fail("Low must skip bed caustics");
+if (ultra.caustic <= low.caustic) fail("Ultra caustics should exceed Low");
 if (low.waveOctaves !== 1) fail("Low is a single cheap ripple");
 if (ultra.waveOctaves < 4) fail("Ultra needs four wave octaves");
 if (ultra.meshSegs < 320) fail("Ultra mesh should resolve vertex waves");
@@ -112,6 +116,13 @@ const nStill = flowWaveNormalScale(0.004);
 const nFlow = flowWaveNormalScale(0.12);
 if (nStill > 0.08) fail(`still normals should be quiet: ${nStill}`);
 if (nFlow <= nStill + 0.45) fail(`flow should tilt wave normals (${nFlow} vs ${nStill})`);
+
+const gStill = gerstnerHeight(1.2, 0.004, 0.08, ultra.waveDisplace, 4);
+const gFlow = gerstnerHeight(1.2, 0.12, 0.08, ultra.waveDisplace, 4);
+const gSpike = gerstnerHeight(1.2, 0.3, 1.2, 0.08, 4);
+if (Math.abs(gStill) > 1e-6) fail(`still Gerstner must be 0: ${gStill}`);
+if (Math.abs(gFlow) < 1e-5) fail(`flow Gerstner should displace: ${gFlow}`);
+if (Math.abs(gSpike) > WATER_SHEET_CAP * 0.45 + 1e-6) fail(`Gerstner blew the sheet cap: ${gSpike}`);
 
 console.log("waterQualitySmoke ok", {
   low: { segs: low.meshSegs, oct: low.waveOctaves, beer: low.beerStrength },

@@ -18,6 +18,7 @@ import {
   clampWaterLipschitz,
   dampFlowField,
   despikeWater,
+  flattenInletCones,
   packDisplayMapsRgba,
   peakNeighborRatio,
   prepareDisplayMaps,
@@ -230,6 +231,28 @@ function almost(a: number, b: number, eps: number, label: string): void {
   if (peakNeighborRatio(maps.water, size, 0.003) > 1.35) {
     fail(`packed pour still spiked: ${peakNeighborRatio(maps.water, size, 0.003)}`);
   }
+}
+
+{
+  // Isolated rain/pour cone must flatten to a mound before GPU upload.
+  const size = 24;
+  const cone = new Float32Array(size * size);
+  const flow = new Float32Array(size * size);
+  cone[12 * size + 12] = 0.42;
+  const scratch = new Float32Array(size * size);
+  flattenInletCones(cone, scratch, size);
+  if (cone[12 * size + 12] > 0.03) fail(`inlet flatten left a cone: ${cone[12 * size + 12]}`);
+  if (cone[12 * size + 13] < 0.02) fail("inlet flatten should fan into neighbors");
+  const dw = new Float32Array(size * size);
+  const df = new Float32Array(size * size);
+  cone.fill(0);
+  cone[12 * size + 12] = 0.42;
+  prepareDisplayMaps(cone, flow, size, dw, df, scratch);
+  const c = dw[12 * size + 12];
+  const n =
+    (dw[12 * size + 11] + dw[12 * size + 13] + dw[11 * size + 12] + dw[13 * size + 12]) / 4;
+  if (c > n * 1.32 + 0.004) fail(`display pour still a cone: ${c} vs n=${n}`);
+  if (peakNeighborRatio(dw, size, 0.003) > 1.35) fail(`display inlet spiked: ${peakNeighborRatio(dw, size, 0.003)}`);
 }
 
 console.log("waterDisplaySmoke ok");
