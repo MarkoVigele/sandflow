@@ -11,7 +11,10 @@ import {
 import {
   allowOneFingerOrbit,
   claimSourceGesture,
+  orbitControlsEnabled,
   pinGrabBeatsOrbit,
+  pointerLeaveEndsGesture,
+  shouldApplyOrbitUpdate,
 } from "./sourceGesture";
 import {
   SOURCE_PIN_PLANT,
@@ -153,5 +156,8 @@ const camEmpty = claimSourceGesture({
 });
 assert(camEmpty.orbit && !pinGrabBeatsOrbit(camEmpty), "missed pin still orbits");
 assert(allowOneFingerOrbit(true, false) && !allowOneFingerOrbit(true, true), "orbit yields while pin claimed");
+assert(!orbitControlsEnabled(true) && orbitControlsEnabled(false), "OrbitControls fully disabled while pin claimed");
+assert(!shouldApplyOrbitUpdate(true) && shouldApplyOrbitUpdate(false), "no damping update during pin drag");
+assert(!pointerLeaveEndsGesture(true) && pointerLeaveEndsGesture(false), "captured leave must not end the pin drag");
 
 console.log("source-pins smoke ok");

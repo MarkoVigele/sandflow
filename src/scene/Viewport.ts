@@ -29,7 +29,14 @@ import {
   type WaterSource,
 } from "../state/types";
 import { CrossSectionView } from "../ui/crossSection";
-import { allowOneFingerOrbit, claimSourceGesture, pinGrabBeatsOrbit } from "../ui/sourceGesture";
+import {
+  allowOneFingerOrbit,
+  claimSourceGesture,
+  orbitControlsEnabled,
+  pinGrabBeatsOrbit,
+  pointerLeaveEndsGesture,
+  shouldApplyOrbitUpdate,
+} from "../ui/sourceGesture";
 import { strokeWaypoints, toolBrushKind } from "../ui/tools";
 import { isLapse, stepsThisFrame } from "../ui/transport";
 import {
@@ -259,9 +266,9 @@ export class Viewport {
     this.loadPreset(store.state.presetId, false);
 
     canvas.addEventListener("pointerdown", this.onPointerDown, true);
-    canvas.addEventListener("pointermove", this.onPointerMove);
-    canvas.addEventListener("pointerup", this.onPointerUp);
-    canvas.addEventListener("pointercancel", this.onPointerUp);
+    canvas.addEventListener("pointermove", this.onPointerMove, true);
+    canvas.addEventListener("pointerup", this.onPointerUp, true);
+    canvas.addEventListener("pointercancel", this.onPointerUp, true);
     canvas.addEventListener("pointerleave", this.onPointerLeave);
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
     canvas.addEventListener("webglcontextlost", this.onContextLost, false);
@@ -539,13 +546,27 @@ export class Viewport {
   /** Pin-drag agent hook: keep one-finger orbit off while a source is moved. */
   lockOrbitForSource(active: boolean): void {
     this.orbitLockedBySource = active;
-    if (active) this.applyOneFingerOrbit(false);
+    if (active) {
+      this.haltOrbitCoast();
+      this.applyOneFingerOrbit(false);
+    } else {
+      this.applyOneFingerOrbit(allowOneFingerOrbit(this.store.state.cameraMode, false));
+    }
+  }
+
+  /** Kill leftover OrbitControls damping so a pin grab cannot inherit camera coast. */
+  private haltOrbitCoast(): void {
+    const delta = (this.controls as OrbitControls & { _sphericalDelta?: THREE.Spherical })._sphericalDelta;
+    delta?.set(0, 0, 0);
+    this.controls.enabled = false;
   }
 
   private applyOneFingerOrbit(allow: boolean): void {
+    const sourceActive = this.sourceGestureActive();
     this.controls.mouseButtons.LEFT = allow ? THREE.MOUSE.ROTATE : (-1 as unknown as THREE.MOUSE);
     this.controls.touches.ONE = allow ? THREE.TOUCH.ROTATE : (-1 as unknown as THREE.TOUCH);
-    this.controls.enableRotate = allow || !this.sourceGestureActive();
+    this.controls.enableRotate = allow || !sourceActive;
+    this.controls.enabled = orbitControlsEnabled(sourceActive);
   }
 
   sourceGestureActive(): boolean {
@@ -869,6 +890,8 @@ export class Viewport {
     if (pinGrabBeatsOrbit(claim)) {
       ev.stopImmediatePropagation();
       this.lockOrbitForSource(true);
+    } else if (!claim.orbit) {
+      this.haltOrbitCoast();
     }
     if (claim.orbit) return;
     this.pointerDown = true;
@@ -910,6 +933,7 @@ export class Viewport {
   };
 
   private onPointerMove = (ev: PointerEvent): void => {
+    if (this.sourceGestureActive()) ev.stopImmediatePropagation();
     this.lastPointer = { clientX: ev.clientX, clientY: ev.clientY };
     const hit = this.hitUv(ev);
     if (hit) this.refreshAim(hit, ev);
@@ -975,6 +999,10 @@ export class Viewport {
   };
 
   private onPointerLeave = (ev: PointerEvent): void => {
+    if (!pointerLeaveEndsGesture(this.canvas.hasPointerCapture(ev.pointerId))) {
+      this.aim.hide();
+      return;
+    }
     this.onPointerUp(ev);
     this.hideAim();
   };
@@ -1000,10 +1028,11 @@ export class Viewport {
     this.raf = requestAnimationFrame(this.loop);
     const dt = Math.min(0.05, this.clock.getDelta());
     const t = this.clock.elapsedTime;
-    this.controls.update();
+    const sourceActive = this.sourceGestureActive();
+    if (shouldApplyOrbitUpdate(sourceActive)) this.controls.update();
     this.clampCamera();
 
-    this.applyOneFingerOrbit(allowOneFingerOrbit(this.store.state.cameraMode, this.sourceGestureActive()));
+    this.applyOneFingerOrbit(allowOneFingerOrbit(this.store.state.cameraMode, sourceActive));
 
     this.syncSourcePins();
 
