@@ -75,6 +75,16 @@ float heightfieldAO(vec2 uv, float h0, float texel, float steps) {
   return clamp(1.0 - acc * 1.85, 0.52, 1.0);
 }
 
+// Warm beach lift on dry only. Green leads (cream-gold, not burnt orange).
+// Soft-knee so bright grains stay readable.
+vec3 liftDrySand(vec3 dry) {
+  vec3 lifted = dry * vec3(1.18, 1.21, 1.14) + vec3(0.025, 0.022, 0.014);
+  float peak = max(lifted.r, max(lifted.g, lifted.b));
+  float knee = max(peak - 0.86, 0.0);
+  lifted *= peak > 1.0e-5 ? (peak - knee * 0.55) / peak : 1.0;
+  return min(lifted, vec3(0.96));
+}
+
 float heightfieldContact(vec2 uv, float h0, vec3 L, float texel, float tray, float steps) {
   if (steps < 0.5) return 1.0;
   vec2 dirUv = vec2(L.x, -L.z);
@@ -114,21 +124,25 @@ void main() {
   vec3 wetB = texture2D(uAlbedoWet, tileB).rgb;
   float stamp = fract(sin(dot(floor(vUv * 16.0), vec2(12.9898, 78.233))) * 43758.5453);
   float mixB = mix(0.12, 0.26, stamp);
-  vec3 dryAlb = mix(dryA, dryB, mixB);
+  vec3 dryRaw = mix(dryA, dryB, mixB);
   vec3 wetAlb = mix(wetA, wetB, mixB);
   vec3 nTex = texture2D(uNormal, tile).rgb * 2.0 - 1.0;
   vec2 roughPair = texture2D(uRough, tile).rg;
-  if (!(dryAlb.x == dryAlb.x)) dryAlb = vec3(0.70, 0.58, 0.40);
-  if (!(wetAlb.x == wetAlb.x)) wetAlb = dryAlb * vec3(0.50, 0.44, 0.36);
+  if (!(dryRaw.x == dryRaw.x)) dryRaw = vec3(0.70, 0.58, 0.40);
+  if (!(wetAlb.x == wetAlb.x)) wetAlb = dryRaw * vec3(0.50, 0.44, 0.36);
   if (!(nTex.x == nTex.x)) nTex = vec3(0.0, 0.0, 1.0);
   if (!(roughPair.x == roughPair.x)) roughPair = vec2(0.86, 0.30);
+
+  // Dry lift is shader-side so every preset brightens without a new jpg.
+  // Wet stays on the unlifted sample so the waterline keeps contrast.
+  vec3 dryAlb = liftDrySand(dryRaw);
 
   // Sharp wet/dry at the waterline; residual moisture inland stays a softer bank.
   float wetBank = smoothstep(0.02, 0.16, wet);
   float wetShore = smoothstep(0.0006, 0.022, water);
   float wetSharp = smoothstep(0.006, 0.045, wet);
   float wetMask = max(wetShore, mix(wetBank, wetSharp, wetShore));
-  vec3 moistened = dryAlb * vec3(0.34, 0.28, 0.22);
+  vec3 moistened = dryRaw * vec3(0.34, 0.28, 0.22);
   vec3 wetCol = mix(moistened, wetAlb, 0.18);
   vec3 albedo = mix(dryAlb, wetCol, wetMask);
 
@@ -150,7 +164,7 @@ void main() {
   }
 
   float lookG = clamp(uLookGrain, 0.0, 1.0);
-  float luma = dot(dryAlb, vec3(0.2126, 0.7152, 0.0722));
+  float luma = dot(dryRaw, vec3(0.2126, 0.7152, 0.0722));
   if (!(luma == luma)) luma = 0.5;
   float micro = 1.0 + (luma - 0.5) * lookG * 0.22;
   albedo *= mix(1.0, micro, 1.0 - hardMask * 0.65);

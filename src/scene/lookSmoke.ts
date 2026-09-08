@@ -5,6 +5,7 @@ import {
   contactShadow,
   heightMicroRelief,
   depthTint,
+  liftDrySandAlbedo,
   lookAoSteps,
   lookVignette,
   ridgeAO,
@@ -12,6 +13,7 @@ import {
   trayShadowOpacity,
   waterSpecCap,
   wetDryMask,
+  wetSandAlbedo,
 } from "./look";
 
 function fail(msg: string): never {
@@ -62,6 +64,33 @@ if (damp <= dry) fail("inland moisture should lift the wet mask");
 if (shore <= damp) fail(`shoreline must snap wetter than a damp bank (${shore} vs ${damp})`);
 if (film < 0.55) fail(`thin water at the lip should read wet: ${film}`);
 if (wetDryMask(0.2, 0) < 0.9) fail("soaked sand stays wet inland");
+
+function luma3(r: number, g: number, b: number): number {
+  return r * 0.2126 + g * 0.7152 + b * 0.0722;
+}
+
+const muddyR = 0.62;
+const muddyG = 0.52;
+const muddyB = 0.38;
+const muddyL = luma3(muddyR, muddyG, muddyB);
+const lifted = liftDrySandAlbedo(muddyR, muddyG, muddyB);
+const liftedL = luma3(lifted[0], lifted[1], lifted[2]);
+if (liftedL < muddyL * 1.15 || liftedL > muddyL * 1.26) {
+  fail(`dry lift should be 15–25% (${muddyL} → ${liftedL})`);
+}
+if (lifted[0] / lifted[2] <= muddyR / muddyB) fail("dry lift should be warmer (higher R/B)");
+const bright = liftDrySandAlbedo(0.9, 0.82, 0.64);
+if (bright[0] > 0.96 || bright[1] > 0.96 || bright[2] > 0.96) {
+  fail(`bright grains must not blow out: ${bright}`);
+}
+if (bright[0] < 0.82) fail(`bright grains should stay bright: ${bright}`);
+const wetCol = wetSandAlbedo(muddyR, muddyG, muddyB, 0.34, 0.27, 0.22);
+const wetL = luma3(wetCol[0], wetCol[1], wetCol[2]);
+if (wetL >= liftedL * 0.55) fail(`wet blend must stay darker than lifted dry (${wetL} vs ${liftedL})`);
+const wetFromLifted = wetSandAlbedo(lifted[0], lifted[1], lifted[2], 0.34, 0.27, 0.22);
+if (wetL >= luma3(wetFromLifted[0], wetFromLifted[1], wetFromLifted[2]) - 1e-6) {
+  fail("wet blend should use the unlifted dry, not the beach lift");
+}
 
 const flatGrain = albedoMicroGrain(0.5, 0.55);
 const brightGrain = albedoMicroGrain(0.72, 0.55);
@@ -121,6 +150,7 @@ if (highDesk <= medMobile) fail("desktop High may spec more than mobile Medium")
 
 console.log("lookSmoke ok", {
   wet: { dry, damp, shore, film },
+  dryLift: { muddyL, liftedL, wetL, lifted, bright },
   grain: { flatGrain, brightGrain, darkGrain },
   ao: { flatAo, valleyAo, blocked },
   tint: { filmTint, deepTint, poolTint },

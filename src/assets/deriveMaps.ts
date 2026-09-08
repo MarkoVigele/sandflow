@@ -235,7 +235,7 @@ export function gradeSandRgba(
   mr /= n;
   mg /= n;
   mb /= n;
-  const target = kind === "dry" ? [198, 164, 116] : [88, 70, 56];
+  const target = kind === "dry" ? [228, 198, 142] : [88, 70, 56];
   const pull = kind === "dry" ? 0.12 : 0.16;
   const sr = mr + (target[0]! - mr) * pull;
   const sg = mg + (target[1]! - mg) * pull;
