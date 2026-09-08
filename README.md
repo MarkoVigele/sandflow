@@ -53,8 +53,9 @@ Zusätzliche Werkzeuge: **Feststampfen** (Kohäsion lokal), **Rinne** vorzeichne
 ## Performance
 
 - **Mittel** ist die Vorgabe auf dem Telefon, **Hoch** am Rechner.
-- **Auto** bleibt an, bis eine feste Stufe gewählt wird. Unter 25 Bildern/s rutscht die Qualität eine Stufe tiefer (Toast).
-- Gitter: Niedrig 128², Mittel 256², Hoch/Ultra 512². Pixelverhältnis und sichtbare Strömungspartikel steigen mit der Stufe (Niedrig 0, Mittel ~⅓, Hoch ~¾, Ultra voll). Schatten ab Hoch. Kontakt-AO, Mikro-Korn und Wasserspiegelungen folgen derselben Qualitätsstufe — Niedrig bleibt mobil-sicher (kein Schattenmarsch, gedämpftes Specular).
+- **Auto** bleibt an, bis eine feste Stufe gewählt wird. Unter 40 Bildern/s für zwei Sekunden rutscht die Qualität eine Stufe tiefer (Toast).
+- Gitter: Niedrig 128², Mittel 256², Hoch 512², Ultra 768². Partikel (0 / 80 / 180 / voll), Schatten (aus / aus / 1024 / 2048) und Pixelverhältnis (1 / 1,25 / 1,5 / 2) folgen der Stufe. Kontakt-AO, Mikro-Korn und Wasserspiegelungen ebenfalls — Niedrig bleibt mobil-sicher (kein Schattenmarsch, gedämpftes Specular).
+- Der Sim-Worker hält höchstens einen Schritt in der Luft; hinterher wird nicht aufgeholt. Auf dem iPhone/iPad pausiert die Schleife im Hintergrund-Tab, damit WebKit den WebGL-Kontext nicht wegnimmt.
 - Texturen: Mittel/Niedrig bleiben bei 512er- (bzw. 256er-) Karten und niedriger Anisotropie, damit ein Qualitätswechsel die Albedo nicht neu ableitet.
 - Wenn es hakelt: Qualität senken, Tempo auf 0,5×, weniger Quellen, Ultra meiden.
 

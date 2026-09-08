@@ -1,4 +1,5 @@
 import { ErosionSim } from "./erosionCore";
+import { MAX_PARTICLES } from "./flowFx";
 import { resampleMask } from "./mapsContract";
 import { resampleHeight } from "./presets";
 import type { WorkerIn, WorkerOut } from "./types";
@@ -7,6 +8,11 @@ import { DEFAULT_PARAMS } from "../state/types";
 let sim: ErosionSim | null = null;
 let lastPourEmit = 0;
 let hardDirty = true;
+let particleBudget = MAX_PARTICLES;
+
+function applyParticleBudget(target: ErosionSim | null = sim): void {
+  if (target) target.particleBudget = particleBudget;
+}
 
 function post(msg: WorkerOut, transfer: Transferable[] = []): void {
   (self as unknown as Worker).postMessage(msg, transfer);
@@ -71,8 +77,15 @@ self.onmessage = (ev: MessageEvent<WorkerIn>) => {
       if (msg.hardmask) sim.hardmask.set(msg.hardmask);
       sim.sources = msg.sources.map((s) => ({ ...s }));
       sim.erodedSand = 0;
+      applyParticleBudget(sim);
       hardDirty = true;
       emitFrame();
+      break;
+    }
+    case "setQuality": {
+      const n = Number.isFinite(msg.particles) ? Math.max(0, Math.round(msg.particles)) : 0;
+      particleBudget = Math.min(MAX_PARTICLES, n);
+      applyParticleBudget();
       break;
     }
     case "step": {
@@ -154,6 +167,7 @@ self.onmessage = (ev: MessageEvent<WorkerIn>) => {
       if (msg.hardmask) sim.hardmask.set(msg.hardmask);
       else if (oldHard && oldSize) sim.hardmask.set(resampleMask(oldHard, oldSize, nextSize));
       sim.sources = msg.sources.map((s) => ({ ...s }));
+      applyParticleBudget(sim);
       hardDirty = true;
       emitFrame();
       break;

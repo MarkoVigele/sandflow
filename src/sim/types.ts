@@ -26,6 +26,7 @@ export type WorkerIn =
     }
   | { type: "step"; steps: number }
   | { type: "setParams"; params: Partial<SimParams> }
+  | { type: "setQuality"; particles: number }
   | {
       type: "brush";
       kind: BrushKind;

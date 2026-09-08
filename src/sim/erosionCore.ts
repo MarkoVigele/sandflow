@@ -67,6 +67,8 @@ export class ErosionSim {
   hardmask: Float32Array;
   sources: WaterSource[] = [];
   erodedSand = 0;
+  /** Quality cap. 0 skips foam + FX packing. */
+  particleBudget = MAX_PARTICLES;
   private waterDelta: Float32Array;
   private sedDelta: Float32Array;
   private terrDelta: Float32Array;
@@ -752,14 +754,17 @@ export class ErosionSim {
 
   collectParticles(): Float32Array {
     this.advanceFlowFx();
+    const cap = Math.max(0, Math.min(MAX_PARTICLES, this.particleBudget | 0));
+    if (cap <= 0) return new Float32Array(0);
     const { size } = this;
     const n = size * size;
     const scan = size > 300 ? 3 : 2;
+    const foamCap = Math.min(MAX_FOAM, cap);
     const foam: number[] = [];
-    for (let i = 0; i < n && foam.length < MAX_FOAM; i += scan) {
+    for (let i = 0; i < n && foam.length < foamCap; i += scan) {
       if (this.flow[i] > 0.016 && this.water[i] > 0.004) foam.push(i);
     }
-    const count = Math.min(MAX_PARTICLES, foam.length + this.fxN);
+    const count = Math.min(cap, foam.length + this.fxN);
     const out = new Float32Array(count * PARTICLE_STRIDE);
     let w = 0;
     for (let k = 0; k < foam.length && w < count; k++) {

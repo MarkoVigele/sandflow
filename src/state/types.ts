@@ -77,7 +77,7 @@ export const QUALITY_GRID: Record<QualityId, number> = {
   low: 128,
   medium: 256,
   high: 512,
-  ultra: 512,
+  ultra: 768,
 };
 
 /** Preset bed height. Relief exaggerates deviation so the slab does not lift into the camera. */

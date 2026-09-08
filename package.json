@@ -16,7 +16,8 @@
     "pins:smoke": "npx --yes vite-node src/ui/sourcePinsSmoke.ts",
     "share:smoke": "npx --yes vite-node src/state/shareSmoke.ts",
     "assets:smoke": "npx --yes vite-node src/assets/textureMapsSmoke.ts",
-    "water:smoke": "npx --yes vite-node src/scene/waterQualitySmoke.ts && npx --yes vite-node src/scene/lookSmoke.ts",
+    "water:smoke": "npx --yes vite-node src/scene/waterQualitySmoke.ts && npx --yes vite-node src/scene/lookSmoke.ts && npx --yes vite-node src/state/qualitySmoke.ts",
+    "quality:smoke": "npx --yes vite-node src/state/qualitySmoke.ts",
     "look:smoke": "npx --yes vite-node src/scene/lookSmoke.ts",
     "flowfx:smoke": "npx --yes vite-node src/sim/flowFxSmoke.ts",
     "vision:smoke": "npx --yes vite-node src/ui/visionSmoke.ts"
