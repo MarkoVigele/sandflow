@@ -13,7 +13,7 @@ void main() {
     // Bedload grain: small warm speck sitting in the sheet.
     float core = smoothstep(1.0, 0.12, r2);
     float a = core * 0.42 * mix(0.45, 1.0, life);
-    vec3 col = mix(vec3(0.46, 0.36, 0.24), vec3(0.70, 0.58, 0.40), core);
+    vec3 col = mix(vec3(0.50, 0.40, 0.24), vec3(0.84, 0.70, 0.44), core);
     gl_FragColor = vec4(col, a);
     return;
   }

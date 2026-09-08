@@ -32,6 +32,70 @@ function mix(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+function mix3(
+  a: readonly [number, number, number],
+  b: readonly [number, number, number],
+  t: number,
+): [number, number, number] {
+  return [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)];
+}
+
+/** Warm beach gain on dry albedo. Blue is lifted less so gray-brown recedes. */
+export const DRY_SAND_LIFT = [1.22, 1.2, 1.1] as const;
+/** Soft-knee start; peaks above this compress instead of clipping. */
+export const DRY_SAND_KNEE = 0.86;
+export const DRY_SAND_KNEE_AMT = 0.55;
+export const DRY_SAND_PEAK = 0.96;
+
+/**
+ * Lift dry sand ~15–25% toward warm beach sand.
+ * Soft-knee keeps bright grains readable. Shaders use the same numbers.
+ */
+export function liftDrySandAlbedo(
+  r: number,
+  g: number,
+  b: number,
+): [number, number, number] {
+  const rr = Number.isFinite(r) ? r : 0.7;
+  const gg = Number.isFinite(g) ? g : 0.58;
+  const bb = Number.isFinite(b) ? b : 0.4;
+  let lr = rr * DRY_SAND_LIFT[0];
+  let lg = gg * DRY_SAND_LIFT[1];
+  let lb = bb * DRY_SAND_LIFT[2];
+  const peak = Math.max(lr, lg, lb);
+  const knee = Math.max(peak - DRY_SAND_KNEE, 0);
+  const scale = peak > 1e-5 ? (peak - knee * DRY_SAND_KNEE_AMT) / peak : 1;
+  lr = Math.min(DRY_SAND_PEAK, lr * scale);
+  lg = Math.min(DRY_SAND_PEAK, lg * scale);
+  lb = Math.min(DRY_SAND_PEAK, lb * scale);
+  return [lr, lg, lb];
+}
+
+/**
+ * Wet color from the *unlifted* dry sample plus a little wet albedo.
+ * Keeps the waterline darker after the dry lift.
+ */
+export function wetSandAlbedo(
+  dryR: number,
+  dryG: number,
+  dryB: number,
+  wetR: number,
+  wetG: number,
+  wetB: number,
+): [number, number, number] {
+  const moist: [number, number, number] = [
+    (Number.isFinite(dryR) ? dryR : 0.7) * 0.34,
+    (Number.isFinite(dryG) ? dryG : 0.58) * 0.28,
+    (Number.isFinite(dryB) ? dryB : 0.4) * 0.22,
+  ];
+  const wet: [number, number, number] = [
+    Number.isFinite(wetR) ? wetR : moist[0],
+    Number.isFinite(wetG) ? wetG : moist[1],
+    Number.isFinite(wetB) ? wetB : moist[2],
+  ];
+  return mix3(moist, wet, 0.18);
+}
+
 /**
  * Cheap screen-space bump from height derivatives (dFdx/dFdy of the bed).
  * Strength 0 is a no-op so Low can skip the mix.
