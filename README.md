@@ -64,7 +64,7 @@ JSON (Speichern) nimmt Höhe, Wasser, Quellen und Materialparameter in voller Ge
 
 Gegen die ursprüngliche V1-Skizze ist der spielbare Kern gewachsen. Neu bzw. fest verdrahtet:
 
-- Wasser mit SWE-ähnlicher Kontinuität (Impuls, Trägheit, Wellenfronten). Flaches, lesbares Wasser über dem Bett; Schaum nur an Turbulenz. Transiente Blasen-Cluster an Schub/Stufen, dünne Bedload-Körner in schnellem klarem Fluss. Stehende Pools brennen nicht ein.
+- Wasser über virtuelle Rohre (Mei / O’Brien): Fluxkarte → Geschwindigkeit → Sediment per MacCormack-Advektion. Kapazität im Gleichgewicht (C ∝ sin α · |v|), Erosion nur bei Fluss×Gefälle — stehende Tropfen brennen nicht ein. Nach dem Schnitt rutschen Ufer über den Böschungswinkel (thermisch). Flaches, lesbares Wasser über dem Bett; Wellen-Normalen folgen der Fließrichtung. Schaum nur an Turbulenz. Transiente Blasen-Cluster an Schub/Stufen, dünne Bedload-Körner in schnellem klarem Fluss.
 - Zielring (AimCursor) sitzt auf der verformten Sandoberfläche, nicht auf der flachen Mesh-Ebene.
 - Werkzeuge **Feststampfen**, **Rinne**, **Einebnen**, **Beton** (nicht erodierbar), plus **Kiesel** und **Radierer**.
 - Vorlagen inkl. Referenz-Rinne, dünnen Adern und Beton-Szenen (Kanal, Becken, Treppe, Wehr); Heatmap für Fluss oder Tiefe.

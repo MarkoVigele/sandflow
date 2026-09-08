@@ -14,6 +14,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run sim:smoke
+      - run: npm run hydraulic:smoke
       - run: npm run tools:smoke
       - run: npm run ui:smoke
       - run: npm run share:smoke

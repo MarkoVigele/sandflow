@@ -90,8 +90,11 @@ void main() {
     vec2(0.72, 0.42)
   );
   vec2 fdir2 = vec2(-fdir.y, fdir.x);
-  float flAmp = (0.35 + depth * 0.65) * (0.45 + flow * 1.4);
-  float rip = sin(dot(vUv, fdir) * 22.0 + uTime * 1.55 + flow * 4.2) * 0.012 * flAmp;
+  float spd = clamp(flow * 2.6, 0.0, 1.0);
+  vec2 vel = fdir * spd;
+  float flAmp = (0.38 + depth * 0.72) * (0.4 + flow * 1.65);
+  float along = dot(vUv, fdir);
+  float rip = sin(along * 22.0 + uTime * 1.55 + flow * 4.2) * 0.012 * flAmp;
   if (uWaveOctaves > 1.5) {
     rip += sin(dot(vUv, fdir2) * 37.0 - uTime * 1.85) * 0.007 * flAmp;
   }
@@ -102,8 +105,12 @@ void main() {
     rip += sin((vUv.x * 1.6 - vUv.y) * 96.0 + uTime * 3.6 + flow * 6.0) * 0.0024 * flAmp;
   }
   rip += vWave * 0.55;
-
-  vec3 N = safeNormalize(vec3(grad.x + rip, 2.0 * dx, grad.y + rip * 0.7), vec3(0.0, 1.0, 0.0));
+  // Flow-velocity normal: derivative of the streamwise ripple.
+  float nRip = cos(along * 28.0 + uTime * 1.7 + flow * 3.2) * 0.02 * flAmp * (0.35 + spd);
+  vec3 N = safeNormalize(
+    vec3(grad.x + rip + nRip * vel.x, 2.0 * dx, grad.y + rip * 0.7 + nRip * vel.y),
+    vec3(0.0, 1.0, 0.0)
+  );
 
   vec3 dpdx = dFdx(vWorldPos);
   vec3 dpdy = dFdy(vWorldPos);

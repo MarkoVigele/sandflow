@@ -71,9 +71,10 @@ void main() {
   float sheet = 0.0;
   float wave = 0.0;
   if (water > 0.0008) {
-    // Lab film with readable depth: beds sit higher than thin veins.
-    float body = min(water, 0.14);
-    sheet = 0.0035 + body * 0.22 + min(vFlow, 0.22) * 0.008;
+    // Readable depth: thin films stay a lab sheet; carved beds lift more.
+    float body = min(water, 0.16);
+    float deep = smoothstep(0.018, 0.09, water);
+    sheet = 0.0038 + body * 0.26 + deep * 0.006 + min(vFlow, 0.22) * 0.012;
     wave = flowWave(uv, water, vFlow);
     sheet += wave;
   }

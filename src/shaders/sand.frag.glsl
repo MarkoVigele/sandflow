@@ -144,8 +144,8 @@ void main() {
   spec = min(spec, 0.09);
 
   vec3 color = albedo * (uAmbient * ao + uSunColor * wrap * shade) + uSunColor * spec * shade;
-  float underWater = smoothstep(0.002, 0.05, water);
-  color = mix(color, color * vec3(0.78, 0.68, 0.54), underWater * 0.38);
+  float underWater = smoothstep(0.002, 0.055, water);
+  color = mix(color, color * vec3(0.74, 0.64, 0.50), underWater * 0.42);
 
   if (uHeatMode > 0.5) {
     float flow = maps.a;

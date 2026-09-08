@@ -138,7 +138,7 @@ export function flowWaveAmp(depth: number, flow: number, displace: number): numb
   if (displace <= 0) return 0;
   const body = smoothstep(0.005, 0.05, Number.isFinite(depth) ? depth : 0);
   const fl = Number.isFinite(flow) ? Math.min(0.4, Math.max(0, flow)) : 0;
-  return displace * body * (0.28 + fl * 2.4);
+  return displace * body * (0.3 + fl * 2.55);
 }
 
 function smoothstep(e0: number, e1: number, x: number): number {
