@@ -78,7 +78,12 @@ const liftedL = luma3(lifted[0], lifted[1], lifted[2]);
 if (liftedL < muddyL * 1.15 || liftedL > muddyL * 1.26) {
   fail(`dry lift should be 15–25% (${muddyL} → ${liftedL})`);
 }
-if (lifted[0] / lifted[2] <= muddyR / muddyB) fail("dry lift should be warmer (higher R/B)");
+if (lifted[0] / lifted[2] >= muddyR / muddyB + 0.02) {
+  fail("dry lift must not go more orange than the muddy source");
+}
+if (lifted[0] <= lifted[2] || lifted[1] <= lifted[2] * 1.15) {
+  fail("lifted dry should stay warm cream (R and G above B)");
+}
 const bright = liftDrySandAlbedo(0.9, 0.82, 0.64);
 if (bright[0] > 0.96 || bright[1] > 0.96 || bright[2] > 0.96) {
   fail(`bright grains must not blow out: ${bright}`);

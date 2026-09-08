@@ -40,17 +40,17 @@ function mix3(
   return [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)];
 }
 
-/** Warm beach gain on dry albedo. Green leads so it goes cream-gold, not burnt orange. */
-export const DRY_SAND_LIFT = [1.18, 1.21, 1.14] as const;
+/** Beach gain on dry albedo. Blue/green lead so warm sun does not turn it burnt orange. */
+export const DRY_SAND_LIFT = [1.15, 1.2, 1.28] as const;
 /** Small cream bias so dark grains lift with the base, not just the highlights. */
-export const DRY_SAND_CREAM = [0.025, 0.022, 0.014] as const;
+export const DRY_SAND_CREAM = [0.018, 0.024, 0.032] as const;
 /** Soft-knee start; peaks above this compress instead of clipping. */
 export const DRY_SAND_KNEE = 0.86;
 export const DRY_SAND_KNEE_AMT = 0.55;
 export const DRY_SAND_PEAK = 0.96;
 
 /**
- * Lift dry sand ~15–25% toward warm beach sand.
+ * Lift dry sand ~15–25% toward cream-gold beach sand.
  * Soft-knee keeps bright grains readable. Shaders use the same numbers.
  */
 export function liftDrySandAlbedo(
