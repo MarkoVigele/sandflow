@@ -1,8 +1,9 @@
 import type { Store } from "../state/store";
 import type { ToolId } from "../state/types";
 import { ICONS } from "./icons";
+import { isOnboardHint } from "./onboard";
 import { SOURCE_TOOL_TIP } from "./sourceGesture";
-import { TOOLBAR_TOOLS } from "./tools";
+import { TOOLBAR_TOOLS, toolHotkeyDigit } from "./tools";
 
 export class Toolbar {
   el: HTMLElement;
@@ -23,15 +24,19 @@ export class Toolbar {
     const { tool, cameraMode, onboardStep } = this.store.state;
     this.el.innerHTML = `
       <div class="toolbar-inner" role="toolbar" aria-label="Werkzeuge">
-        ${TOOLBAR_TOOLS.map(
-          (t) => `
-          <button class="tool ${tool === t.id && !cameraMode ? "is-active" : ""} ${hintClass(t.id, onboardStep)}" data-tool="${t.id}" title="${t.id === "source" ? SOURCE_TOOL_TIP : t.hint}" ${t.id === "source" ? `data-source-tip="${SOURCE_TOOL_TIP}"` : ""} aria-pressed="${tool === t.id}">
-            <span class="icon">${ICONS[t.id]}</span>
+        ${TOOLBAR_TOOLS.map((t) => {
+          const digit = toolHotkeyDigit(t.id);
+          const shortcut = digit ? ` Taste ${digit}` : letterHint(t.id);
+          const hint = t.id === "source" ? SOURCE_TOOL_TIP : t.hint;
+          const label = `${t.label}. ${hint}.${shortcut}`;
+          return `
+          <button type="button" class="tool ${tool === t.id && !cameraMode ? "is-active" : ""} ${isOnboardHint(t.id, onboardStep) ? "is-hint" : ""}" data-tool="${t.id}" title="${hint}${shortcut}" ${t.id === "source" ? `data-source-tip="${SOURCE_TOOL_TIP}"` : ""} aria-label="${escapeAttr(label)}" aria-pressed="${tool === t.id && !cameraMode}"${digit ? ` aria-keyshortcuts="${digit}"` : ""}>
+            <span class="icon" aria-hidden="true">${ICONS[t.id]}</span>
             <span class="tool-label">${t.label}</span>
-          </button>`,
-        ).join("")}
-        <button class="tool ${cameraMode ? "is-active" : ""}" data-cam="1" title="Mit einem Finger drehen. Quellenstifte bleiben greifbar." aria-pressed="${cameraMode}">
-          <span class="icon">${ICONS.camera}</span>
+          </button>`;
+        }).join("")}
+        <button type="button" class="tool ${cameraMode ? "is-active" : ""} ${isOnboardHint("camera", onboardStep) ? "is-hint" : ""}" data-cam="1" title="Mit einem Finger drehen. Quellenstifte bleiben greifbar." aria-label="Kamera. Ein-Finger-Orbit. Quellenstifte bleiben greifbar." aria-pressed="${cameraMode}">
+          <span class="icon" aria-hidden="true">${ICONS.camera}</span>
           <span class="tool-label">Kamera</span>
         </button>
       </div>
@@ -47,8 +52,13 @@ export class Toolbar {
   }
 }
 
-function hintClass(id: string, step: number): string {
-  if (step === 1 && (id === "pile" || id === "dig" || id === "groove" || id === "flatten" || id === "stone")) return "is-hint";
-  if (step === 2 && id === "source") return "is-hint";
+function letterHint(id: string): string {
+  if (id === "concrete") return " Taste B";
+  if (id === "stone") return " Taste K";
+  if (id === "erase") return " Taste R";
   return "";
+}
+
+function escapeAttr(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }

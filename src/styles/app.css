@@ -131,6 +131,29 @@ body {
 .menu button:hover { background: rgba(212, 180, 131, 0.12); color: var(--sand); }
 .btn.primary { background: #3d3224; color: var(--sand); }
 .btn:disabled, .icon-btn:disabled, .menu button:disabled { opacity: 0.4; cursor: default; }
+.tool:focus-visible,
+.icon-btn:focus-visible,
+.chip:focus-visible,
+.btn:focus-visible,
+.seg-btn:focus-visible,
+.adv-toggle:focus-visible,
+.stats-toggle:focus-visible,
+.menu button:focus-visible,
+.card:focus-visible,
+.quality select:focus-visible,
+.field input:focus-visible,
+.field select:focus-visible,
+.slider input:focus-visible,
+.speed input:focus-visible {
+  outline: 2px solid var(--sand);
+  outline-offset: 2px;
+}
+.tool:focus:not(:focus-visible),
+.icon-btn:focus:not(:focus-visible),
+.chip:focus:not(:focus-visible),
+.btn:focus:not(:focus-visible) {
+  outline: none;
+}
 
 .viewport { grid-area: view; position: relative; min-width: 0; min-height: 0; }
 .viewport canvas { width: 100%; height: 100%; display: block; touch-action: none; }

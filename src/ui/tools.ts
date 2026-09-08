@@ -233,3 +233,8 @@ export const LETTER_HOTKEYS: Partial<Record<string, ToolId>> = {
   k: "stone",
   r: "erase",
 };
+
+export function toolHotkeyDigit(id: ToolId): number | null {
+  const i = TOOL_HOTKEYS.indexOf(id);
+  return i >= 0 ? i + 1 : null;
+}

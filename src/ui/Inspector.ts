@@ -22,7 +22,7 @@ function slider(
   return `
     <label class="slider">
       <span>${name}<em>${format(value)}</em></span>
-      <input type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-key="${key}" />
+      <input type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-key="${key}" aria-label="${name}" />
     </label>`;
 }
 
@@ -43,7 +43,7 @@ export class Inspector {
     let sig = "";
     store.subscribe(() => {
       const st = store.state;
-      const next = `${st.tool}|${st.advancedOpen}|${st.selectedSourceId}|${st.galleryOpen}|${st.heatmap}|${st.sectionOpen}`;
+      const next = `${st.tool}|${st.advancedOpen}|${st.selectedSourceId}|${st.galleryOpen}|${st.heatmap}|${st.sectionOpen}|${st.brushRadius}`;
       if (next !== sig) {
         sig = next;
         this.render();
