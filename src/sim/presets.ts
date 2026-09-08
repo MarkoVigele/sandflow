@@ -116,6 +116,46 @@ export function sourceSitsOnTerrain(
   return true;
 }
 
+/** OrbitControls window: distance 3.2–15, polar 0.22–π/2−0.14, target on the tray. */
+export function cameraLooksAtTray(camera: CameraPose): boolean {
+  const [px, py, pz] = camera.position;
+  const [tx, ty, tz] = camera.target;
+  if (![px, py, pz, tx, ty, tz].every((n) => Number.isFinite(n))) return false;
+  const dist = Math.hypot(px - tx, py - ty, pz - tz);
+  if (dist < 3.2 || dist > 15) return false;
+  const polar = Math.acos(Math.min(1, Math.max(-1, (py - ty) / dist)));
+  if (polar < 0.22 || polar > Math.PI / 2 - 0.14) return false;
+  if (Math.abs(tx) > 2 || Math.abs(tz) > 2.4) return false;
+  if (ty < 0.05 || ty > 1.4) return false;
+  return true;
+}
+
+function plantSources(
+  terrain: Float32Array,
+  sources: WaterSource[],
+  hardmask?: Float32Array,
+): WaterSource[] {
+  const size = Math.round(Math.sqrt(terrain.length));
+  return sources.map((s) => {
+    const p = placeSourceOnTerrain(terrain, hardmask, size, s.x, s.y);
+    return { ...s, x: p.x, y: p.y };
+  });
+}
+
+function showcase(def: PresetDef): PresetDef {
+  return {
+    ...def,
+    build(size) {
+      const built = def.build(size);
+      return {
+        terrain: built.terrain,
+        hardmask: built.hardmask,
+        sources: plantSources(built.terrain, built.sources, built.hardmask),
+      };
+    },
+  };
+}
+
 function rim(terrain: Float32Array, size: number, openDown = false): void {
   const edge = Math.max(3, Math.round(size * 0.03));
   for (let y = 0; y < size; y++) {
@@ -209,11 +249,11 @@ function carveChannel(
   }
 }
 
-export const PRESETS: PresetDef[] = [
+const PRESET_DEFS: PresetDef[] = [
   {
     id: "flat",
     title: "Flache Wanne",
-    blurb: "Ebenes Sandbett, eine Quelle oben in der Mitte. Gut, um zu sehen, wie sich Adern von allein suchen.",
+    blurb: "Eine Quelle oben. Adern entstehen von allein.",
     camera: { position: [6.4, 5.6, 6.8], target: [0, 0.55, 0] },
     build(size) {
       const terrain = new Float32Array(size * size);
@@ -229,9 +269,27 @@ export const PRESETS: PresetDef[] = [
     },
   },
   {
+    id: "heller-strand",
+    title: "Heller Strand",
+    blurb: "Helles, flaches Bett. Sanfte Quelle, dünne Adern.",
+    camera: { position: [5.6, 6.4, 6.2], target: [0, 0.42, 0.15] },
+    build(size) {
+      const terrain = new Float32Array(size * size);
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const v = y / (size - 1);
+          terrain[idx(x, y, size)] = BASE + 0.08 + (1 - v) * 0.1;
+        }
+      }
+      grain(terrain, size, 0.01, 7);
+      rim(terrain, size, true);
+      return { terrain, sources: [source("s-strand", 0.5, 0.16, 1.05)] };
+    },
+  },
+  {
     id: "slope",
     title: "Sanfte Schräge",
-    blurb: "Leichtes Gefälle von oben nach unten. Wasser bleibt in der Spur, gräbt aber tiefer nach.",
+    blurb: "Gefälle von oben. Wasser bleibt in der Spur und gräbt nach.",
     camera: { position: [5.8, 5.8, 6.6], target: [0, 0.5, 0.2] },
     build(size) {
       const terrain = new Float32Array(size * size);
@@ -249,7 +307,7 @@ export const PRESETS: PresetDef[] = [
   {
     id: "bed",
     title: "Vorgegrabenes Bett",
-    blurb: "Ein flaches Rinnsal liegt schon da. Wasser folgt erst, dann frisst es Ufer und verzweigt sich.",
+    blurb: "Ein Rinnsal liegt schon da. Ufer werden später angefressen.",
     camera: { position: [0.4, 5.2, -6.4], target: [0, 0.4, 1.1] },
     build(size) {
       const terrain = new Float32Array(size * size);
@@ -272,7 +330,7 @@ export const PRESETS: PresetDef[] = [
   {
     id: "meet",
     title: "Zwei Quellen",
-    blurb: "Zwei Zuläufe treffen sich in einer Mulde. Ablagerung und Überlauf entstehen von allein.",
+    blurb: "Zwei Zuläufe treffen sich in einer Mulde.",
     camera: { position: [5.4, 6.2, 6.6], target: [0, 0.4, 0.8] },
     build(size) {
       const terrain = new Float32Array(size * size);
@@ -300,9 +358,34 @@ export const PRESETS: PresetDef[] = [
     },
   },
   {
+    id: "quellen-ziehen",
+    title: "Quellen ziehen",
+    blurb: "Drei Pins. Tippen wählt, Ziehen verschiebt.",
+    camera: { position: [2.8, 7.8, 6.2], target: [0, 0.4, 0.15] },
+    build(size) {
+      const terrain = new Float32Array(size * size);
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const v = y / (size - 1);
+          terrain[idx(x, y, size)] = BASE + 0.04 + (1 - v) * 0.22;
+        }
+      }
+      grain(terrain, size, 0.014, 23);
+      rim(terrain, size, true);
+      return {
+        terrain,
+        sources: [
+          source("s-pin-a", 0.26, 0.22, 1.15),
+          source("s-pin-b", 0.5, 0.14, 1.15),
+          source("s-pin-c", 0.74, 0.26, 1.15),
+        ],
+      };
+    },
+  },
+  {
     id: "canyon",
     title: "Mini-Canyon",
-    blurb: "Steile Wände, tiefes Bett. Eine Quelle oben — das Wasser bleibt im Schlitz.",
+    blurb: "Steile Wände, tiefes Bett. Wasser bleibt im Schlitz.",
     camera: { position: [5.8, 3.7, 5.4], target: [0, 0.28, 0.1] },
     build(size) {
       const terrain = new Float32Array(size * size);
@@ -326,8 +409,8 @@ export const PRESETS: PresetDef[] = [
   },
   {
     id: "delta",
-    title: "Delta / Verzweigung",
-    blurb: "Ein Zulauf teilt sich in mehrere Arme. Gut, um Verzweigung und Ablagerung zu sehen.",
+    title: "Delta",
+    blurb: "Ein Zulauf teilt sich in mehrere Arme.",
     camera: { position: [3.1, 7.2, 5.9], target: [0, 0.28, 0.45] },
     build(size) {
       const terrain = new Float32Array(size * size);
@@ -349,7 +432,7 @@ export const PRESETS: PresetDef[] = [
   {
     id: "referenz",
     title: "Referenz-Rinne",
-    blurb: "Tiefes, klares Bett wie in der Referenz: Wasser hat eine Spur, Ufer bleiben stehen.",
+    blurb: "Tiefes, klares Bett als Vergleichsspur.",
     camera: { position: [0.15, 4.9, -6.2], target: [0, 0.38, 1.2] },
     build(size) {
       const terrain = new Float32Array(size * size);
@@ -374,7 +457,7 @@ export const PRESETS: PresetDef[] = [
   {
     id: "veins",
     title: "Dünne Adern",
-    blurb: "Viele feine Rinnen auf der Schräge. Wasser sucht sich die dünnen Adern.",
+    blurb: "Viele feine Rinnen auf der Schräge.",
     camera: { position: [5.2, 6.5, 6.2], target: [0, 0.42, 0.15] },
     build(size) {
       const terrain = new Float32Array(size * size);
@@ -412,7 +495,7 @@ export const PRESETS: PresetDef[] = [
   {
     id: "betonkanal",
     title: "Betonkanal",
-    blurb: "Labor-Rinne: Betonwände, Sandsohle, eine Quelle oben. Wasser bleibt in der Spur — die Wände erodieren nicht.",
+    blurb: "Betonwände, Sandsohle. Die Wände erodieren nicht.",
     camera: { position: [0.2, 4.7, -6.15], target: [0, 0.42, 1.05] },
     build(size) {
       const terrain = new Float32Array(size * size);
@@ -458,13 +541,13 @@ export const PRESETS: PresetDef[] = [
         }
       }
       rim(terrain, size, true);
-      return { terrain, hardmask: hard, sources: [source("s-flume", 0.5, 0.07, 2.15)] };
+      return { terrain, hardmask: hard, sources: [source("s-flume", 0.5, 0.12, 2.15)] };
     },
   },
   {
     id: "auffangbecken",
     title: "Delta ins Becken",
-    blurb: "Sanddelta läuft in ein Beton-Auffangbecken. Wände bleiben stehen, im Becken lagert sich Sand ab.",
+    blurb: "Sanddelta läuft in ein Betonbecken.",
     camera: { position: [3.4, 7.0, 5.6], target: [0, 0.32, 0.55] },
     build(size) {
       const terrain = new Float32Array(size * size);
@@ -506,7 +589,7 @@ export const PRESETS: PresetDef[] = [
   {
     id: "treppenueberlauf",
     title: "Treppenüberlauf",
-    blurb: "Gestufte Beton-Kaskade, unten ein Sandfang. Die Stufen bleiben, der Sand darunter arbeitet.",
+    blurb: "Betonkaskade, unten ein Sandfang.",
     camera: { position: [5.6, 5.4, 5.2], target: [0, 0.38, 0.35] },
     build(size) {
       const terrain = new Float32Array(size * size);
@@ -552,7 +635,7 @@ export const PRESETS: PresetDef[] = [
   {
     id: "betonwehr",
     title: "Betonwehr",
-    blurb: "Ein Betonwehr quert die Sandstrecke. Oben staut sich Wasser, der Überlauf frisst unten weiter.",
+    blurb: "Wehr quert die Strecke. Überlauf nagt darunter.",
     camera: { position: [5.5, 5.8, 6.1], target: [0, 0.4, 0.25] },
     build(size) {
       const terrain = new Float32Array(size * size);
@@ -596,7 +679,7 @@ export const PRESETS: PresetDef[] = [
   {
     id: "regen-hang",
     title: "Regenhang",
-    blurb: "Schräge unter Regen. Betonrinnen fangen das Wasser — erst Adern, unten eine Pfütze. Die Rinnen bleiben stehen.",
+    blurb: "Regen auf der Schräge. Betonrinnen, unten eine Pfütze.",
     camera: { position: [5.4, 6.4, 6.0], target: [0, 0.4, 0.2] },
     build(size) {
       const terrain = new Float32Array(size * size);
@@ -656,7 +739,7 @@ export const PRESETS: PresetDef[] = [
   {
     id: "staudamm",
     title: "Staudamm",
-    blurb: "Betonstaumauer quer durchs Tal. Oben staut sich ein See, der Überlauf nagt unten am Sand.",
+    blurb: "Staumauer, See oben. Überlauf nagt am Sand.",
     camera: { position: [5.6, 5.9, 5.8], target: [0, 0.42, 0.2] },
     build(size) {
       const terrain = new Float32Array(size * size);
@@ -701,6 +784,8 @@ export const PRESETS: PresetDef[] = [
     },
   },
 ];
+
+export const PRESETS: PresetDef[] = PRESET_DEFS.map(showcase);
 
 export function getPreset(id: string): PresetDef {
   if (id === "beton-kanal") return PRESETS.find((p) => p.id === "betonkanal") ?? PRESETS[0];

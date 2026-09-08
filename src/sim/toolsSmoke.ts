@@ -10,7 +10,7 @@ import {
   stoneIslandUvRadius,
 } from "./mapsContract";
 import { ErosionSim } from "./erosionCore";
-import { PRESETS, getPreset, sourceSitsOnTerrain } from "./presets";
+import { PRESETS, cameraLooksAtTray, getPreset, sourceSitsOnTerrain } from "./presets";
 import type { SimSnapshot } from "./SimClient";
 
 function fail(msg: string): never {
@@ -152,6 +152,8 @@ const needed = [
   "betonwehr",
   "regen-hang",
   "staudamm",
+  "heller-strand",
+  "quellen-ziehen",
 ];
 for (const id of needed) {
   const p = getPreset(id);
@@ -166,7 +168,7 @@ for (const id of needed) {
     min = Math.min(min, built.terrain[i]);
     max = Math.max(max, built.terrain[i]);
   }
-  if (max - min < 0.12) fail(`Preset ${id} zu flach: ${max - min}`);
+  if (id !== "heller-strand" && max - min < 0.12) fail(`Preset ${id} zu flach: ${max - min}`);
 }
 
 if (getPreset("beton-kanal").id !== "betonkanal") fail("beton-kanal alias fehlt");
@@ -203,9 +205,41 @@ const upStone = resampleMask(stoneMask, 16, 32);
 if (Math.abs(upStone[0] - HARD_STONE) > 1e-6) fail(`resample must keep stone value, got ${upStone[0]}`);
 if (upStone[31] >= HARD_THRESHOLD) fail("empty stone resample stayed hard");
 
+const ids = new Set<string>();
 for (const p of PRESETS) {
   if (!p.camera?.position || !p.camera?.target) fail(`Kamera fehlt: ${p.id}`);
+  if (!cameraLooksAtTray(p.camera)) fail(`Kamera schaut nicht auf die Wanne: ${p.id}`);
+  if (ids.has(p.id)) fail(`Preset-ID doppelt: ${p.id}`);
+  ids.add(p.id);
+  if (p.title.length < 4 || p.title.length > 28) fail(`Titel zu lang/kurz: ${p.id} "${p.title}"`);
+  if (p.blurb.length < 16 || p.blurb.length > 120) fail(`Blurb zu lang/kurz: ${p.id}`);
+  const built = p.build(size);
+  if (!built.sources.length) fail(`Preset ${p.id} ohne Quelle`);
+  for (const src of built.sources) {
+    if (!sourceSitsOnTerrain(built.terrain, built.hardmask, size, src)) {
+      fail(`${p.id} source ${src.id} must sit on sand, not rim/hardmask`);
+    }
+  }
 }
+
+const strand = getPreset("heller-strand").build(size);
+if (strand.sources.length !== 1) fail("heller-strand braucht eine sanfte Quelle");
+if (strand.sources[0]!.rate < 0.85 || strand.sources[0]!.rate > 1.25) {
+  fail(`heller-strand rate should be a gentle pour: ${strand.sources[0]!.rate}`);
+}
+
+const pins = getPreset("quellen-ziehen").build(size);
+if (pins.sources.length < 2 || pins.sources.length > 3) {
+  fail(`quellen-ziehen should demo 2–3 pins, got ${pins.sources.length}`);
+}
+let minPin = Infinity;
+for (let i = 0; i < pins.sources.length; i++) {
+  for (let j = i + 1; j < pins.sources.length; j++) {
+    const d = Math.hypot(pins.sources[i]!.x - pins.sources[j]!.x, pins.sources[i]!.y - pins.sources[j]!.y);
+    minPin = Math.min(minPin, d);
+  }
+}
+if (minPin < 0.16) fail(`quellen-ziehen pins too close to drag: ${minPin}`);
 
 const snap: SimSnapshot = {
   size,

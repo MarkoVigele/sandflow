@@ -239,16 +239,22 @@ body {
   width: min(760px, 100%); max-height: min(86vh, 720px); overflow: auto;
   background: var(--panel-solid); border: 1px solid var(--panel-border); border-radius: 16px; padding: 18px;
 }
+.sheet.gallery {
+  width: min(960px, 100%);
+  max-height: min(90vh, 860px);
+}
+.sheet.gallery h2 { margin: 4px 0 0; font-size: 22px; letter-spacing: -0.02em; }
 .sheet-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 16px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }
 .card {
   text-align: left; padding: 12px; border-radius: 12px;
   border: 1px solid var(--panel-border); background: var(--ink); color: var(--text);
-  min-height: 120px; display: flex; flex-direction: column; gap: 6px; cursor: pointer; font: inherit;
+  min-height: 148px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; font: inherit;
 }
 .card.is-active { border-color: var(--sand); }
-.card span { color: var(--muted); font-size: 12px; line-height: 1.35; }
-.card-swatch { height: 44px; border-radius: 8px; display: block; }
+.card-title { font-size: 15px; line-height: 1.25; letter-spacing: -0.01em; }
+.card-blurb, .card span { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.card-swatch { height: 76px; border-radius: 10px; display: block; flex: 0 0 auto; }
 .swatch-flat { background: linear-gradient(#c9a36a, #8a6a3e); }
 .swatch-slope { background: linear-gradient(180deg, #e0c08a, #6b4e2c); }
 .swatch-bed { background: linear-gradient(90deg, #b08950, #3d4f55 45%, #b08950); }
@@ -263,6 +269,14 @@ body {
 .swatch-betonwehr { background: linear-gradient(180deg, #c4a06a 0%, #8d8d88 42%, #8d8d88 56%, #b08950 100%); }
 .swatch-regen-hang { background: repeating-linear-gradient(180deg, #6a8ea0 0 5px, #c4a06a 5px 12px, #8a8a86 12px 15px); }
 .swatch-staudamm { background: linear-gradient(180deg, #4a6a72 0%, #8d8d88 46%, #8d8d88 58%, #b08950 100%); }
+.swatch-heller-strand { background: linear-gradient(180deg, #f3d9a4, #e0c08a 55%, #c9a36a); }
+.swatch-quellen-ziehen {
+  background:
+    radial-gradient(circle at 28% 42%, #efe6d8 0 6px, transparent 7px),
+    radial-gradient(circle at 50% 24%, #efe6d8 0 6px, transparent 7px),
+    radial-gradient(circle at 74% 46%, #efe6d8 0 6px, transparent 7px),
+    linear-gradient(180deg, #e8c98a, #b08950);
+}
 .about p { color: var(--muted); line-height: 1.5; }
 
 .seg {
