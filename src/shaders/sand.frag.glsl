@@ -139,13 +139,13 @@ void main() {
   vec3 wetAlb = mix(wetA, wetB, mixB);
   vec3 nTex = texture2D(uNormal, tile).rgb * 2.0 - 1.0;
   vec2 roughPair = texture2D(uRough, tile).rg;
-  if (!(dryRaw.x == dryRaw.x)) dryRaw = vec3(0.70, 0.58, 0.40);
+  if (!(dryRaw.x == dryRaw.x)) dryRaw = vec3(0.86, 0.78, 0.62);
   if (!(wetAlb.x == wetAlb.x)) wetAlb = dryRaw * vec3(0.50, 0.44, 0.36);
   if (!(nTex.x == nTex.x)) nTex = vec3(0.0, 0.0, 1.0);
   if (!(roughPair.x == roughPair.x)) roughPair = vec2(0.86, 0.30);
 
-  // Dry lift is shader-side so every preset brightens without a new jpg.
-  // Wet stays on the unlifted sample so the waterline keeps contrast.
+  // Baked dry albedo is already cream-gold; this keeps a hue lift so warm sun
+  // does not rust the bed. Wet stays on the unlifted sample for waterline contrast.
   vec3 dryAlb = liftDrySand(dryRaw);
 
   // Sharp wet/dry at the waterline; residual moisture inland stays a softer bank.

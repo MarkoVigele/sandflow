@@ -235,12 +235,13 @@ export function gradeSandRgba(
   mr /= n;
   mg /= n;
   mb /= n;
-  const target = kind === "dry" ? [226, 200, 158] : [88, 70, 56];
-  const pull = kind === "dry" ? 0.12 : 0.16;
+  // Dry target is pale cream-gold so the baked jpg stays bright, not muddy tan.
+  const target = kind === "dry" ? [242, 224, 188] : [88, 70, 56];
+  const pull = kind === "dry" ? 0.28 : 0.16;
   const sr = mr + (target[0]! - mr) * pull;
   const sg = mg + (target[1]! - mg) * pull;
   const sb = mb + (target[2]! - mb) * pull;
-  const contrast = kind === "dry" ? 1.06 : 0.88;
+  const contrast = kind === "dry" ? 1.02 : 0.88;
   const out = new Uint8Array(n * 4);
   for (let i = 0; i < n; i++) {
     const p = i * 4;
@@ -249,8 +250,8 @@ export function gradeSandRgba(
     let b = sb + ((rgba[p + 2] ?? 0) - mb) * contrast;
     const L = luma01(r, g, b);
     const meanL = luma01(sr, sg, sb);
-    if (L < meanL - 0.22) {
-      const t = 0.45;
+    if (L < meanL - 0.16) {
+      const t = kind === "dry" ? 0.55 : 0.45;
       r = r + (sr - r) * t;
       g = g + (sg - g) * t;
       b = b + (sb - b) * t;

@@ -50,7 +50,8 @@ export const DRY_SAND_KNEE_AMT = 0.55;
 export const DRY_SAND_PEAK = 0.96;
 
 /**
- * Lift dry sand ~15–25% toward cream-gold beach sand.
+ * Cream-gold hue lift on dry sand (~15–25% on muddy samples).
+ * The baked dry albedo is already pale; this keeps warm sun from rusting it.
  * Soft-knee keeps bright grains readable. Shaders use the same numbers.
  */
 export function liftDrySandAlbedo(
@@ -58,9 +59,9 @@ export function liftDrySandAlbedo(
   g: number,
   b: number,
 ): [number, number, number] {
-  const rr = Number.isFinite(r) ? r : 0.7;
-  const gg = Number.isFinite(g) ? g : 0.58;
-  const bb = Number.isFinite(b) ? b : 0.4;
+  const rr = Number.isFinite(r) ? r : 0.86;
+  const gg = Number.isFinite(g) ? g : 0.78;
+  const bb = Number.isFinite(b) ? b : 0.62;
   let lr = rr * DRY_SAND_LIFT[0] + DRY_SAND_CREAM[0];
   let lg = gg * DRY_SAND_LIFT[1] + DRY_SAND_CREAM[1];
   let lb = bb * DRY_SAND_LIFT[2] + DRY_SAND_CREAM[2];
@@ -86,9 +87,9 @@ export function wetSandAlbedo(
   wetB: number,
 ): [number, number, number] {
   const moist: [number, number, number] = [
-    (Number.isFinite(dryR) ? dryR : 0.7) * 0.34,
-    (Number.isFinite(dryG) ? dryG : 0.58) * 0.28,
-    (Number.isFinite(dryB) ? dryB : 0.4) * 0.22,
+    (Number.isFinite(dryR) ? dryR : 0.86) * 0.34,
+    (Number.isFinite(dryG) ? dryG : 0.78) * 0.28,
+    (Number.isFinite(dryB) ? dryB : 0.62) * 0.22,
   ];
   const wet: [number, number, number] = [
     Number.isFinite(wetR) ? wetR : moist[0],
