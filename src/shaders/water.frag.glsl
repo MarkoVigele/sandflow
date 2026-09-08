@@ -155,7 +155,7 @@ void main() {
   float waveF = schlick(ndv, fresScale);
   float ssF = schlick(ssFacing, fresScale);
   float fresnel = mix(waveF, ssF, uQuality > 0.5 ? 0.18 : 0.08);
-  fresnel *= mix(0.42, 0.78, depth);
+  fresnel *= mix(0.55, 0.92, depth);
   fresnel = min(fresnel, fresCap);
 
   // Optical depth from the SWE column (color), not the vertex spike.
@@ -166,10 +166,10 @@ void main() {
   vec3 trans = exp(-sigma * optical);
   if (!(trans.x == trans.x)) trans = vec3(0.74, 0.82, 0.84);
 
-  // Films: aqua so rivulets read as water. Pools: teal you can still see through.
-  vec3 film = vec3(0.55, 0.72, 0.74);
-  vec3 shallow = vec3(0.34, 0.54, 0.58);
-  vec3 scatter = vec3(0.26, 0.38, 0.40);
+  // Films: saturated aqua so rivulets read as water, not wet sand.
+  vec3 film = vec3(0.42, 0.70, 0.76);
+  vec3 shallow = vec3(0.22, 0.50, 0.58);
+  vec3 scatter = vec3(0.16, 0.34, 0.40);
   vec3 silt = vec3(0.50, 0.46, 0.38);
   vec3 foamC = vec3(0.94, 0.95, 0.93);
   vec3 wetSand = vec3(0.36, 0.28, 0.20);
@@ -233,18 +233,18 @@ void main() {
   spec = min(spec, specCap);
   float ndl = max(dot(N, L), 0.0);
 
-  vec3 sky = vec3(0.74, 0.82, 0.88);
-  float fresAmt = mix(0.40, 0.56, clamp(uQuality * 0.22, 0.0, 1.0));
-  vec3 color = base * (0.78 + ndl * 0.18) + sky * fresnel * fresAmt + uSunColor * spec * 0.34;
-  float hi = uQuality < 1.5 ? 0.84 : 0.92;
-  color = clamp(color, vec3(0.16), vec3(hi));
+  vec3 sky = vec3(0.62, 0.80, 0.92);
+  float fresAmt = mix(0.58, 0.78, clamp(uQuality * 0.22, 0.0, 1.0));
+  vec3 color = base * (0.72 + ndl * 0.20) + sky * fresnel * fresAmt + uSunColor * spec * 0.42;
+  float hi = uQuality < 1.5 ? 0.88 : 0.94;
+  color = clamp(color, vec3(0.14), vec3(hi));
 
   float absorbAlpha = 1.0 - clamp((trans.x + trans.y + trans.z) * 0.333, 0.0, 1.0);
   float lip = smoothstep(0.0007, 0.014, max(rawW, col));
-  float alpha = mix(0.24, 0.52, depth) + absorbAlpha * 0.12 + foam * 0.10 + fresnel * 0.14;
+  float alpha = mix(0.38, 0.64, depth) + absorbAlpha * 0.10 + foam * 0.08 + fresnel * 0.16;
   if (geoArea > 4.0e-4) alpha *= mix(0.35, 1.0, smoothstep(0.28, 0.52, geoUp));
   alpha *= lip;
-  alpha = clamp(alpha, 0.16, 0.58);
+  alpha = clamp(alpha, 0.28, 0.70);
 
   gl_FragColor = vec4(color, alpha);
 }
