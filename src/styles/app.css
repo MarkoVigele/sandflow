@@ -401,8 +401,11 @@ body {
   .stats { left: 10px; bottom: auto; top: calc(var(--top) + var(--safe-t) + 8px); }
   .top-actions { gap: 4px; flex-wrap: nowrap; min-width: 0; }
   .transport { min-width: 0; }
-  .brand small { display: none; }
-  .brand strong { font-size: 13px; }
+  .transport [data-shot],
+  .transport [data-trail] { display: none; }
+  .top-actions > .chip[data-presets] { display: none; }
+  .brand > div { display: none; }
+  .quality select { max-width: 7.25rem; }
   .quality span { display: none; }
   .speed { min-width: 72px; }
   .speed span { font-size: 11px; }
