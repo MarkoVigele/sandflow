@@ -180,9 +180,10 @@ const dryL = luma01(dryGraded[lightI]!, dryGraded[lightI + 1]!, dryGraded[lightI
 const wetL = luma01(graded[lightI]!, graded[lightI + 1]!, graded[lightI + 2]!);
 assert(dryL > wetL + 0.12, `dry grade stays brighter than wet (${dryL} vs ${wetL})`);
 assert(
-  dryGraded[lightI]! > 200 && dryGraded[lightI + 2]! > dryGraded[lightI + 1]! * 0.68,
-  `dry grade target is cream-gold, not burnt orange (${dryGraded[lightI]}, ${dryGraded[lightI + 2]})`,
+  dryGraded[lightI]! > 210 && dryGraded[lightI + 2]! > dryGraded[lightI + 1]! * 0.72,
+  `dry grade target is pale cream-gold, not muddy tan (${dryGraded[lightI]}, ${dryGraded[lightI + 2]})`,
 );
+assert(dryL > 0.72, `dry grade luma should read bright beach, got ${dryL}`);
 
 const prepared = prepareSandRgba(seam, 32, 32, "dry");
 assert(prepared.length === seam.length, "prepare keeps size");

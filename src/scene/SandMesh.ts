@@ -35,7 +35,7 @@ export class SandMesh {
     const geo = new THREE.PlaneGeometry(traySize, traySize, segs, segs);
     geo.rotateX(-Math.PI / 2);
 
-    const fallbackAlbedo = new THREE.DataTexture(new Uint8Array([196, 162, 112, 255]), 1, 1);
+    const fallbackAlbedo = new THREE.DataTexture(new Uint8Array([232, 214, 176, 255]), 1, 1);
     fallbackAlbedo.needsUpdate = true;
     const fallbackConcrete = new THREE.DataTexture(new Uint8Array([138, 136, 130, 255]), 1, 1);
     fallbackConcrete.needsUpdate = true;

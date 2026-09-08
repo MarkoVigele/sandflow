@@ -57,9 +57,9 @@ interface Palette {
 
 function parsePrompt(prompt: string): Palette {
   const p = prompt.toLowerCase();
-  let dryA: [number, number, number] = [214, 186, 142];
-  let dryB: [number, number, number] = [186, 156, 112];
-  let pebble: [number, number, number] = [138, 116, 88];
+  let dryA: [number, number, number] = [236, 216, 178];
+  let dryB: [number, number, number] = [210, 188, 148];
+  let pebble: [number, number, number] = [164, 144, 110];
   let grain = 0.55;
 
   if (/dunkel|basalt|vulkan|schwarz/.test(p)) {
@@ -67,9 +67,9 @@ function parsePrompt(prompt: string): Palette {
     dryB = [58, 50, 44];
     pebble = [36, 32, 30];
   } else if (/hell|weiß|quarz|bleich/.test(p)) {
-    dryA = [228, 214, 186];
-    dryB = [206, 188, 154];
-    pebble = [176, 158, 128];
+    dryA = [244, 232, 204];
+    dryB = [222, 208, 174];
+    pebble = [186, 168, 138];
   } else if (/rot|laterit|rost|terra/.test(p)) {
     dryA = [176, 96, 62];
     dryB = [140, 72, 46];
