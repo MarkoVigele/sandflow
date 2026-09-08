@@ -61,13 +61,42 @@ if (Math.abs(brushFlat.terrain[local] - brushFlat.terrain[neighbor]) > 0.04) {
   fail("Einebnen-Pinsel lässt die Auswahl zu rau");
 }
 
+const pile = new ErosionSim(size, DEFAULT_PARAMS, flat.slice());
+pile.brush("pile", 0.5, 0.5, 0.08, 1.4);
+if (pile.terrain[mid] <= 0.52) fail("Hügel hebt Sand nicht");
+
+const dug = new ErosionSim(size, DEFAULT_PARAMS, flat.slice());
+dug.brush("dig", 0.5, 0.5, 0.08, 1.4);
+if (dug.terrain[mid] >= 0.52) fail("Graben trägt Sand nicht ab");
+
+const ridge = new ErosionSim(size, DEFAULT_PARAMS, flat.slice());
+ridge.brush("dam", 0.5, 0.5, 0.08, 1.4);
+if (ridge.terrain[mid] <= pile.terrain[mid]) fail("Damm muss steiler sein als Hügel");
+
+const wavy = flat.slice();
+for (let i = 0; i < wavy.length; i++) wavy[i] += ((i % 11) - 5) * 0.01;
+const smo = new ErosionSim(size, DEFAULT_PARAMS, wavy);
+const smoN = mid + 2;
+const smoGap0 = Math.abs(smo.terrain[mid] - smo.terrain[smoN]);
+smo.brush("smooth", 0.5, 0.5, 0.14, 2);
+const smoGap1 = Math.abs(smo.terrain[mid] - smo.terrain[smoN]);
+if (smoGap1 >= smoGap0 * 0.92) fail(`Glätten zieht Nachbarn nicht zusammen: ${smoGap0} → ${smoGap1}`);
+
 const slab = new ErosionSim(size, DEFAULT_PARAMS, flat.slice());
 slab.brush("concrete", 0.5, 0.5, 0.08, 0.7);
 if (slab.hardmask[mid] < HARD_THRESHOLD) fail(`Beton setzt Hartmaske nicht: ${slab.hardmask[mid]}`);
+if (slab.hardmask[mid] < 0.999) fail(`Beton-Kern muss fest 1 sein: ${slab.hardmask[mid]}`);
+let softHalo = 0;
+for (let i = 0; i < slab.hardmask.length; i++) {
+  const h = slab.hardmask[i];
+  if (h > 0 && h < HARD_THRESHOLD) softHalo++;
+}
+if (softHalo > 0) fail(`Beton darf keinen weichen Hof malen: ${softHalo}`);
 const slabH = slab.terrain[mid];
 if (slabH <= 0.52) fail("Beton-Platte sollte leicht anheben");
 slab.brush("soft", 0.5, 0.5, 0.1, 1.6);
 if (slab.hardmask[mid] >= HARD_THRESHOLD) fail("Radierer lässt Beton stehen");
+if (slab.hardmask[mid] !== 0) fail(`Radierer muss Hartmaske auf 0 setzen: ${slab.hardmask[mid]}`);
 
 const wall = new ErosionSim(size, DEFAULT_PARAMS, flat.slice());
 wall.brush("concrete", 0.5, 0.5, 0.07, 1.8);

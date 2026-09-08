@@ -688,14 +688,16 @@ export class ErosionSim {
         const fall = Math.exp(-d2 / (r2 * 0.38));
         const i = this.i(x, y);
         if (kind === "concrete") {
-          this.hardmask[i] = Math.min(1, this.hardmask[i] + fall * 1.85);
+          // Binary hardmask: core of the brush snaps fully hard so erosion
+          // cannot nibble a soft halo of 0.2–0.49 cells.
+          if (fall >= 0.22) this.hardmask[i] = 1;
           const slab = fall * strength * 0.018;
           const wall = fall * Math.max(0, strength - 0.85) * 0.055;
           this.terrain[i] += slab + wall;
           continue;
         }
         if (kind === "soft") {
-          this.hardmask[i] = Math.max(0, this.hardmask[i] - fall * Math.max(0.65, strength));
+          if (fall >= 0.18) this.hardmask[i] = 0;
           continue;
         }
         if (this.hardmask[i] >= HARD_THRESHOLD) continue;
