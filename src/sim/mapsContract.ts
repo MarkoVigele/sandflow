@@ -6,7 +6,7 @@
  *   R — terrain height
  *   G — water depth
  *   B — wetness 0..1
- *   A — flow magnitude (turbidity / particles)
+ *   A — flow magnitude (turbidity / particles / water-velocity normals)
  *
  * Companion uHard (R32F, size×size) — NOT packed into uMaps RGBA:
  *   0 — sand (erodible)
