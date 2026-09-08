@@ -42,6 +42,24 @@ export function allowOneFingerOrbit(cameraMode: boolean, sourceActive: boolean):
   return cameraMode && !sourceActive;
 }
 
+/** OrbitControls.enabled — off for the whole pin claim, not just one-finger rotate. */
+export function orbitControlsEnabled(sourceActive: boolean): boolean {
+  return !sourceActive;
+}
+
+/** Skip controls.update() so leftover damping cannot coast the camera during a pin drag. */
+export function shouldApplyOrbitUpdate(sourceActive: boolean): boolean {
+  return !sourceActive;
+}
+
+/**
+ * pointerleave must not end a captured pin/stroke. Touch often leaves the
+ * canvas mid-drag; treating that as pointerup unlocks orbit and drops the pin.
+ */
+export function pointerLeaveEndsGesture(hasCapture: boolean): boolean {
+  return !hasCapture;
+}
+
 export function sourceTipVisible(tool: ToolId | string, onboardStep: number): boolean {
   return tool === "source" && onboardStep === 0;
 }

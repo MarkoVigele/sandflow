@@ -26,8 +26,11 @@ import { sampleCrossSection } from "./crossSection";
 import {
   allowOneFingerOrbit,
   claimSourceGesture,
+  orbitControlsEnabled,
   pinGrabBeatsOrbit,
+  pointerLeaveEndsGesture,
   SOURCE_TOOL_TIP,
+  shouldApplyOrbitUpdate,
   sourceTipVisible,
 } from "./sourceGesture";
 import {
@@ -111,6 +114,8 @@ const tool = claimSourceGesture({
 assert(tool.tool && !tool.orbit, "brush tool keeps one-finger orbit off");
 assert(allowOneFingerOrbit(true, false) && !allowOneFingerOrbit(true, true), "orbit off while source active");
 assert(!allowOneFingerOrbit(false, false), "no one-finger orbit outside camera mode");
+assert(!orbitControlsEnabled(true) && !shouldApplyOrbitUpdate(true), "pin claim disables orbit + damping");
+assert(!pointerLeaveEndsGesture(true), "leave with capture keeps the pin");
 
 assert(togglePlaying(true) === false && togglePlaying(false) === true, "play toggle");
 assert(speedFromIndex(speedIndex(2)) === 2, "speed index roundtrip");
