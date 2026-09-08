@@ -16,20 +16,18 @@ import { getPreset, resampleHeight } from "../sim/presets";
 import {
   buildSharePayload,
   compactShareForHash,
-  decodeHeightField,
-  decodeMaskField,
+  decodeShareScene,
   parseAnyScene,
   parseShareHash,
   sanitizeQuality,
   SHARE_FILE_GRID,
-  shareCamera,
   shareHref,
-  shareSources,
   type SharePayload,
 } from "../state/share";
 import { persistOnboardDone, Store } from "../state/store";
 import { QUALITY_GRID, SPEEDS } from "../state/types";
 import { qualityProfile } from "../state/quality";
+import { SOURCE_TOOL_TIP } from "./sourceGesture";
 import { LETTER_HOTKEYS, TOOL_HOTKEYS } from "./tools";
 import { Inspector } from "./Inspector";
 import { Onboarding } from "./Onboarding";
@@ -65,9 +63,7 @@ export class App {
     `;
 
     const viewportHost = root.querySelector<HTMLElement>("#viewport")!;
-    this.viewport = new Viewport(viewportHost, this.store, () => {
-      /* store patches already notify */
-    });
+    this.viewport = new Viewport(viewportHost, this.store, () => this.syncHistory());
     this.viewport.onToast = (msg) => this.toast(msg);
 
     new Toolbar(this.store, root.querySelector("#toolbar")!);
@@ -85,8 +81,8 @@ export class App {
       onSave: () => void this.saveScene(),
       onLoad: () => this.fileInput.click(),
       onShot: () => this.screenshot(),
-      onUndo: () => void this.viewport.undo(),
-      onRedo: () => void this.viewport.redo(),
+      onUndo: () => void this.undo(),
+      onRedo: () => void this.redo(),
       onStep: () => this.viewport.stepOnce(),
       onResetScene: () => {
         this.viewport.resetScene();
@@ -239,40 +235,40 @@ export class App {
       presetId: share.preset,
       texturePrompt: prompt,
       quality,
+      autoQuality: false,
       speed: SPEEDS.includes(share.speed) ? share.speed : 1,
       selectedSourceId: null,
     });
     this.viewport.applyQuality(quality, false);
     const grid = QUALITY_GRID[quality];
-    const terrain = decodeHeightField(share.h, share.hn, grid);
-    const water = decodeHeightField(share.w, share.wn, grid);
-    const sources = shareSources(share);
-    if (terrain) {
+    const decoded = decodeShareScene(share, grid);
+    if (decoded.terrain) {
       const hard =
-        decodeMaskField(share.m, share.mn, grid) ??
+        decoded.hardmask ??
         getPreset(share.preset).build(grid).hardmask ??
         new Float32Array(grid * grid);
       const snap: SimSnapshot = {
         size: grid,
-        terrain,
-        water: water ?? new Float32Array(grid * grid),
+        terrain: decoded.terrain,
+        water: decoded.water ?? new Float32Array(grid * grid),
         wetness: new Float32Array(grid * grid),
         sediment: new Float32Array(grid * grid),
         cohesion: new Float32Array(grid * grid),
         hardmask: hard,
-        sources,
+        sources: decoded.sources,
         erodedSand: 0,
       };
       this.viewport.applySnapshot(snap);
-      this.store.patch({ selectedSourceId: sources[0]?.id ?? null });
+      this.store.patch({ selectedSourceId: decoded.sources[0]?.id ?? null });
     } else {
       this.viewport.loadPreset(share.preset, true);
-      this.viewport.replaceSources(sources);
+      this.viewport.replaceSources(decoded.sources);
     }
-    const cam = shareCamera(share);
-    if (cam) this.viewport.applyCamera(cam);
+    if (decoded.camera) this.viewport.applyCamera(decoded.camera);
     this.viewport.setProps(propsFromShare(share.props));
     this.viewport.applyParams();
+    this.viewport.history.clear();
+    this.syncHistory();
     void this.loadLabTextures(prompt);
   }
 
@@ -299,6 +295,7 @@ export class App {
       const { hash, omittedHeight } = compactShareForHash(await this.shareInput());
       const href = shareHref(hash);
       history.replaceState(null, "", `#${hash}`);
+      this.lastShareHash = location.hash;
       const ok = await copyText(href);
       this.toast(
         ok
@@ -325,6 +322,24 @@ export class App {
     }
   }
 
+  private syncHistory(): void {
+    if (!this.viewport) return;
+    const next = this.viewport.history.flags();
+    if (this.store.state.canUndo !== next.canUndo || this.store.state.canRedo !== next.canRedo) {
+      this.store.patch(next);
+    }
+  }
+
+  private async undo(): Promise<void> {
+    await this.viewport.undo();
+    this.syncHistory();
+  }
+
+  private async redo(): Promise<void> {
+    await this.viewport.redo();
+    this.syncHistory();
+  }
+
   private screenshot(): void {
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
     downloadDataUrl(`sandflow-${stamp}.png`, this.viewport.screenshotPng());
@@ -345,10 +360,10 @@ export class App {
               <button class="icon-btn" data-x>${ICONS.close}</button>
             </header>
             <p>Wasser sucht sich Wege durch Sand: erst dünne Adern, dann ein Bett, später ein verzweigtes Netz. V1.x ist der spielbare Kern — Zielring, Werkzeuge, Teilen, Kiesel, Beton, gebackene Texturen. WebGPU und eine volle Requisitenbibliothek bleiben später.</p>
-            <p>Kurzanleitung: <strong>Sand formen</strong> → <strong>Quelle setzen</strong> (<em>tippen = wählen, ziehen = verschieben</em>) → <strong>Abspielen</strong>. Pins sitzen auf dem Sand; ziehen verschiebt sie.</p>
+            <p>Kurzanleitung: <strong>Sand formen</strong> → <strong>Quelle setzen</strong> (<em>${SOURCE_TOOL_TIP}</em>) → <strong>Abspielen</strong>. Pins sitzen auf dem Sand; Ziehen verschiebt sie auch im Kameramodus.</p>
             <p>Rechtsklick oder zwei Finger drehen die Kamera. Ein Finger (oder die linke Taste) bedient das Werkzeug. Unter <em>Kamera</em> geht das Drehen auch mit einem Finger.</p>
             <p>Oben: <em>Tempo</em> und <em>Zeitraffer</em>, Qualität inkl. Auto, Szene oder nur Wasser zurücksetzen, Teilen per Link oder JSON. <em>Beton</em> setzt Hartstoff (Platte oder Wand). Kiesel sind kleine Steine — der Radierer nimmt Kiesel und Beton weg.</p>
-            <p>Unter <em>Erweitert</em> liegen Heatmap (Fluss oder Tiefe) und <em>Relief</em>, das die Höhen in der Wanne überhöht. Texturen entstehen lokal aus einer kurzen Beschreibung.</p>
+            <p>Unter <em>Erweitert</em> liegen Farbkarte (Strömung oder Nässe) und <em>Relief</em>, das die Höhen in der Wanne überhöht. Texturen entstehen lokal aus einer kurzen Beschreibung.</p>
           </div>
         </div>`
         : "";
@@ -375,12 +390,12 @@ export class App {
       }
       if ((e.metaKey || e.ctrlKey) && k === "z") {
         e.preventDefault();
-        if (e.shiftKey) void this.viewport.redo();
-        else void this.viewport.undo();
+        if (e.shiftKey) void this.redo();
+        else void this.undo();
       }
       if ((e.metaKey || e.ctrlKey) && k === "y") {
         e.preventDefault();
-        void this.viewport.redo();
+        void this.redo();
       }
       const n = Number(e.key);
       if (n >= 1 && n <= TOOL_HOTKEYS.length) {

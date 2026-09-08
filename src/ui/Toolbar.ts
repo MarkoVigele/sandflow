@@ -30,7 +30,7 @@ export class Toolbar {
             <span class="tool-label">${t.label}</span>
           </button>`,
         ).join("")}
-        <button class="tool ${cameraMode ? "is-active" : ""}" data-cam="1" title="Ein-Finger-Kamera" aria-pressed="${cameraMode}">
+        <button class="tool ${cameraMode ? "is-active" : ""}" data-cam="1" title="Mit einem Finger drehen. Quellenstifte bleiben greifbar." aria-pressed="${cameraMode}">
           <span class="icon">${ICONS.camera}</span>
           <span class="tool-label">Kamera</span>
         </button>

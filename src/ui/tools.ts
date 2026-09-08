@@ -1,18 +1,19 @@
 import type { ToolId } from "../state/types";
+import { SOURCE_TOOL_TIP } from "./sourceGesture";
 
 export const TOOLBAR_TOOLS: { id: ToolId; label: string; hint: string }[] = [
-  { id: "pile", label: "Aufschütten", hint: "Sand anhäufen" },
-  { id: "dig", label: "Graben", hint: "Sand abtragen" },
-  { id: "smooth", label: "Glätten", hint: "Unebenheiten ziehen" },
-  { id: "dam", label: "Damm", hint: "Steile Wand setzen" },
-  { id: "tamp", label: "Feststampfen", hint: "Kohäsion lokal erhöhen" },
-  { id: "groove", label: "Rinne", hint: "Rinne vorzeichnen" },
-  { id: "flatten", label: "Einebnen", hint: "Auswahl oder ganze Wanne glattziehen" },
-  { id: "concrete", label: "Beton", hint: "Hartstoff setzen: Platte oder Wand" },
-  { id: "stone", label: "Kiesel", hint: "Kleine Steine setzen" },
-  { id: "erase", label: "Radierer", hint: "Kiesel und Beton entfernen" },
-  { id: "pour", label: "Gießen", hint: "Halten zum Gießen" },
-  { id: "source", label: "Quelle", hint: "Setzen oder Quelle ziehen" },
+  { id: "pile", label: "Hügel", hint: "Sand zu einem Hügel aufschütten" },
+  { id: "dig", label: "Graben", hint: "Sand wegnehmen und eine Mulde graben" },
+  { id: "smooth", label: "Glätten", hint: "Unebene Stellen weichziehen" },
+  { id: "dam", label: "Wall", hint: "Einen steilen Wall aufschütten" },
+  { id: "tamp", label: "Stampfen", hint: "Sand fest drücken, damit Wasser ihn nicht so leicht mitnimmt" },
+  { id: "groove", label: "Rinne", hint: "Eine Rinne ziehen, der das Wasser folgen kann" },
+  { id: "flatten", label: "Einebnen", hint: "Die Fläche unter dem Finger glattziehen" },
+  { id: "concrete", label: "Beton", hint: "Feste Platte oder Mauer setzen — erodiert nicht" },
+  { id: "stone", label: "Kiesel", hint: "Kleine Steine auf den Sand legen" },
+  { id: "erase", label: "Radierer", hint: "Steine und Beton wieder entfernen" },
+  { id: "pour", label: "Gießen", hint: "Halten: Wasser tropft an dieser Stelle" },
+  { id: "source", label: "Quelle", hint: SOURCE_TOOL_TIP },
 ];
 
 export const TOOL_HOTKEYS: ToolId[] = [

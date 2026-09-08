@@ -65,7 +65,40 @@ export interface ShareBuildInput {
 }
 
 function clamp01(n: number): number {
+  if (!Number.isFinite(n)) return 0;
   return Math.max(0, Math.min(1, n));
+}
+
+function finite01(n: unknown, fallback: number): number {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return fallback;
+  return clamp01(v);
+}
+
+function finiteRate(n: unknown, fallback = 1.5): number {
+  const v = Number(n);
+  if (!Number.isFinite(v) || v <= 0) return fallback;
+  return Math.min(8, v);
+}
+
+function asGridSize(n: unknown): number | undefined {
+  const v = Number(n);
+  if (!Number.isFinite(v) || v < 2 || v > 1024) return undefined;
+  return v | 0;
+}
+
+function isVec3(v: unknown): v is [number, number, number] {
+  return Array.isArray(v) && v.length === 3 && v.every((x) => Number.isFinite(Number(x)));
+}
+
+function sanitizeParams(raw: unknown): SimParams {
+  const src = raw && typeof raw === "object" ? (raw as Partial<SimParams>) : {};
+  const out = { ...DEFAULT_PARAMS };
+  (Object.keys(DEFAULT_PARAMS) as Array<keyof SimParams>).forEach((key) => {
+    const n = Number(src[key]);
+    if (Number.isFinite(n)) out[key] = n;
+  });
+  return compactParams(out);
 }
 
 export function round3(n: number): number {
@@ -209,27 +242,34 @@ export function parseSharePayload(data: unknown): SharePayload {
   if (!raw.preset || !raw.params || !Array.isArray(raw.sources)) {
     throw new Error("Unbekanntes Szenenformat");
   }
+  const camera =
+    raw.camera && isVec3(raw.camera.p) && isVec3(raw.camera.t)
+      ? {
+          p: raw.camera.p.map((n) => Number(n)) as [number, number, number],
+          t: raw.camera.t.map((n) => Number(n)) as [number, number, number],
+        }
+      : undefined;
   return {
     v: 2,
     preset: String(raw.preset),
     quality: sanitizeQuality(raw.quality),
-    speed: typeof raw.speed === "number" ? raw.speed : 1,
-    params: { ...DEFAULT_PARAMS, ...raw.params },
+    speed: typeof raw.speed === "number" && Number.isFinite(raw.speed) ? raw.speed : 1,
+    params: sanitizeParams(raw.params),
     sources: raw.sources.map((s) => ({
-      x: clamp01(Number(s.x)),
-      y: clamp01(Number(s.y)),
-      rate: Number(s.rate) || 1.5,
-      kind: s.kind === "rain" ? "rain" : undefined,
-      spread: typeof s.spread === "number" ? clamp01(s.spread) : undefined,
+      x: finite01(s?.x, 0.5),
+      y: finite01(s?.y, 0.12),
+      rate: finiteRate(s?.rate),
+      kind: s?.kind === "rain" ? "rain" : undefined,
+      spread: s?.spread != null ? finite01(s.spread, 0.4) : undefined,
     })),
-    prompt: String(raw.prompt ?? ""),
-    camera: raw.camera,
+    prompt: String(raw.prompt ?? "").slice(0, 80),
+    camera,
     props: raw.props,
-    hn: raw.hn,
+    hn: asGridSize(raw.hn),
     h: raw.h,
-    wn: raw.wn,
+    wn: asGridSize(raw.wn),
     w: raw.w,
-    mn: raw.mn,
+    mn: asGridSize(raw.mn),
     m: raw.m,
   };
 }
@@ -250,18 +290,20 @@ export function parseShareHash(hash: string): SharePayload | null {
 }
 
 export function decodeHeightField(b64: string | undefined, srcSize: number | undefined, dstSize: number): Float32Array | null {
-  if (!b64 || !srcSize) return null;
+  const n = asGridSize(srcSize);
+  if (!b64 || !n) return null;
   try {
-    return dequantizeHeight(b64UrlToBytes(b64), srcSize, dstSize);
+    return dequantizeHeight(b64UrlToBytes(b64), n, dstSize);
   } catch {
     return null;
   }
 }
 
 export function decodeMaskField(b64: string | undefined, srcSize: number | undefined, dstSize: number): Float32Array | null {
-  if (!b64 || !srcSize) return null;
+  const n = asGridSize(srcSize);
+  if (!b64 || !n) return null;
   try {
-    return dequantizeMask(b64UrlToBytes(b64), srcSize, dstSize);
+    return dequantizeMask(b64UrlToBytes(b64), n, dstSize);
   } catch {
     return null;
   }
@@ -270,17 +312,37 @@ export function decodeMaskField(b64: string | undefined, srcSize: number | undef
 export function shareSources(share: SharePayload): WaterSource[] {
   return share.sources.map((s, i) => ({
     id: `s-share-${i}`,
-    x: s.x,
-    y: s.y,
-    rate: s.rate,
+    x: finite01(s.x, 0.5),
+    y: finite01(s.y, 0.12),
+    rate: finiteRate(s.rate),
     kind: s.kind === "rain" ? "rain" : undefined,
-    spread: s.spread,
+    spread: s.spread != null ? finite01(s.spread, 0.4) : undefined,
   }));
 }
 
 export function shareCamera(share: SharePayload): CameraPose | undefined {
-  if (!share.camera) return undefined;
-  return { position: share.camera.p, target: share.camera.t };
+  if (!isVec3(share.camera?.p) || !isVec3(share.camera?.t)) return undefined;
+  return {
+    position: share.camera.p.map(Number) as [number, number, number],
+    target: share.camera.t.map(Number) as [number, number, number],
+  };
+}
+
+/** Decode maps + sources for a quality grid. Used by App.applyShare and smoke tests. */
+export function decodeShareScene(share: SharePayload, grid: number): {
+  terrain: Float32Array | null;
+  water: Float32Array | null;
+  hardmask: Float32Array | null;
+  sources: WaterSource[];
+  camera: CameraPose | undefined;
+} {
+  return {
+    terrain: decodeHeightField(share.h, share.hn, grid),
+    water: decodeHeightField(share.w, share.wn, grid),
+    hardmask: decodeMaskField(share.m, share.mn, grid),
+    sources: shareSources(share),
+    camera: shareCamera(share),
+  };
 }
 
 export function compactShareForHash(input: ShareBuildInput): { hash: string; omittedHeight: boolean } {

@@ -9,6 +9,7 @@ import {
   compactShareForHash,
   decodeHeightField,
   decodeMaskField,
+  decodeShareScene,
   dequantizeHeight,
   encodeShareHash,
   parseAnyScene,
@@ -16,6 +17,7 @@ import {
   parseSharePayload,
   quantizeHeight,
   sanitizeQuality,
+  shareCamera,
   shareSources,
   textToB64Url,
 } from "./share";
@@ -135,12 +137,16 @@ const compact = compactShareForHash({
 if (compact.omittedHeight) fail("empty height should not omit");
 if (!parseShareHash(compact.hash)) fail("compact hash");
 
+const twoSources = [
+  { id: "a", x: 0.5, y: 0.12, rate: 1.7 },
+  { id: "b", x: 0.22, y: 0.81, rate: 2.4 },
+];
 const compactH = compactShareForHash({
   presetId: "slope",
   quality: "medium",
   speed: 1,
   params: DEFAULT_PARAMS,
-  sources: [{ id: "a", x: 0.5, y: 0.12, rate: 1.7 }],
+  sources: twoSources,
   texturePrompt: "feiner Quarzsand, warm, trocken",
   camera: { position: [6, 5, 7], target: [0, 0.5, 0] },
   props: [{ u: 0.4, v: 0.6, s: 0.07, r: 1.2, k: 2 }],
@@ -153,6 +159,51 @@ if (!kept?.h || kept.hn !== SHARE_HASH_GRID) fail("compact hash keeps height");
 const keptH = decodeHeightField(kept.h, kept.hn, srcSize);
 if (!keptH) fail("compact height decodes");
 almost(keptH[mid], terrain[mid], 0.1, "compact height mid");
+if (kept.preset !== "slope") fail("compact keeps preset");
+if (kept.sources.length !== 2) fail("compact keeps both sources");
+almost(kept.sources[1].x, 0.22, 1e-6, "source 2 x");
+almost(kept.sources[1].rate, 2.4, 1e-6, "source 2 rate");
+const scene = decodeShareScene(kept, srcSize);
+if (!scene.terrain || scene.sources.length !== 2) fail("decodeShareScene maps+sources");
+if (!scene.camera || scene.camera.position[1] !== 5) fail("decodeShareScene camera");
+almost(scene.terrain[mid], terrain[mid], 0.1, "decodeShareScene height mid");
+
+const presets = ["flat", "slope", "bed", "meet", "canyon", "delta", "referenz", "veins", "regen-hang", "staudamm"];
+for (const id of presets) {
+  const { hash } = compactShareForHash({
+    presetId: id,
+    quality: "low",
+    speed: 2,
+    params: DEFAULT_PARAMS,
+    sources: [{ id: "s", x: 0.31, y: 0.44, rate: 1.1 }],
+    texturePrompt: "sand",
+  });
+  const p = parseShareHash(hash);
+  if (!p || p.preset !== id) fail(`preset ${id} hash roundtrip`);
+  if (shareSources(p)[0]?.x !== 0.31) fail(`preset ${id} source`);
+}
+
+const dirty = parseSharePayload({
+  v: 2,
+  preset: "meet",
+  quality: "nope",
+  speed: Number.NaN,
+  params: { ...DEFAULT_PARAMS, grain: "nope", cohesion: 0.4 },
+  sources: [{ x: "bad", y: 1.4, rate: -3 }, { x: 0.2, y: 0.3, rate: 9 }],
+  prompt: "x",
+  camera: { p: [1, 2], t: [0, 0, 0] },
+  hn: "64",
+});
+if (dirty.quality !== "high") fail("bad quality falls back");
+if (dirty.speed !== 1) fail("NaN speed falls back");
+if (dirty.params.grain !== DEFAULT_PARAMS.grain) fail("bad grain ignored");
+almost(dirty.params.cohesion, 0.4, 1e-6, "good cohesion kept");
+almost(dirty.sources[0].x, 0.5, 1e-6, "NaN x fallback");
+almost(dirty.sources[0].y, 1, 1e-6, "y clamped");
+almost(dirty.sources[0].rate, 1.5, 1e-6, "bad rate fallback");
+almost(dirty.sources[1].rate, 8, 1e-6, "rate cap");
+if (shareCamera(dirty)) fail("short camera vector dropped");
+if (dirty.hn !== 64) fail("hn string coerced");
 
 const anyV2 = parseAnyScene(JSON.stringify(payload));
 if (anyV2.kind !== "v2") fail("any v2");

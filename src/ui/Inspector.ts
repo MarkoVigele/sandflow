@@ -1,6 +1,7 @@
 import type { Store } from "../state/store";
 import type { Viewport } from "../scene/Viewport";
 import {
+  HEATMAP_LABEL,
   RELIEF_MAX,
   RELIEF_MIN,
   WAVES_MAX,
@@ -12,20 +13,20 @@ import {
 import { SOURCE_TOOL_TIP } from "./sourceGesture";
 
 const TOOL_COPY: Record<ToolId, { title: string; body: string }> = {
-  pile: { title: "Aufschütten", body: "Kreis = Pinselradius. Ziehen, um Sand anzuhäufen." },
-  dig: { title: "Graben", body: "Kreis = Pinselradius. Sand abtragen — gut für Rinnen." },
-  smooth: { title: "Glätten", body: "Kreis = Pinselradius. Mittelwert über die Nachbarschaft." },
-  dam: { title: "Damm / Wand", body: "Kreis = Pinselradius. Steiler als Aufschütten." },
-  tamp: { title: "Feststampfen", body: "Drückt Sand fest: lokale Kohäsion steigt, Erosion hält schlechter." },
-  groove: { title: "Rinne vorzeichnen", body: "Ziehen zeichnet eine V-Rinne mit leichten Ufern — Wasser folgt später." },
-  flatten: { title: "Einebnen", body: "Pinsel ebnet die Fläche unter dem Finger. Unten: ganze Wanne. Beton bleibt stehen." },
-  concrete: { title: "Beton", body: "Hartstoff setzen. Niedrige Stärke = Platte, hohe Stärke = Wand. Wasser fließt darüber, Erosion und Ablagerung nicht. Radierer nimmt den Beton weg." },
-  stone: { title: "Kiesel", body: "Kleine Steine auf den Sand setzen. Radius steuert die Größe. Der Radierer nimmt sie wieder weg." },
-  erase: { title: "Radierer", body: "Kiesel und Beton in Reichweite entfernen. Sandhöhe und Wasser bleiben unberührt." },
-  pour: { title: "Gießen", body: "Der Kreis auf dem Sand zeigt die Tropfstelle. Halten zum Gießen." },
+  pile: { title: "Hügel aufschütten", body: "Ziehen häufelt Sand an. Der Kreis ist die Pinselgröße." },
+  dig: { title: "Mulde graben", body: "Ziehen nimmt Sand weg — gut, um dem Wasser eine Spur zu geben." },
+  smooth: { title: "Glätten", body: "Ziehen weicht Kanten und Wellen im Sand auf." },
+  dam: { title: "Wall setzen", body: "Setzt einen steilen Wall, höher und schärfer als ein Hügel." },
+  tamp: { title: "Sand feststampfen", body: "Drückt den Sand fest, damit fließendes Wasser ihn nicht so leicht mitnimmt." },
+  groove: { title: "Rinne ziehen", body: "Zeichnet eine Furche mit leichten Ufern. Wasser folgt ihr später von allein." },
+  flatten: { title: "Einebnen", body: "Macht die Fläche unter dem Finger glatt. Unten: die ganze Wanne. Beton bleibt stehen." },
+  concrete: { title: "Beton setzen", body: "Niedrige Stärke = Platte, hohe Stärke = Mauer. Wasser fließt darüber, der Beton bleibt. Der Radierer nimmt ihn weg." },
+  stone: { title: "Kiesel legen", body: "Kleine Steine auf den Sand. Die Größe stellst du am Regler ein. Der Radierer nimmt sie weg." },
+  erase: { title: "Radierer", body: "Nimmt Steine und Beton in Reichweite weg. Sand und Wasser bleiben." },
+  pour: { title: "Wasser gießen", body: "Der Kreis zeigt, wo es tropft. Taste oder Finger halten." },
   source: {
     title: "Quelle",
-    body: `${SOURCE_TOOL_TIP}. Quelle ziehen: Pin antippen und auf dem Sand verschieben. Freier Sand setzt eine neue, Löschen nimmt sie weg. Durchfluss nur mit dem Regler.`,
+    body: `${SOURCE_TOOL_TIP} Freier Sand setzt eine neue Quelle. Löschen nimmt sie weg. Die Menge stellst du am Regler ein.`,
   },
 };
 
@@ -85,9 +86,9 @@ export class Inspector {
           <div class="row">
             <button class="btn" data-del ${src ? "" : "disabled"}>Quelle löschen</button>
           </div>
-          ${src ? slider("Durchfluss Quelle", 0.2, 6, 0.1, src.rate, "sourceRate") : ""}`
+          ${src ? slider("Wie stark die Quelle läuft", 0.2, 6, 0.1, src.rate, "sourceRate") : ""}`
             : `
-          ${s.tool === "pour" ? slider("Durchfluss", 0.25, 4, 0.05, s.pourRate, "pourRate") : ""}
+          ${s.tool === "pour" ? slider("Wie stark es tropft", 0.25, 4, 0.05, s.pourRate, "pourRate") : ""}
           ${s.tool !== "pour" ? slider(s.tool === "stone" ? "Größe" : s.tool === "erase" ? "Reichweite" : "Radius", 0.02, 0.16, 0.005, s.brushRadius, "brushRadius") : ""}
           ${s.tool !== "pour" && s.tool !== "stone" && s.tool !== "erase" ? slider("Stärke", 0.3, 2.2, 0.05, s.brushStrength, "brushStrength") : ""}
           ${s.tool === "flatten" ? `<div class="row"><button class="btn" data-flatten>Ganze Wanne</button></div>` : ""}`
@@ -97,10 +98,11 @@ export class Inspector {
           <button class="btn" data-reset-all>Szene zurücksetzen</button>
         </div>
         <fieldset class="seg">
-          <legend>Heatmap</legend>
-          ${segBtn("off", "Aus", s.heatmap)}
-          ${segBtn("flow", "Fluss", s.heatmap)}
-          ${segBtn("depth", "Tiefe", s.heatmap)}
+          <legend>Farbkarte</legend>
+          ${segBtn("off", HEATMAP_LABEL.off, s.heatmap)}
+          ${segBtn("flow", HEATMAP_LABEL.flow, s.heatmap)}
+          ${segBtn("depth", HEATMAP_LABEL.depth, s.heatmap)}
+          <p class="lede">Strömung zeigt, wo es schnell fließt. Nässe zeigt feuchten Sand.</p>
         </fieldset>
         <div class="row">
           <button type="button" class="chip ${s.sectionOpen ? "is-on" : ""}" data-section aria-pressed="${s.sectionOpen}">Querschnitt</button>

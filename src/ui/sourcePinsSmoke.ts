@@ -9,6 +9,11 @@ import {
   uvToWorldXZ,
 } from "./AimCursor";
 import {
+  allowOneFingerOrbit,
+  claimSourceGesture,
+  pinGrabBeatsOrbit,
+} from "./sourceGesture";
+import {
   SOURCE_PIN_PLANT,
   SOURCE_PIN_STEM_H,
   applySourceMarkerStyle,
@@ -20,6 +25,7 @@ import {
   shouldStartSourceDrag,
   sourceDragThresholdPx,
   sourcePickRadiusPx,
+  sourcePinHeadWorld,
   sourcePinPlantedY,
   sourcePinWorld,
 } from "./sourcePins";
@@ -99,6 +105,9 @@ assert(!shouldStartSourceDrag(11, "touch"), "finger tap slack");
 assert(shouldStartSourceDrag(12, "touch"), "finger drag after slack");
 almost(pointerPixelDelta({ x: 10, y: 10 }, { x: 14, y: 13 }), 5, 1e-6, "pixel delta");
 assert(sourcePickRadiusPx("touch") > sourcePickRadiusPx("mouse"), "finger pick is generous");
+assert(sourcePickRadiusPx("mouse", true) > sourcePickRadiusPx("mouse"), "camera-mode pick is wider");
+const head = sourcePinHeadWorld(0.5, 0.5, 0.42, tray, heightScale);
+assert(head.y > sourcePinWorld(0.5, 0.5, 0.42, tray, heightScale).y + 0.2, "drop head sits above the plant");
 
 const camera = new THREE.PerspectiveCamera(48, 1, 0.12, 80);
 camera.position.set(0, 8, 0.15);
@@ -128,5 +137,21 @@ const pinSame = sourcePinWorld(0.3, 0.6, 0.5, tray, heightScale);
 almost(aimStatePour.x, pinSame.x, 1e-9, "shared helper x");
 almost(aimStatePour.y, pinSame.y, 1e-9, "shared helper y");
 almost(aimStatePour.z, pinSame.z, 1e-9, "shared helper z");
+
+const grab = claimSourceGesture({
+  tool: "source",
+  cameraMode: true,
+  hitSourceId: "a",
+  draggingSource: null,
+});
+assert(pinGrabBeatsOrbit(grab), "pin grab wins over camera orbit");
+const camEmpty = claimSourceGesture({
+  tool: "pour",
+  cameraMode: true,
+  hitSourceId: null,
+  draggingSource: null,
+});
+assert(camEmpty.orbit && !pinGrabBeatsOrbit(camEmpty), "missed pin still orbits");
+assert(allowOneFingerOrbit(true, false) && !allowOneFingerOrbit(true, true), "orbit yields while pin claimed");
 
 console.log("source-pins smoke ok");

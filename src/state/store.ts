@@ -53,6 +53,8 @@ export interface UiState {
   onboardStep: OnboardStep;
   menuOpen: null | "reset" | "share" | "more";
   sectionOpen: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 export const initialUiState = (): UiState => {
@@ -81,6 +83,8 @@ export const initialUiState = (): UiState => {
     onboardStep,
     menuOpen: null,
     sectionOpen: false,
+    canUndo: false,
+    canRedo: false,
   };
 };
 

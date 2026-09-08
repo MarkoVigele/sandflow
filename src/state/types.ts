@@ -29,6 +29,13 @@ export function speedLabel(speed: number): string {
 
 export type HeatmapMode = "off" | "flow" | "depth";
 
+/** Plain-language labels for the cheap sand overlay (flow = speed, depth = wetness). */
+export const HEATMAP_LABEL: Record<HeatmapMode, string> = {
+  off: "Aus",
+  flow: "Strömung",
+  depth: "Nässe",
+};
+
 export type OnboardStep = 0 | 1 | 2 | 3;
 
 export interface SimParams {

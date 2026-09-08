@@ -28,6 +28,10 @@ export class History {
     return this.redoStack.length > 0;
   }
 
+  flags(): { canUndo: boolean; canRedo: boolean } {
+    return { canUndo: this.canUndo, canRedo: this.canRedo };
+  }
+
   push(current: SimSnapshot): void {
     this.undoStack.push(cloneSnap(current));
     if (this.undoStack.length > LIMIT) this.undoStack.shift();
