@@ -679,7 +679,8 @@ const PRESET_DEFS: PresetDef[] = [
         const v = y / (size - 1);
         const x = i % size;
         const u = x / (size - 1);
-        const notch = Math.abs(u - 0.5) < 0.07 && v > 0.42 && v < 0.52;
+        const inWeir = v >= 0.40 && v <= 0.54;
+        const notch = Math.abs(u - 0.5) < 0.07 && inWeir;
         terrain[i] = notch ? BASE + 0.36 : BASE + 0.62;
         if (u < 0.18 || u > 0.82) terrain[i] = BASE + 0.7;
       }
@@ -750,16 +751,22 @@ const PRESET_DEFS: PresetDef[] = [
   {
     id: "staudamm",
     title: "Staudamm",
-    blurb: "Staumauer, See oben. Überlauf nagt am Sand.",
+    blurb: "Staumauer staut den See. Ist er voll, läuft er über die Krone.",
     camera: { position: [5.6, 5.9, 5.8], target: [0, 0.42, 0.2] },
     build(size) {
       const terrain = new Float32Array(size * size);
       const hard = blankHard(size);
+      const damV0 = 0.46;
+      const damV1 = 0.54;
+      const notchHalf = 0.07;
+      const crest = BASE + 0.26;
+      const wall = BASE + 0.78;
+      const abutment = BASE + 0.86;
       for (let y = 0; y < size; y++) {
         const v = y / (size - 1);
         for (let x = 0; x < size; x++) {
           const u = x / (size - 1);
-          const valley = ((u - 0.5) ** 2) * 0.72;
+          const valley = ((u - 0.5) ** 2) * 1.35;
           terrain[idx(x, y, size)] = BASE + (1 - v) * 0.38 + valley;
         }
       }
@@ -772,12 +779,12 @@ const PRESET_DEFS: PresetDef[] = [
         0.04,
         0.96,
       );
-      fillBox(terrain, hard, size, 0.08, 0.44, 0.92, 0.56, (u) => {
-        const notch = Math.abs(u - 0.5) < 0.065;
-        return notch ? BASE + 0.4 : BASE + 0.78;
+      // Notch cuts the full dam thickness — no sealing lips on the faces.
+      fillBox(terrain, hard, size, 0.02, damV0, 0.98, damV1, (u) => {
+        return Math.abs(u - 0.5) < notchHalf ? crest : wall;
       }, true);
-      fillBox(terrain, hard, size, 0.08, 0.42, 0.16, 0.58, BASE + 0.86, true);
-      fillBox(terrain, hard, size, 0.84, 0.42, 0.92, 0.58, BASE + 0.86, true);
+      fillBox(terrain, hard, size, 0.02, damV0, 0.10, damV1, abutment, true);
+      fillBox(terrain, hard, size, 0.90, damV0, 0.98, damV1, abutment, true);
       grain(terrain, size, 0.014, 67);
       for (let i = 0; i < hard.length; i++) {
         if (hard[i] < 0.5) continue;
@@ -785,13 +792,16 @@ const PRESET_DEFS: PresetDef[] = [
         const v = y / (size - 1);
         const x = i % size;
         const u = x / (size - 1);
-        const notch = Math.abs(u - 0.5) < 0.065 && v > 0.44 && v < 0.56;
-        terrain[i] = notch ? BASE + 0.4 : BASE + 0.78;
-        if (u < 0.16 || u > 0.84) terrain[i] = BASE + 0.86;
+        if (v < damV0 - 0.02 || v > damV1 + 0.02) continue;
+        const notch = Math.abs(u - 0.5) < notchHalf;
+        terrain[i] = notch ? crest : wall;
+        if (u < 0.10 || u > 0.90) terrain[i] = abutment;
       }
+      paintWallBand(terrain, hard, size, 0.04, 0.16, 0.12, damV0, (_u, v) => abutment - (1 - v) * 0.04);
+      paintWallBand(terrain, hard, size, 0.84, 0.96, 0.12, damV0, (_u, v) => abutment - (1 - v) * 0.04);
       rim(terrain, size, true);
       const inlet = placeSourceOnTerrain(terrain, hard, size, 0.5, 0.16);
-      return { terrain, hardmask: hard, sources: [source("s-stau", inlet.x, inlet.y, 1.65)] };
+      return { terrain, hardmask: hard, sources: [source("s-stau", inlet.x, inlet.y, 1.85)] };
     },
   },
 ];

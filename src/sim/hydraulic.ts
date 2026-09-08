@@ -41,6 +41,15 @@ export const PICK_MAX_WATER_FLAT = 0.026;
 export const MAX_WATER_DEPTH = 1.15;
 export const MAX_WATER_DEPTH_ULTRA = 0.28;
 const ULTRA_GRID = 640;
+/**
+ * Deeper than this, the cell is a pond/lake: equalize, no vein boost.
+ * Thin films stay in the thread-concentrate regime.
+ */
+export const POND_DEPTH = 0.024;
+/** Extra √h on a rising bed so barrier flux ~ weir Q ∝ h^{3/2}. */
+export const WEIR_COEFF = 1.55;
+const HYDRO_SPIKE_RATIO = 1.35;
+const HYDRO_SPIKE_PAD = 0.006;
 
 export function maxWaterDepthFor(size: number): number {
   if (size >= ULTRA_GRID) return MAX_WATER_DEPTH_ULTRA;
@@ -243,9 +252,30 @@ export function bedSlopeAt(
   return Math.hypot(dx, dy);
 }
 
+/** Higher of two beds — Audusse interface for well-balanced SWE/pipes. */
+export function interfaceBed(z0: number, z1: number): number {
+  return z0 > z1 ? z0 : z1;
+}
+
+/** Water-surface height above an interface bed. 0 if the column cannot wet it. */
+export function hydroHead(eta: number, zInterface: number): number {
+  const h = eta - zInterface;
+  return h > 0 ? h : 0;
+}
+
 /**
- * Virtual-pipe outflow (4-neighbor). `areaScale` folds flowRate and a
- * channel-conductivity boost so established streams stay thin.
+ * Extra scale on a rising bed. Combined with flux ∝ Δh this is a weir
+ * Q ∝ h^{3/2} so a dam crest sheets instead of dumping a needle.
+ */
+export function weirFluxScale(head: number, bedRise: number): number {
+  if (!(head > 0) || !(bedRise > 0.006)) return 1;
+  return Math.min(2.6, 1 + WEIR_COEFF * Math.sqrt(head));
+}
+
+/**
+ * Virtual-pipe outflow (4-neighbor). Hydrostatic reconstruction: no flux
+ * onto a neighbor whose bed sits above this cell's free surface. Deep
+ * ponds equalize instead of vein-boosting, so a reservoir can rise.
  *
  * f ← max(0, f·friction + dt·A·g·Δh / l), then scale so Σf·dt ≤ water.
  */
@@ -274,46 +304,68 @@ export function updatePipeFlux(
         fluxB[i] = 0;
         continue;
       }
-      const eta = terrain[i] + w;
-      const dL = eta - (terrain[i - 1] + water[i - 1]);
-      const dR = eta - (terrain[i + 1] + water[i + 1]);
-      const dB = eta - (terrain[i - size] + water[i - size]);
-      const dT = eta - (terrain[i + size] + water[i + size]);
+      const z0 = terrain[i];
+      const eta = z0 + w;
+      const zL = terrain[i - 1];
+      const zR = terrain[i + 1];
+      const zB = terrain[i - size];
+      const zT = terrain[i + size];
+      const etaL = zL + water[i - 1];
+      const etaR = zR + water[i + 1];
+      const etaB = zB + water[i - size];
+      const etaT = zT + water[i + size];
+      const headL = hydroHead(eta, interfaceBed(z0, zL));
+      const headR = hydroHead(eta, interfaceBed(z0, zR));
+      const headB = hydroHead(eta, interfaceBed(z0, zB));
+      const headT = hydroHead(eta, interfaceBed(z0, zT));
+      const dL = headL > 0 ? eta - etaL : 0;
+      const dR = headR > 0 ? eta - etaR : 0;
+      const dB = headB > 0 ? eta - etaB : 0;
+      const dT = headT > 0 ? eta - etaT : 0;
 
-      // Conductivity rises in an established thread and on a falling bed.
-      // Thin films stay less laterally conductive so a gentle pour becomes a vein.
-      const bedFall = Math.max(0, -Math.min(dL, dR, dB, dT) + (w - Math.max(water[i - 1], water[i + 1], water[i - size], water[i + size])));
-      const thin = w < 0.02 ? 0.78 + 11 * w : 1;
-      const cond = (1 + 14 * Math.min(flow[i], 0.32) + 6 * Math.min(bedFall, 0.08)) * thin;
+      const surfaceDrop = Math.max(0, dL, dR, dB, dT);
+      const pond = w > POND_DEPTH && surfaceDrop < 0.01;
+      const thin = pond ? 1 : w < 0.02 ? 0.78 + 11 * w : 1;
+      const bedFall = Math.max(
+        0,
+        -Math.min(dL, dR, dB, dT) +
+          (w - Math.max(water[i - 1], water[i + 1], water[i - size], water[i + size])),
+      );
+      const cond = pond
+        ? 1.35 + 10 * Math.min(w, 0.4)
+        : (1 + 14 * Math.min(flow[i], 0.32) + 6 * Math.min(bedFall, 0.08)) * thin;
       const acc = gAl * cond;
+      const friction = pond ? 0.7 : PIPE_FRICTION;
 
-      let fL = Math.max(0, fluxL[i] * PIPE_FRICTION + acc * dL);
-      let fR = Math.max(0, fluxR[i] * PIPE_FRICTION + acc * dR);
-      let fB = Math.max(0, fluxB[i] * PIPE_FRICTION + acc * dB);
-      let fT = Math.max(0, fluxT[i] * PIPE_FRICTION + acc * dT);
+      let fL = Math.max(0, fluxL[i] * friction + acc * dL * weirFluxScale(headL, zL - z0));
+      let fR = Math.max(0, fluxR[i] * friction + acc * dR * weirFluxScale(headR, zR - z0));
+      let fB = Math.max(0, fluxB[i] * friction + acc * dB * weirFluxScale(headB, zB - z0));
+      let fT = Math.max(0, fluxT[i] * friction + acc * dT * weirFluxScale(headT, zT - z0));
 
-      // Concentrate along the steepest downhill pipe so sources form veins.
-      let steep = fL;
-      let which = 0;
-      if (fR > steep) {
-        steep = fR;
-        which = 1;
-      }
-      if (fB > steep) {
-        steep = fB;
-        which = 2;
-      }
-      if (fT > steep) {
-        steep = fT;
-        which = 3;
-      }
-      if (steep > 1e-8) {
-        const boost = w < 0.018 ? 1.7 : 1.55;
-        const keep = w < 0.018 ? 0.6 : 0.72;
-        fL *= which === 0 ? boost : keep;
-        fR *= which === 1 ? boost : keep;
-        fB *= which === 2 ? boost : keep;
-        fT *= which === 3 ? boost : keep;
+      // Streams stay thin. Still ponds must not — a lake has to reach the wall.
+      if (!pond) {
+        let steep = fL;
+        let which = 0;
+        if (fR > steep) {
+          steep = fR;
+          which = 1;
+        }
+        if (fB > steep) {
+          steep = fB;
+          which = 2;
+        }
+        if (fT > steep) {
+          steep = fT;
+          which = 3;
+        }
+        if (steep > 1e-8) {
+          const boost = w < 0.018 ? 1.7 : 1.55;
+          const keep = w < 0.018 ? 0.6 : 0.72;
+          fL *= which === 0 ? boost : keep;
+          fR *= which === 1 ? boost : keep;
+          fB *= which === 2 ? boost : keep;
+          fT *= which === 3 ? boost : keep;
+        }
       }
 
       const out = fL + fR + fB + fT;
@@ -322,6 +374,122 @@ export function updatePipeFlux(
       fluxR[i] = x >= size - 2 ? 0 : fR * k;
       fluxB[i] = y <= 1 ? 0 : fB * k;
       fluxT[i] = y >= size - 2 ? 0 : fT * k;
+    }
+  }
+}
+
+/**
+ * Physics despike that will not teleport a column onto a bed above its
+ * free surface (the display Lipschitz can walk water over a dam).
+ */
+export function relaxPhysicsSpikesHydro(
+  water: Float32Array,
+  terrain: Float32Array,
+  scratch: Float32Array,
+  size: number,
+  iters = 3,
+): void {
+  if (size < 3) return;
+  const nPass = Math.max(1, iters | 0);
+  for (let pass = 0; pass < nPass; pass++) {
+    scratch.set(water);
+    for (let y = 1; y < size - 1; y++) {
+      const row = y * size;
+      for (let x = 1; x < size - 1; x++) {
+        const i = row + x;
+        const w = scratch[i];
+        if (w < 1e-6) continue;
+        const nMax = Math.max(scratch[i - 1], scratch[i + 1], scratch[i - size], scratch[i + size]);
+        const ceil = nMax * HYDRO_SPIKE_RATIO + HYDRO_SPIKE_PAD;
+        if (w <= ceil) continue;
+        const eta = terrain[i] + w;
+        let dests = 0;
+        for (let oy = -1; oy <= 1; oy++) {
+          for (let ox = -1; ox <= 1; ox++) {
+            if (ox === 0 && oy === 0) continue;
+            if (terrain[i + oy * size + ox] < eta) dests++;
+          }
+        }
+        if (dests === 0) continue;
+        const share = (w - ceil) / dests;
+        water[i] = ceil;
+        for (let oy = -1; oy <= 1; oy++) {
+          for (let ox = -1; ox <= 1; ox++) {
+            if (ox === 0 && oy === 0) continue;
+            const j = i + oy * size + ox;
+            if (terrain[j] < eta) water[j] += share;
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Flatten the free surface of a pond without dumping down a cliff.
+ * Overflow / weirs stay in the pipe solve.
+ */
+export function equalizePondSurface(
+  terrain: Float32Array,
+  water: Float32Array,
+  delta: Float32Array,
+  size: number,
+  passes = 2,
+): void {
+  if (size < 3) return;
+  const n = size * size;
+  const nPass = Math.max(1, passes | 0);
+  for (let p = 0; p < nPass; p++) {
+    delta.fill(0);
+    for (let y = 1; y < size - 1; y++) {
+      const row = y * size;
+      for (let x = 1; x < size - 1; x++) {
+        const i = row + x;
+        const w = water[i];
+        if (w < POND_DEPTH) continue;
+        const z0 = terrain[i];
+        const eta = z0 + w;
+        const neigh = [i - 1, i + 1, i - size, i + size];
+        let openFall = 0;
+        for (let k = 0; k < 4; k++) {
+          const j = neigh[k];
+          if (terrain[j] < z0 - 0.003 && terrain[j] + water[j] < eta - 0.004) openFall++;
+        }
+        if (openFall > 0) continue;
+        let share = 0;
+        let dests = 0;
+        const dest = [0, 0, 0, 0];
+        const amt = [0, 0, 0, 0];
+        for (let k = 0; k < 4; k++) {
+          const j = neigh[k];
+          const zj = terrain[j];
+          if (zj >= eta) continue;
+          if (zj > z0 + 0.008) continue;
+          if (z0 - zj > 0.014) continue;
+          const etaJ = zj + water[j];
+          const drop = eta - etaJ;
+          if (drop <= 1e-5) continue;
+          const move = Math.min(w * 0.22, drop * 0.45);
+          if (move < 1e-7) continue;
+          dest[dests] = j;
+          amt[dests] = move;
+          share += move;
+          dests++;
+        }
+        if (dests === 0 || share < 1e-8) continue;
+        const k = share > w * 0.55 ? (w * 0.55) / share : 1;
+        let sent = 0;
+        for (let d = 0; d < dests; d++) {
+          const move = amt[d] * k;
+          delta[dest[d]] += move;
+          sent += move;
+        }
+        delta[i] -= sent;
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      const next = water[i] + delta[i];
+      water[i] = next > 0 ? next : 0;
     }
   }
 }

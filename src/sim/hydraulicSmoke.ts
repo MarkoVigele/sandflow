@@ -4,16 +4,22 @@ import {
   MAX_PIPE_SPEED,
   MAX_WATER_DEPTH,
   MAX_WATER_DEPTH_ULTRA,
+  POND_DEPTH,
   STILL_SPEED,
   advectMacCormack,
   applyPipeFlux,
   canPickSediment,
   clampWaterDepth,
   clampWaterField,
+  equalizePondSurface,
   equilibriumTransfer,
+  hydroHead,
+  interfaceBed,
   maxWaterDepthFor,
+  relaxPhysicsSpikesHydro,
   sedimentCapacity,
   updatePipeFlux,
+  weirFluxScale,
 } from "./hydraulic";
 import { HARD_THRESHOLD } from "./mapsContract";
 import { hardSupportCount, talusLimit, thermalRateScale, thermalSlip } from "./thermalErosion";
@@ -276,5 +282,96 @@ const n = size * size;
 }
 
 if (!(MAX_PIPE_SPEED > 1) || !Number.isFinite(MAX_PIPE_SPEED)) fail("pipe speed cap");
+
+{
+  if (interfaceBed(0.4, 0.7) !== 0.7) fail("interfaceBed takes the higher bed");
+  if (hydroHead(0.6, 0.7) !== 0) fail("no head under a higher crest");
+  if (Math.abs(hydroHead(0.9, 0.7) - 0.2) > 1e-6) fail("head above crest");
+  if (weirFluxScale(0.1, 0) !== 1) fail("no weir on a flat bed");
+  if (!(weirFluxScale(0.16, 0.2) > 1)) fail("weir should boost overflow");
+  if (!(POND_DEPTH > 0.01 && POND_DEPTH < 0.05)) fail("pond threshold");
+}
+
+{
+  // High wall: water must pool until the free surface exceeds the crest, then weir over.
+  const sizeB = 32;
+  const nB = sizeB * sizeB;
+  const terrain = new Float32Array(nB);
+  const water = new Float32Array(nB);
+  const flow = new Float32Array(nB);
+  const fL = new Float32Array(nB);
+  const fR = new Float32Array(nB);
+  const fT = new Float32Array(nB);
+  const fB = new Float32Array(nB);
+  const velX = new Float32Array(nB);
+  const velY = new Float32Array(nB);
+  const wallX = 16;
+  const crest = 0.72;
+  const bed = 0.48;
+  for (let y = 0; y < sizeB; y++) {
+    for (let x = 0; x < sizeB; x++) {
+      terrain[y * sizeB + x] = x === wallX ? crest : bed;
+    }
+  }
+  for (let y = 2; y < sizeB - 2; y++) {
+    for (let x = 2; x < wallX; x++) water[y * sizeB + x] = 0.12;
+  }
+  for (let s = 0; s < 8; s++) {
+    updatePipeFlux(fL, fR, fT, fB, terrain, water, flow, sizeB, 1.1, 0.2);
+    applyPipeFlux(fL, fR, fT, fB, water, velX, velY, sizeB, 0.2);
+  }
+  let downEarly = 0;
+  for (let y = 2; y < sizeB - 2; y++) {
+    for (let x = wallX + 1; x < sizeB - 2; x++) downEarly += water[y * sizeB + x];
+  }
+  if (downEarly > 0.08) fail(`leaked through the wall before overtop: ${downEarly}`);
+
+  for (let y = 2; y < sizeB - 2; y++) {
+    for (let x = 2; x < wallX; x++) water[y * sizeB + x] = 0.32;
+  }
+  for (let s = 0; s < 16; s++) {
+    updatePipeFlux(fL, fR, fT, fB, terrain, water, flow, sizeB, 1.1, 0.2);
+    applyPipeFlux(fL, fR, fT, fB, water, velX, velY, sizeB, 0.2);
+  }
+  let downLate = 0;
+  let onCrest = 0;
+  for (let y = 2; y < sizeB - 2; y++) {
+    onCrest += water[y * sizeB + wallX];
+    for (let x = wallX + 1; x < sizeB - 2; x++) downLate += water[y * sizeB + x];
+  }
+  console.log(JSON.stringify({ weir: { downEarly: +downEarly.toFixed(4), downLate: +downLate.toFixed(3), onCrest: +onCrest.toFixed(3) } }));
+  if (downLate < 0.12) fail(`did not weir over the crest: ${downLate}`);
+  if (onCrest < 0.02) fail(`overflow skipped the crest: ${onCrest}`);
+}
+
+{
+  const sizeB = 24;
+  const nB = sizeB * sizeB;
+  const terrain = new Float32Array(nB);
+  const water = new Float32Array(nB);
+  const scratch = new Float32Array(nB);
+  terrain.fill(0.4);
+  for (let y = 0; y < sizeB; y++) terrain[y * sizeB + 12] = 0.95;
+  water[8 * sizeB + 11] = 0.4;
+  relaxPhysicsSpikesHydro(water, terrain, scratch, sizeB, 4);
+  if (water[8 * sizeB + 12] > 0.02) fail(`despike teleported over the wall: ${water[8 * sizeB + 12]}`);
+  if (water[8 * sizeB + 13] > 0.01) fail(`despike crossed the wall: ${water[8 * sizeB + 13]}`);
+}
+
+{
+  const sizeB = 24;
+  const nB = sizeB * sizeB;
+  const terrain = new Float32Array(nB);
+  const water = new Float32Array(nB);
+  const delta = new Float32Array(nB);
+  terrain.fill(0.5);
+  water[10 * sizeB + 8] = 0.2;
+  water[10 * sizeB + 9] = 0.04;
+  equalizePondSurface(terrain, water, delta, sizeB, 3);
+  const a = water[10 * sizeB + 8];
+  const b = water[10 * sizeB + 9];
+  console.log(JSON.stringify({ pondEq: { a: +a.toFixed(3), b: +b.toFixed(3) } }));
+  if (a - b > 0.12) fail(`pond did not level: ${a} vs ${b}`);
+}
 
 console.log("hydraulicSmoke ok");
