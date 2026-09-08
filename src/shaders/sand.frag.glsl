@@ -1,4 +1,7 @@
 uniform sampler2D uMaps;
+uniform sampler2D uMapsBefore;
+uniform float uCompare;
+uniform float uWipe;
 uniform sampler2D uAlbedo;
 uniform sampler2D uAlbedoWet;
 uniform sampler2D uNormal;
@@ -31,6 +34,7 @@ varying vec2 vUv;
 varying vec3 vWorldPos;
 varying vec3 vViewDir;
 varying vec3 vNormalW;
+varying float vComparePick;
 
 vec3 safeNormalize(vec3 v, vec3 fallback) {
   float len2 = dot(v, v);
@@ -40,8 +44,13 @@ vec3 safeNormalize(vec3 v, vec3 fallback) {
   return n;
 }
 
+vec4 sampleMaps(vec2 coord) {
+  float pick = vComparePick > 0.5 ? 1.0 : 0.0;
+  return mix(texture2D(uMaps, coord), texture2D(uMapsBefore, coord), pick);
+}
+
 float heightAt(vec2 uv) {
-  float h01 = texture2D(uMaps, uv).r;
+  float h01 = sampleMaps(uv).r;
   if (!(h01 == h01)) h01 = 0.0;
   float relief = uRelief > 0.05 ? uRelief : 1.0;
   float h = (uPivot + (h01 - uPivot) * relief) * uHeightScale;
@@ -109,7 +118,7 @@ float heightfieldContact(vec2 uv, float h0, vec3 L, float texel, float tray, flo
 }
 
 void main() {
-  vec4 maps = texture2D(uMaps, vUv);
+  vec4 maps = sampleMaps(vUv);
   float wet = clamp(maps.b, 0.0, 1.0);
   float water = maps.g;
   if (!(wet == wet)) wet = 0.0;

@@ -1,3 +1,4 @@
+import type { CompareMode } from "../sim/compare";
 import {
   DEFAULT_PARAMS,
   DEFAULT_RELIEF,
@@ -56,6 +57,9 @@ export interface UiState {
   sectionOpen: boolean;
   canUndo: boolean;
   canRedo: boolean;
+  compareMode: CompareMode;
+  compareWipe: number;
+  hasCompare: boolean;
 }
 
 export const initialUiState = (): UiState => {
@@ -87,6 +91,9 @@ export const initialUiState = (): UiState => {
     sectionOpen: false,
     canUndo: false,
     canRedo: false,
+    compareMode: "off",
+    compareWipe: 0.5,
+    hasCompare: false,
   };
 };
 

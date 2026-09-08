@@ -3,6 +3,15 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { GeneratedMaps } from "../assets/AssetService";
 import { SimClient, type SimFrame, type SimSnapshot } from "../sim/SimClient";
 import type { BrushKind } from "../sim/types";
+import {
+  COMPARE_MODE_CODE,
+  captureCompareSnap,
+  compareSnapFromFields,
+  packCompareSnap,
+  resampleCompareSnap,
+  type CompareSnap,
+} from "../sim/compare";
+import { encodeHeightPng16, heightmapFilename } from "../sim/heightmap";
 import { packMapsRgba, resampleMask, stoneIslandUvRadius, unpackRgba } from "../sim/mapsContract";
 import { packDisplayMapsRgba } from "../sim/waterDisplay";
 import { getPreset, resampleHeight, type CameraPose } from "../sim/presets";
@@ -101,6 +110,8 @@ export class Viewport {
   private store: Store;
   private host: HTMLElement;
   private maps: THREE.DataTexture;
+  private beforeMaps: THREE.DataTexture;
+  private compareSnap: CompareSnap | null = null;
   private hardTex: THREE.DataTexture;
   private sand: SandMesh;
   private tray: TrayHandle;
@@ -232,19 +243,24 @@ export class Viewport {
     const q = store.state.quality;
     const grid = QUALITY_GRID[q];
     this.maps = createMapsTexture(grid);
+    this.beforeMaps = createMapsTexture(grid);
     this.hardTex = createHardTexture(grid);
     this.sand = new SandMesh(TRAY_SIZE, this.maps, q, this.heightScale);
     this.sand.setHard(this.hardTex);
+    this.sand.setBeforeMaps(this.beforeMaps);
     this.allocTrail(grid);
     this.water = new WaterMesh(TRAY_SIZE, this.maps, q, this.heightScale);
+    this.water.setBeforeMaps(this.beforeMaps);
     this.particles = new FlowParticles();
     this.scene.add(this.sand.mesh, this.water.mesh, this.particles.points, this.propsLite.group);
     this.section = new CrossSectionView(host);
     this.sand.setHeatMode(store.state.heatmap);
     this.section.setOpen(store.state.sectionOpen);
+    this.syncCompare();
     store.subscribe(() => {
       this.sand.setHeatMode(this.store.state.heatmap);
       this.section.setOpen(this.store.state.sectionOpen);
+      this.syncCompare();
     });
     this.sourceGroup.name = "sources";
     this.scene.add(this.sourceGroup);
@@ -384,6 +400,9 @@ export class Viewport {
       mapWidth: this.maps.image.width,
       nextGrid: grid,
     });
+    if (this.compareSnap && this.compareSnap.size !== grid) {
+      this.compareSnap = resampleCompareSnap(this.compareSnap, grid);
+    }
     if (mapsPlan === "resample" && this.lastPacked) {
       const { terrain, water, wetness, flow } = unpackRgba(this.lastPacked, this.lastSize);
       const t2 = resampleHeight(terrain, this.lastSize, grid);
@@ -391,13 +410,7 @@ export class Viewport {
       const n2 = resampleHeight(wetness, this.lastSize, grid);
       const f2 = resampleHeight(flow, this.lastSize, grid);
       const h2 = this.lastHard ? resampleMask(this.lastHard, this.lastSize, grid) : undefined;
-      this.maps.dispose();
-      this.hardTex.dispose();
-      this.maps = createMapsTexture(grid);
-      this.hardTex = createHardTexture(grid);
-      this.sand.setMaps(this.maps);
-      this.sand.setHard(this.hardTex);
-      this.water.setMaps(this.maps);
+      this.rebuildMapTextures(grid);
       const packed = packMapsRgba(t2, w2, n2, f2);
       this.lastPacked = packed;
       this.lastSize = grid;
@@ -411,13 +424,7 @@ export class Viewport {
       this.syncSourcePins();
       this.paintSection();
     } else if (mapsPlan === "allocEmpty") {
-      this.maps.dispose();
-      this.hardTex.dispose();
-      this.maps = createMapsTexture(grid);
-      this.hardTex = createHardTexture(grid);
-      this.sand.setMaps(this.maps);
-      this.sand.setHard(this.hardTex);
-      this.water.setMaps(this.maps);
+      this.rebuildMapTextures(grid);
       this.allocTrail(grid);
     }
   }
@@ -429,13 +436,7 @@ export class Viewport {
     this.sources = built.sources.map((s) => ({ ...s }));
     this.erodedSand = 0;
     this.rebuildMarkers();
-    this.maps.dispose();
-    this.hardTex.dispose();
-    this.maps = createMapsTexture(grid);
-    this.hardTex = createHardTexture(grid);
-    this.sand.setMaps(this.maps);
-    this.sand.setHard(this.hardTex);
-    this.water.setMaps(this.maps);
+    this.rebuildMapTextures(grid);
     this.lastHard = built.hardmask ? built.hardmask.slice() : new Float32Array(grid * grid);
     if (this.lastHard) uploadHard(this.hardTex, this.lastHard, grid);
     const empty = new Float32Array(grid * grid);
@@ -447,6 +448,7 @@ export class Viewport {
     this.sim.init(grid, this.store.state.params, built.terrain, this.sources, {
       hardmask: built.hardmask,
     });
+    this.captureBefore({ terrain: built.terrain, size: grid });
     this.syncSourcePins();
     this.paintSection();
     this.applyCamera(preset.camera);
@@ -471,18 +473,94 @@ export class Viewport {
     return this.sim.requestSnapshot();
   }
 
+  private rebuildMapTextures(grid: number): void {
+    this.maps.dispose();
+    this.hardTex.dispose();
+    this.beforeMaps.dispose();
+    this.maps = createMapsTexture(grid);
+    this.hardTex = createHardTexture(grid);
+    this.beforeMaps = createMapsTexture(grid);
+    this.sand.setMaps(this.maps);
+    this.sand.setHard(this.hardTex);
+    this.sand.setBeforeMaps(this.beforeMaps);
+    this.water.setMaps(this.maps);
+    this.water.setBeforeMaps(this.beforeMaps);
+    if (this.compareSnap && this.compareSnap.size !== grid) {
+      this.compareSnap = resampleCompareSnap(this.compareSnap, grid);
+    }
+    this.uploadCompareSnap();
+  }
+
+  private uploadCompareSnap(): void {
+    if (!this.compareSnap) return;
+    uploadPacked(this.beforeMaps, packCompareSnap(this.compareSnap), this.compareSnap.size);
+  }
+
+  private syncCompare(): void {
+    const mode = this.compareSnap ? this.store.state.compareMode : "off";
+    const wipe = this.store.state.compareWipe;
+    this.sand.setCompare(COMPARE_MODE_CODE[mode], wipe);
+    this.water.setCompare(COMPARE_MODE_CODE[mode], wipe);
+    this.particles.points.visible = mode !== "before";
+  }
+
+  captureBefore(from?: { terrain: Float32Array; water?: Float32Array; size: number }): boolean {
+    const snap = from
+      ? compareSnapFromFields(from.size, from.terrain, from.water)
+      : this.lastPacked && this.lastSize
+        ? captureCompareSnap(this.lastPacked, this.lastSize)
+        : null;
+    if (!snap) return false;
+    this.compareSnap = snap;
+    if (this.beforeMaps.image.width !== snap.size) {
+      this.beforeMaps.dispose();
+      this.beforeMaps = createMapsTexture(snap.size);
+      this.sand.setBeforeMaps(this.beforeMaps);
+      this.water.setBeforeMaps(this.beforeMaps);
+    }
+    this.uploadCompareSnap();
+    if (!this.store.state.hasCompare) this.store.patch({ hasCompare: true });
+    else this.syncCompare();
+    return true;
+  }
+
+  applyHeightmap(terrain: Float32Array, srcSize: number): void {
+    const grid = QUALITY_GRID[this.store.state.quality];
+    const h = srcSize === grid ? terrain.slice() : resampleHeight(terrain, srcSize, grid);
+    const empty = new Float32Array(grid * grid);
+    const hard =
+      this.lastHard && this.lastSize === grid ? this.lastHard.slice() : new Float32Array(grid * grid);
+    if (grid !== this.maps.image.width) this.rebuildMapTextures(grid);
+    this.sim.replaceTerrain(h, this.sources, empty, empty, hard);
+    const packed = packMapsRgba(h, empty, empty, empty);
+    this.lastPacked = packed;
+    this.lastHard = hard;
+    this.lastSize = grid;
+    uploadPacked(this.maps, packed, grid);
+    uploadHard(this.hardTex, hard, grid);
+    this.seedTrail(packed, grid);
+    this.captureBefore({ terrain: h, size: grid });
+    this.syncSourcePins();
+    this.paintSection();
+    this.onUi();
+  }
+
+  exportHeightPng(): { bytes: Uint8Array; filename: string; mime: string } | null {
+    if (!this.lastPacked || this.lastSize < 2) return null;
+    const { terrain } = unpackRgba(this.lastPacked, this.lastSize);
+    return {
+      bytes: encodeHeightPng16(terrain, this.lastSize),
+      filename: heightmapFilename(this.lastSize, "png16"),
+      mime: "image/png",
+    };
+  }
+
   applySnapshot(snap: SimSnapshot): void {
     this.sources = snap.sources.map((s) => ({ ...s }));
     this.erodedSand = snap.erodedSand;
     this.rebuildMarkers();
     if (snap.size !== this.maps.image.width) {
-      this.maps.dispose();
-      this.hardTex.dispose();
-      this.maps = createMapsTexture(snap.size);
-      this.hardTex = createHardTexture(snap.size);
-      this.sand.setMaps(this.maps);
-      this.sand.setHard(this.hardTex);
-      this.water.setMaps(this.maps);
+      this.rebuildMapTextures(snap.size);
     }
     this.sim.init(snap.size, this.store.state.params, snap.terrain, this.sources, {
       water: snap.water,
@@ -662,6 +740,7 @@ export class Viewport {
     this.aim.dispose();
     this.propsLite.dispose();
     this.maps.dispose();
+    this.beforeMaps.dispose();
     this.hardTex.dispose();
     this.trailTex?.dispose();
     this.section.dispose();

@@ -1,6 +1,7 @@
 import { persistOnboardDone, type Store } from "../state/store";
 import { SPEEDS, speedLabel } from "../state/types";
 import type { QualityId } from "../state/types";
+import { compareChipLabel, nextCompareMode } from "./compare";
 import { ICONS } from "./icons";
 import { QualitySwitcher } from "./QualitySwitcher";
 import { applyPlay, isLapse, lapseSpeed, speedFromIndex, speedIndex } from "./transport";
@@ -23,6 +24,8 @@ export class TopBar {
       onResetWater: () => void;
       onShareLink: () => void;
       onShareJson: () => void;
+      onCompareCycle: () => void;
+      onExportHeight: () => void;
     },
   ) {
     this.el = host;
@@ -30,7 +33,7 @@ export class TopBar {
     let sig = "";
     store.subscribe(() => {
       const st = store.state;
-      const next = `${st.playing}|${st.speed}|${st.trailFade}|${st.quality}|${st.autoQuality}|${st.onboardStep}|${st.menuOpen}|${st.canUndo}|${st.canRedo}`;
+      const next = `${st.playing}|${st.speed}|${st.trailFade}|${st.quality}|${st.autoQuality}|${st.onboardStep}|${st.menuOpen}|${st.canUndo}|${st.canRedo}|${st.compareMode}|${st.hasCompare}`;
       if (next !== sig) {
         sig = next;
         this.render();
@@ -66,6 +69,7 @@ export class TopBar {
             <span class="lapse-short">${lapseOn ? "8× an" : "8×"}</span>
           </button>
           <button type="button" class="chip ${s.trailFade ? "is-on" : ""}" data-trail title="Sanfte Höhenspur im Zeitraffer" aria-label="Höhenspur" aria-pressed="${s.trailFade}">Spur</button>
+          <button type="button" class="chip chip-compare ${s.compareMode !== "off" ? "is-on" : ""}" data-compare title="Vorher und Nachher vergleichen" aria-label="Vergleich" aria-pressed="${s.compareMode !== "off"}">${compareChipLabel(s.compareMode, s.hasCompare)}</button>
         </div>
         <div class="top-desktop">
           <button type="button" class="icon-btn" data-step title="Einzelschritt" aria-label="Einzelschritt">${ICONS.step}</button>
@@ -93,6 +97,7 @@ export class TopBar {
                 : ""
             }
           </div>
+          <button type="button" class="icon-btn" data-height title="Höhenkarte als 16-Bit-PNG" aria-label="Höhenkarte exportieren">${ICONS.height}</button>
           <button type="button" class="icon-btn" data-save title="Szene speichern" aria-label="Szene speichern">${ICONS.save}</button>
           <button type="button" class="icon-btn" data-load title="Szene laden" aria-label="Szene laden">${ICONS.load}</button>
           <button type="button" class="chip ghost" data-about aria-label="Über Sandflow">Über</button>
@@ -114,6 +119,8 @@ export class TopBar {
                   <button type="button" data-share-json>Share-JSON</button>
                   <button type="button" data-save>Szene speichern</button>
                   <button type="button" data-load>Szene laden</button>
+                  <button type="button" data-compare>${compareChipLabel(s.compareMode, s.hasCompare)}</button>
+                  <button type="button" data-height>Höhe PNG</button>
                   <button type="button" data-shot>Bild speichern</button>
                   <button type="button" data-about>Über</button>
                 </div>`
@@ -153,6 +160,21 @@ export class TopBar {
     this.el.querySelectorAll("[data-trail]").forEach((btn) => {
       btn.addEventListener("click", () => {
         this.store.patch({ trailFade: !this.store.state.trailFade, menuOpen: null });
+      });
+    });
+    this.el.querySelectorAll("[data-compare]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this.store.patch({
+          compareMode: nextCompareMode(this.store.state.compareMode, this.store.state.hasCompare),
+          menuOpen: null,
+        });
+        this.actions.onCompareCycle();
+      });
+    });
+    this.el.querySelectorAll("[data-height]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this.store.patch({ menuOpen: null });
+        this.actions.onExportHeight();
       });
     });
     this.el.querySelector("[data-more-menu]")?.addEventListener("click", (e) => {

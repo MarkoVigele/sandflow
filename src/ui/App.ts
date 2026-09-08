@@ -4,7 +4,9 @@ import { propsFromShare, propsToShare } from "../scene/PropsLite";
 import { Viewport } from "../scene/Viewport";
 import { resampleMask } from "../sim/mapsContract";
 import type { SimSnapshot } from "../sim/SimClient";
+import { decodeHeightBytes, lumaToHeight } from "../sim/heightmap";
 import {
+  downloadBlob,
   downloadDataUrl,
   downloadText,
   encodeScene,
@@ -30,6 +32,7 @@ import { persistOnboardDone, Store } from "../state/store";
 import { QUALITY_GRID, SPEEDS } from "../state/types";
 import { qualityProfile } from "../state/quality";
 import { interpretHotkey, nudgeBrushRadius } from "./hotkeys";
+import { CompareBar } from "./CompareBar";
 import { Inspector } from "./Inspector";
 import { Onboarding } from "./Onboarding";
 import { PresetGallery } from "./PresetGallery";
@@ -45,6 +48,7 @@ export class App {
   readonly viewport: Viewport;
   private assets = createAssetService();
   private fileInput: HTMLInputElement;
+  private heightInput: HTMLInputElement;
   private texToken = 0;
   private texKey = "";
   private lastShareHash: string | null = null;
@@ -54,6 +58,7 @@ export class App {
       <header id="topbar" class="topbar"></header>
       <aside id="toolbar" class="toolbar"></aside>
       <main id="viewport" class="viewport">
+        <div id="compare"></div>
         <div id="onboard"></div>
         <div id="source-tip"></div>
       </main>
@@ -95,6 +100,15 @@ export class App {
       },
       onShareLink: () => void this.shareLink(),
       onShareJson: () => void this.shareJson(),
+      onCompareCycle: () => {
+        if (!this.store.state.hasCompare) this.toast("Erst Vorher merken, dann vergleichen.");
+      },
+      onExportHeight: () => this.exportHeight(),
+    });
+    new CompareBar(this.store, root.querySelector("#compare")!, {
+      onCapture: () => this.captureBefore(),
+      onExport: () => this.exportHeight(),
+      onImport: () => this.heightInput.click(),
     });
     new PresetGallery(this.store, root.querySelector("#gallery")!, (id) => {
       this.viewport.loadPreset(id, true);
@@ -109,6 +123,12 @@ export class App {
     this.fileInput.hidden = true;
     root.appendChild(this.fileInput);
     this.fileInput.addEventListener("change", () => void this.loadScene());
+    this.heightInput = document.createElement("input");
+    this.heightInput.type = "file";
+    this.heightInput.accept = "image/png,.png,.r32,application/octet-stream";
+    this.heightInput.hidden = true;
+    root.appendChild(this.heightInput);
+    this.heightInput.addEventListener("change", () => void this.importHeight());
 
     this.bindAbout(root.querySelector("#about")!);
     this.bindKeys();
@@ -341,6 +361,47 @@ export class App {
     this.syncHistory();
   }
 
+  private captureBefore(): void {
+    if (this.viewport.captureBefore()) this.toast("Vorher gespeichert — nach der Erosion vergleichen.");
+    else this.toast("Noch kein Gelände zum Merken.");
+  }
+
+  private exportHeight(): void {
+    const file = this.viewport.exportHeightPng();
+    if (!file) {
+      this.toast("Höhe konnte nicht gespeichert werden.");
+      return;
+    }
+    const copy = new Uint8Array(file.bytes.byteLength);
+    copy.set(file.bytes);
+    downloadBlob(file.filename, new Blob([copy], { type: file.mime }));
+    this.toast("Höhenkarte gespeichert (16-Bit-PNG).");
+  }
+
+  private async importHeight(): Promise<void> {
+    const file = this.heightInput.files?.[0];
+    this.heightInput.value = "";
+    if (!file) return;
+    try {
+      const buf = new Uint8Array(await file.arrayBuffer());
+      const decoded = decodeHeightBytes(buf);
+      if (decoded) {
+        this.viewport.applyHeightmap(decoded.terrain, decoded.size);
+        this.toast("Höhe geladen.");
+        return;
+      }
+      const fromImage = await heightFromImageFile(file);
+      if (fromImage) {
+        this.viewport.applyHeightmap(fromImage.terrain, fromImage.size);
+        this.toast("Höhe aus Bild geladen.");
+        return;
+      }
+      this.toast("Höhe konnte nicht gelesen werden.");
+    } catch {
+      this.toast("Höhe konnte nicht gelesen werden.");
+    }
+  }
+
   private screenshot(): void {
     try {
       const url = this.viewport.screenshotPng();
@@ -371,7 +432,7 @@ export class App {
             <p>Wasser sucht sich Wege durch Sand: erst dünne Adern, dann ein Bett, später ein verzweigtes Netz. V1.x ist der spielbare Kern — Zielring, Werkzeuge, Teilen, Kiesel, Beton, gebackene Texturen. WebGPU und eine volle Requisitenbibliothek bleiben später.</p>
             <p>Kurzanleitung: <strong>Kamera drehen</strong> → <strong>Gießen / Quelle ziehen</strong> → <strong>Graben und Beton</strong>. Pins sitzen auf dem Sand; Ziehen verschiebt sie auch im Kameramodus.</p>
             <p>Rechtsklick oder zwei Finger drehen die Kamera. Ein Finger (oder die linke Taste) bedient das Werkzeug. Unter <em>Kamera</em> geht das Drehen auch mit einem Finger.</p>
-            <p>Oben neben Play: <em>Bild</em> (PNG der aktuellen Kamera), <em>Tempo</em>, <em>Zeitraffer</em> (8× Ticks) und optionale <em>Spur</em> (sanfte Höhenspur). Qualität inkl. Auto, Szene oder nur Wasser zurücksetzen, Teilen per Link oder JSON. <em>Beton</em> setzt Hartstoff (Platte oder Wand). Kiesel sind kleine Steine mit einer Hartinsel darunter — der Radierer nimmt Kiesel und Beton weg. Der Wannenrahmen ist Holz.</p>
+            <p>Oben neben Play: <em>Bild</em> (PNG der aktuellen Kamera), <em>Tempo</em>, <em>Zeitraffer</em> (8× Ticks), optionale <em>Spur</em> und <em>Vergleich</em> (Vorher merken, dann Teilen oder Vorher). <em>Höhe PNG</em> legt die aktuelle Höhenkarte als 16-Bit-Graustufenbild ab. Qualität inkl. Auto, Szene oder nur Wasser zurücksetzen, Teilen per Link oder JSON. <em>Beton</em> setzt Hartstoff (Platte oder Wand). Kiesel sind kleine Steine mit einer Hartinsel darunter — der Radierer nimmt Kiesel und Beton weg. Der Wannenrahmen ist Holz.</p>
             <p>Unter <em>Erweitert</em> liegen Farbkarte (Strömung oder Nässe) und <em>Relief</em>, das die Höhen in der Wanne überhöht. Texturen entstehen lokal aus einer kurzen Beschreibung.</p>
           </div>
         </div>`
@@ -447,5 +508,34 @@ async function copyText(text: string): Promise<boolean> {
     return ok;
   } catch {
     return false;
+  }
+}
+
+async function heightFromImageFile(file: File): Promise<{ terrain: Float32Array; size: number } | null> {
+  if (!file.type.startsWith("image/") && !file.name.toLowerCase().endsWith(".png")) return null;
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("image"));
+      el.src = url;
+    });
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    if (w < 2 || h < 2) return null;
+    const size = Math.min(w, h);
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0, size, size);
+    const rgba = ctx.getImageData(0, 0, size, size).data;
+    return { terrain: lumaToHeight(rgba, size, size), size };
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(url);
   }
 }
