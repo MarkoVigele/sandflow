@@ -26,7 +26,8 @@
  * Optional visual uniforms:
  *   uHard, uConcrete
  *
- * Particles: triples [u, v, terrain+water] in 0..1 uv, height in sim units.
+ * Particles: quads [u, v, height, attr] in 0..1 uv, height in sim units.
+ *   attr = kind + life∈[0,1) — kind 0 foam, 1 bubble cluster, 2 bedload grain.
  */
 
 export const MAP_R_TERRAIN = 0;

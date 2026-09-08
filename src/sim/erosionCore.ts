@@ -1,5 +1,21 @@
 import { hash2 } from "../assets/noise";
 import type { SimParams, WaterSource } from "../state/types";
+import {
+  KIND_BUBBLE,
+  KIND_FOAM,
+  KIND_GRAIN,
+  MAX_BUBBLES,
+  MAX_FOAM,
+  MAX_FX,
+  MAX_GRAINS,
+  MAX_PARTICLES,
+  PARTICLE_STRIDE,
+  bubbleSpawnScore,
+  clusterJitter,
+  grainSpawnScore,
+  packParticleAttr,
+  type ParticleKind,
+} from "./flowFx";
 import { HARD_THRESHOLD, packMapsRgba } from "./mapsContract";
 import type { BrushKind } from "./types";
 
@@ -15,7 +31,6 @@ const NEIGH = [
 ] as const;
 
 const DIAG = 1.41421356;
-const MAX_PARTICLES = 280;
 const CONCENTRATE = 2.92;
 const MIN_SAND = 0.04;
 /** Water-surface drop below this is a still pool, not a stream. Keep — standing water must not burn holes. */
@@ -57,6 +72,15 @@ export class ErosionSim {
   /** Cell-centered momentum (water × velocity) for SWE-style inertia. */
   private momX: Float32Array;
   private momY: Float32Array;
+  /** Transient aeration from high shear / drops. Visual only. */
+  private aerate: Float32Array;
+  private fxU = new Float32Array(MAX_FX);
+  private fxV = new Float32Array(MAX_FX);
+  private fxH = new Float32Array(MAX_FX);
+  private fxKind = new Uint8Array(MAX_FX);
+  private fxAge = new Uint8Array(MAX_FX);
+  private fxLife = new Uint8Array(MAX_FX);
+  private fxN = 0;
   private tick = 0;
 
   constructor(size: number, params: SimParams, terrain: Float32Array) {
@@ -75,6 +99,7 @@ export class ErosionSim {
     this.terrDelta = new Float32Array(n);
     this.momX = new Float32Array(n);
     this.momY = new Float32Array(n);
+    this.aerate = new Float32Array(n);
     this.lastDir = new Uint8Array(n);
     this.lastDir.fill(255);
   }
@@ -96,6 +121,8 @@ export class ErosionSim {
     this.settleSediment();
     this.soakAndDrain();
     if ((this.tick & 1) === 0) this.thermal();
+    const air = this.aerate;
+    for (let i = 0; i < air.length; i++) air[i] *= 0.88;
   }
 
   private addSources(): void {
@@ -243,6 +270,10 @@ export class ErosionSim {
         const stream = moving ? movable * (0.38 + maxDrop * 2.6) : movable * 0.05;
         flow[i] = flow[i] * 0.46 + stream * 0.54;
         const flux = flow[i];
+        if (!ponded) {
+          const score = bubbleSpawnScore(shear, Math.max(maxDrop, head), flux, w);
+          if (score > this.aerate[i]) this.aerate[i] = score;
+        }
 
         const ratio = second >= 0 ? this.nDrop[second] / Math.max(this.nDrop[steep], 1e-6) : 0;
         const canBranch =
@@ -667,6 +698,8 @@ export class ErosionSim {
     this.flow.fill(0);
     this.momX.fill(0);
     this.momY.fill(0);
+    this.aerate.fill(0);
+    this.fxN = 0;
     this.lastDir.fill(255);
   }
 
@@ -675,28 +708,141 @@ export class ErosionSim {
   }
 
   collectParticles(): Float32Array {
+    this.advanceFlowFx();
     const { size } = this;
     const n = size * size;
-    const stride = size > 300 ? 3 : 2;
-    const idx: number[] = [];
-    for (let i = 0; i < n && idx.length < MAX_PARTICLES; i += stride) {
-      if (this.flow[i] > 0.016 && this.water[i] > 0.004) idx.push(i);
+    const scan = size > 300 ? 3 : 2;
+    const foam: number[] = [];
+    for (let i = 0; i < n && foam.length < MAX_FOAM; i += scan) {
+      if (this.flow[i] > 0.016 && this.water[i] > 0.004) foam.push(i);
     }
-    const out = new Float32Array(idx.length * 3);
-    for (let k = 0; k < idx.length; k++) {
-      const i = idx[k];
+    const count = Math.min(MAX_PARTICLES, foam.length + this.fxN);
+    const out = new Float32Array(count * PARTICLE_STRIDE);
+    let w = 0;
+    for (let k = 0; k < foam.length && w < count; k++) {
+      const i = foam[k];
       const x = i % size;
       const y = (i - x) / size;
-      out[k * 3] = x / (size - 1);
-      out[k * 3 + 1] = y / (size - 1);
-      out[k * 3 + 2] = this.terrain[i] + this.water[i];
+      const o = w * PARTICLE_STRIDE;
+      out[o] = x / (size - 1);
+      out[o + 1] = y / (size - 1);
+      out[o + 2] = this.terrain[i] + this.water[i];
+      out[o + 3] = packParticleAttr(KIND_FOAM, 1);
+      w++;
+    }
+    for (let k = 0; k < this.fxN && w < count; k++) {
+      const o = w * PARTICLE_STRIDE;
+      out[o] = this.fxU[k];
+      out[o + 1] = this.fxV[k];
+      out[o + 2] = this.fxH[k];
+      const life = 1 - this.fxAge[k] / Math.max(1, this.fxLife[k]);
+      out[o + 3] = packParticleAttr(this.fxKind[k] as ParticleKind, life);
+      w++;
     }
     return out;
+  }
+
+  private pushFx(u: number, v: number, h: number, kind: ParticleKind, life: number): void {
+    if (this.fxN >= MAX_FX) return;
+    const i = this.fxN++;
+    this.fxU[i] = u;
+    this.fxV[i] = v;
+    this.fxH[i] = h;
+    this.fxKind[i] = kind;
+    this.fxAge[i] = 0;
+    this.fxLife[i] = life;
+  }
+
+  /** Age / spawn visual FX once per emitted frame, not per SWE step. */
+  private advanceFlowFx(): void {
+    const { size } = this;
+    const n = size * size;
+    const denom = size - 1;
+    let keep = 0;
+    for (let k = 0; k < this.fxN; k++) {
+      const age = this.fxAge[k] + 1;
+      if (age >= this.fxLife[k]) continue;
+      const x = Math.max(1, Math.min(size - 2, Math.round(this.fxU[k] * denom)));
+      const y = Math.max(1, Math.min(size - 2, Math.round(this.fxV[k] * denom)));
+      const i = this.i(x, y);
+      const w = this.water[i];
+      if (w < 0.002) continue;
+      if (this.fxKind[k] === KIND_GRAIN) {
+        if (this.flow[i] < 0.012) continue;
+        const inv = 1 / Math.max(w, 1e-4);
+        this.fxU[k] = Math.min(0.98, Math.max(0.02, this.fxU[k] + this.momX[i] * inv * 0.004));
+        this.fxV[k] = Math.min(0.98, Math.max(0.02, this.fxV[k] + this.momY[i] * inv * 0.004));
+        this.fxH[k] = this.terrain[i] + Math.min(w * 0.14, 0.005);
+      } else {
+        const lift = 0.35 + (this.fxU[k] * 17 + this.fxV[k] * 9) % 0.5;
+        this.fxH[k] = this.terrain[i] + w * Math.min(0.92, lift);
+      }
+      if (keep !== k) {
+        this.fxU[keep] = this.fxU[k];
+        this.fxV[keep] = this.fxV[k];
+        this.fxH[keep] = this.fxH[k];
+        this.fxKind[keep] = this.fxKind[k];
+        this.fxLife[keep] = this.fxLife[k];
+      }
+      this.fxAge[keep] = age;
+      keep++;
+    }
+    this.fxN = keep;
+
+    const scan = size > 300 ? 3 : 2;
+    for (let i = 0; i < n; i++) this.aerate[i] *= 0.68;
+
+    let bubbles = 0;
+    let grains = 0;
+    for (let k = 0; k < this.fxN; k++) {
+      if (this.fxKind[k] === KIND_GRAIN) grains++;
+      else bubbles++;
+    }
+
+    for (let i = 0; i < n && grains < MAX_GRAINS && this.fxN < MAX_FX; i += scan) {
+      const w = this.water[i];
+      const score = grainSpawnScore(this.flow[i], w, this.sediment[i]);
+      if (score < 0.14) continue;
+      const x = i % size;
+      const y = ((i - x) / size) | 0;
+      if (hash2(x, y, this.tick + 61) < 0.58) continue;
+      const u = Math.min(0.99, Math.max(0.01, x / denom + (hash2(x, y, 203) - 0.5) * 0.012));
+      const v = Math.min(0.99, Math.max(0.01, y / denom + (hash2(x + 5, y, 211) - 0.5) * 0.012));
+      const h = this.terrain[i] + Math.min(w * 0.14, 0.005);
+      const life = 16 + ((hash2(x, y, this.tick + 83) * 10) | 0);
+      this.pushFx(u, v, h, KIND_GRAIN, life);
+      grains++;
+    }
+
+    for (let i = 0; i < n && bubbles < MAX_BUBBLES && this.fxN < MAX_FX; i += scan) {
+      const air = this.aerate[i];
+      const w = this.water[i];
+      if (air < 0.2 || w < 0.006) continue;
+      const x = i % size;
+      const y = ((i - x) / size) | 0;
+      if (hash2(x, y, this.tick + 7) < 0.38) continue;
+      const nBub = 2 + ((hash2(x + 3, y, this.tick) * 3.4) | 0);
+      for (let k = 0; k < nBub && bubbles < MAX_BUBBLES && this.fxN < MAX_FX; k++) {
+        const j = clusterJitter(x, y, k, this.tick + k * 13);
+        const u = Math.min(0.99, Math.max(0.01, x / denom + j.du));
+        const v = Math.min(0.99, Math.max(0.01, y / denom + j.dv));
+        const h = this.terrain[i] + w * j.lift;
+        const life = 8 + ((hash2(x, k, this.tick + 29) * 7) | 0);
+        this.pushFx(u, v, h, KIND_BUBBLE, life);
+        bubbles++;
+      }
+    }
   }
 
   waterVolume(): number {
     let s = 0;
     for (let i = 0; i < this.water.length; i++) s += this.water[i];
     return s;
+  }
+
+  aerationPeak(): number {
+    let m = 0;
+    for (let i = 0; i < this.aerate.length; i++) if (this.aerate[i] > m) m = this.aerate[i];
+    return m;
   }
 }
