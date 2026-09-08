@@ -5,7 +5,7 @@
 import { fbm } from "../assets/noise";
 import { DEFAULT_PARAMS } from "../state/types";
 import { ErosionSim } from "./erosionCore";
-import { MAX_WATER_DEPTH } from "./hydraulic";
+import { MAX_WATER_DEPTH, POND_DEPTH } from "./hydraulic";
 import { HARD_THRESHOLD } from "./mapsContract";
 import {
   getPreset,
@@ -329,41 +329,123 @@ function massCentroidY(sim: ErosionSim, size: number) {
   sim.hardmask.set(built.hardmask);
   sim.sources = built.sources;
   const t0 = sim.terrain.slice();
-  sim.step(70);
-  let up = 0;
-  let down = 0;
-  const damY = (size * 0.5) | 0;
-  for (let y = 2; y < damY; y++) {
-    for (let x = 2; x < size - 2; x++) up += sim.water[y * size + x];
+  const midX = (size * 0.5) | 0;
+  let damY0 = size;
+  let damY1 = 0;
+  let crest = 9;
+  for (let y = 0; y < size; y++) {
+    const i = y * size + midX;
+    if (sim.hardmask[i] < HARD_THRESHOLD) continue;
+    damY0 = Math.min(damY0, y);
+    damY1 = Math.max(damY1, y);
+    crest = Math.min(crest, sim.terrain[i]);
   }
-  for (let y = damY + 2; y < size - 2; y++) {
-    for (let x = 2; x < size - 2; x++) down += sim.water[y * size + x];
+  if (damY1 <= damY0) fail("staudamm has no center dam column");
+  const lipIn = sim.terrain[damY0 * size + midX];
+  const lipOut = sim.terrain[damY1 * size + midX];
+  if (lipIn > crest + 0.06) fail(`staudamm inlet lip seals the notch: ${lipIn} vs crest ${crest}`);
+  if (lipOut > crest + 0.06) fail(`staudamm outlet lip seals the notch: ${lipOut} vs crest ${crest}`);
+
+  const bandMass = (y0: number, y1: number) => {
+    let s = 0;
+    const ya = Math.max(1, y0);
+    const yb = Math.min(size - 2, y1);
+    for (let y = ya; y <= yb; y++) {
+      for (let x = 2; x < size - 2; x++) s += sim.water[y * size + x];
+    }
+    return s;
+  };
+  const maxIn = (y0: number, y1: number) => {
+    let m = 0;
+    const ya = Math.max(1, y0);
+    const yb = Math.min(size - 2, y1);
+    for (let y = ya; y <= yb; y++) {
+      for (let x = 2; x < size - 2; x++) {
+        const w = sim.water[y * size + x];
+        if (w > m) m = w;
+      }
+    }
+    return m;
+  };
+  const needles = () => {
+    let n = 0;
+    for (let y = 1; y < size - 1; y++) {
+      for (let x = 1; x < size - 1; x++) {
+        const i = y * size + x;
+        const w = sim.water[i];
+        if (w < 0.03) continue;
+        const nMax = Math.max(sim.water[i - 1], sim.water[i + 1], sim.water[i - size], sim.water[i + size]);
+        if (w > nMax * 2.4 + 0.02) n++;
+      }
+    }
+    return n;
+  };
+
+  sim.step(55);
+  const up55 = bandMass(2, damY0 - 1);
+  const down55 = bandMass(damY1 + 1, size - 3);
+  const depth55 = maxIn(2, damY0 - 1);
+  if (up55 < 1.4) fail(`staudamm did not start a reservoir: up=${up55}`);
+  if (down55 > up55 * 0.22) fail(`staudamm leaked before the lake rose: up=${up55} down=${down55}`);
+  if (depth55 < POND_DEPTH) fail(`staudamm lake stayed a film: ${depth55}`);
+
+  sim.step(40);
+  const up95 = bandMass(2, damY0 - 1);
+  const depth95 = maxIn(2, damY0 - 1);
+  if (up95 < up55 * 1.08 && depth95 < depth55 * 1.05) {
+    fail(`staudamm lake did not rise: ${up55}/${depth55} → ${up95}/${depth95}`);
+  }
+
+  sim.step(200);
+  const upLate = bandMass(2, damY0 - 1);
+  const downLate = bandMass(damY1 + 1, size - 3);
+  let onCrest = 0;
+  for (let y = damY0; y <= damY1; y++) {
+    for (let x = midX - 4; x <= midX + 4; x++) {
+      if (x < 1 || x >= size - 1) continue;
+      onCrest += sim.water[y * size + x];
+    }
   }
   const hardMove = maxAbsHardMove(t0, sim.terrain, sim.hardmask);
   let lakeCut = 0;
-  for (let y = 2; y < damY; y++) {
+  for (let y = 2; y < damY0; y++) {
     for (let x = 2; x < size - 2; x++) {
       const i = y * size + x;
       if (sim.hardmask[i] >= HARD_THRESHOLD) continue;
       lakeCut = Math.max(lakeCut, t0[i] - sim.terrain[i]);
     }
   }
+  let maxW = 0;
+  for (let i = 0; i < sim.water.length; i++) if (sim.water[i] > maxW) maxW = sim.water[i];
+  const spikeN = needles();
   console.log(
     JSON.stringify({
       staudamm: {
-        up: +up.toFixed(3),
-        down: +down.toFixed(3),
+        crest: +crest.toFixed(3),
+        lipIn: +lipIn.toFixed(3),
+        lipOut: +lipOut.toFixed(3),
+        up55: +up55.toFixed(3),
+        down55: +down55.toFixed(3),
+        depth55: +depth55.toFixed(3),
+        up95: +up95.toFixed(3),
+        depth95: +depth95.toFixed(3),
+        upLate: +upLate.toFixed(3),
+        downLate: +downLate.toFixed(3),
+        onCrest: +onCrest.toFixed(3),
         hardMove: +hardMove.toFixed(6),
         lakeCut: +lakeCut.toFixed(4),
+        maxW: +maxW.toFixed(3),
+        spikeN,
       },
     }),
   );
   if (hardMove > 1e-6) fail(`staudamm hardmask moved: ${hardMove}`);
-  if (up < down * 0.55) fail(`staudamm did not pond upstream: up=${up} down=${down}`);
   if (lakeCut > 0.03) fail(`staudamm reservoir burned in: ${lakeCut}`);
-  let maxW = 0;
-  for (let i = 0; i < sim.water.length; i++) if (sim.water[i] > maxW) maxW = sim.water[i];
   if (maxW > MAX_WATER_DEPTH + 1e-6) fail(`staudamm water blew the cap: ${maxW}`);
+  if (downLate < 0.12) fail(`staudamm never overflowed the crest: down=${downLate}`);
+  if (onCrest < 0.015) fail(`staudamm overflow skipped the crest: onCrest=${onCrest}`);
+  if (upLate < downLate * 0.35) fail(`staudamm drained instead of holding a lake: up=${upLate} down=${downLate}`);
+  if (spikeN > 12) fail(`staudamm overflow made needles: ${spikeN}`);
 }
 
 {

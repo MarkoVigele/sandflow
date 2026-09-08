@@ -21,14 +21,17 @@ import {
   MAX_ERODE_FRAC,
   MIN_SAND,
   PIPE_DT,
+  POND_DEPTH,
   STILL_SPEED,
   advectMacCormack,
   applyPipeFlux,
   bedSlopeAt,
   canPickSediment,
   clampWaterField,
+  equalizePondSurface,
   equilibriumTransfer,
   maxWaterDepthFor,
+  relaxPhysicsSpikesHydro,
   sedimentCapacity,
   updatePipeFlux,
 } from "./hydraulic";
@@ -42,7 +45,6 @@ import {
   addCappedDelta,
   addWaterKernelCapped,
   prepareDisplayMaps,
-  relaxPhysicsSpikes,
 } from "./waterDisplay";
 
 const NEIGH = [
@@ -167,6 +169,8 @@ export class ErosionSim {
     this.addSources();
     this.virtualPipes();
     this.virtualPipes();
+    equalizePondSurface(this.terrain, this.water, this.waterDelta, this.size, 2);
+    clampWaterField(this.water, maxWaterDepthFor(this.size));
     this.threadConcentrate();
     this.erodeDeposit();
     this.advectSediment();
@@ -182,7 +186,7 @@ export class ErosionSim {
       if (src.kind === "rain") this.addRain(src);
       else this.addPointSource(src);
     }
-    relaxPhysicsSpikes(this.water, this.visScratch, this.size, 2);
+    relaxPhysicsSpikesHydro(this.water, this.terrain, this.visScratch, this.size, 2);
     clampWaterField(this.water, maxWaterDepthFor(this.size));
   }
 
@@ -232,7 +236,8 @@ export class ErosionSim {
 
   /**
    * Mei / O'Brien virtual pipes: flux → water → velocity.
-   * Hardmask is ignored for routing — water still crosses concrete.
+   * Hardmask does not block routing; hydrostatic reconstruction does —
+   * water only wets a neighbor whose bed sits under the free surface.
    */
   private virtualPipes(): void {
     const { size, params } = this;
@@ -315,6 +320,7 @@ export class ErosionSim {
 
         for (let k = 0; k < 8; k++) {
           const j = this.i(x + NEIGH[k][0], y + NEIGH[k][1]);
+          if (terrain[j] >= h) continue;
           const hn = terrain[j] + water[j];
           if (hn < minHn) minHn = hn;
           if (terrain[j] < minBed) minBed = terrain[j];
@@ -620,8 +626,8 @@ export class ErosionSim {
       const moving = this.flow[i];
       const w = this.water[i];
       const still = moving < 0.008;
-      const deepStill = still && w > 0.03;
-      const soakScale = w < 0.03 ? 0.16 : deepStill ? 0.1 : 1;
+      const deepStill = still && w > POND_DEPTH;
+      const soakScale = w < 0.03 ? 0.16 : deepStill ? 0.04 : 1;
       const soak = Math.min(w, (inf * 0.36 * soakScale * w) / (1 + moving * 24));
       this.water[i] -= soak;
       this.wetness[i] = Math.min(1, this.wetness[i] + soak * 8 + (w > 0.0015 ? 0.08 : 0));
@@ -789,7 +795,7 @@ export class ErosionSim {
     const cx = Math.round(u * (size - 1));
     const cy = Math.round(v * (size - 1));
     addWaterKernelCapped(this.water, size, cx, cy, amount, 0.58, 2, 0.5, POUR_CELL_ADD_CAP);
-    relaxPhysicsSpikes(this.water, this.visScratch, size, 4);
+    relaxPhysicsSpikesHydro(this.water, this.terrain, this.visScratch, size, 4);
     clampWaterField(this.water, maxWaterDepthFor(size));
   }
 
