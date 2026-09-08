@@ -490,6 +490,7 @@ export class Viewport {
   private applyOneFingerOrbit(allow: boolean): void {
     this.controls.mouseButtons.LEFT = allow ? THREE.MOUSE.ROTATE : (-1 as unknown as THREE.MOUSE);
     this.controls.touches.ONE = allow ? THREE.TOUCH.ROTATE : (-1 as unknown as THREE.TOUCH);
+    this.controls.enableRotate = allow || !this.sourceGestureActive();
   }
 
   sourceGestureActive(): boolean {
@@ -689,7 +690,7 @@ export class Viewport {
       (u, v) => this.sampleHeight(u, v),
       TRAY_SIZE,
       this.heightScale,
-      sourcePickRadiusPx(ev.pointerType),
+      sourcePickRadiusPx(ev.pointerType, this.store.state.cameraMode || this.store.state.tool === "source"),
     );
   }
 

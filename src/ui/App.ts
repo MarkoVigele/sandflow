@@ -323,6 +323,7 @@ export class App {
   }
 
   private syncHistory(): void {
+    if (!this.viewport) return;
     const next = this.viewport.history.flags();
     if (this.store.state.canUndo !== next.canUndo || this.store.state.canRedo !== next.canRedo) {
       this.store.patch(next);

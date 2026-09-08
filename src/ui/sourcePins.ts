@@ -35,13 +35,27 @@ export function sourcePinPlantedY(height01: number, heightScale: number): number
   return height01 * heightScale - SOURCE_PIN_PLANT;
 }
 
+/** World position of the drop head — what fingers actually grab. */
+export function sourcePinHeadWorld(
+  u: number,
+  v: number,
+  height01: number,
+  traySize: number,
+  heightScale: number,
+): THREE.Vector3 {
+  const base = sourcePinWorld(u, v, height01, traySize, heightScale);
+  base.y = sourcePinPlantedY(height01, heightScale) + SOURCE_PIN_STEM_H + SOURCE_PIN_DROP_R * 0.45;
+  return base;
+}
+
 /** Pixel slack before a tap becomes a drag. Touch needs more. */
 export function sourceDragThresholdPx(pointerType: string): number {
   return pointerType === "touch" || pointerType === "pen" ? 12 : 8;
 }
 
-export function sourcePickRadiusPx(pointerType: string): number {
-  return pointerType === "touch" || pointerType === "pen" ? 36 : 22;
+export function sourcePickRadiusPx(pointerType: string, generous = false): number {
+  const base = pointerType === "touch" || pointerType === "pen" ? 36 : 22;
+  return generous ? Math.round(base * 1.5) : base;
 }
 
 export function pointerPixelDelta(
@@ -74,17 +88,21 @@ export function pickNearestSourceId(
   let bestId: string | null = null;
   let bestDist = radiusPx;
   const ndc = new THREE.Vector3();
-  for (const s of sources) {
-    const world = sourcePinWorld(s.x, s.y, heightAt(s.x, s.y), traySize, heightScale);
+  const consider = (world: THREE.Vector3, id: string): void => {
     ndc.copy(world).project(camera);
-    if (ndc.z < -1 || ndc.z > 1) continue;
+    if (ndc.z < -1 || ndc.z > 1) return;
     const sx = canvas.left + (ndc.x * 0.5 + 0.5) * canvas.width;
     const sy = canvas.top + (-ndc.y * 0.5 + 0.5) * canvas.height;
     const d = Math.hypot(clientX - sx, clientY - sy);
     if (d <= bestDist) {
       bestDist = d;
-      bestId = s.id;
+      bestId = id;
     }
+  };
+  for (const s of sources) {
+    const h = heightAt(s.x, s.y);
+    consider(sourcePinWorld(s.x, s.y, h, traySize, heightScale), s.id);
+    consider(sourcePinHeadWorld(s.x, s.y, h, traySize, heightScale), s.id);
   }
   return bestId;
 }
