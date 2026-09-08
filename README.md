@@ -54,14 +54,14 @@ Zusätzliche Werkzeuge: **Feststampfen** (Kohäsion lokal), **Rinne** vorzeichne
 
 - **Mittel** ist die Vorgabe auf dem Telefon, **Hoch** am Rechner.
 - **Auto** bleibt an, bis eine feste Stufe gewählt wird. Unter 40 Bildern/s für zwei Sekunden rutscht die Qualität eine Stufe tiefer (Toast).
-- Gitter: Niedrig 128², Mittel 256², Hoch 512², Ultra 768². Partikel (0 / 80 / 180 / voll), Schatten (aus / aus / 1024 / 2048) und Pixelverhältnis (1 / 1,25 / 1,5 / 2) folgen der Stufe. Kontakt-AO, Mikro-Korn und Wasserspiegelungen ebenfalls — Niedrig bleibt mobil-sicher (kein Schattenmarsch, gedämpftes Specular).
+- Gitter: Niedrig 128², Mittel 256², Hoch 512², Ultra 768². Partikel (0 / 80 / 180 / voll), Schatten (aus / aus / 1024 / 2048) und Pixelverhältnis (1 / 1,25 / 1,5 / 2) folgen der Stufe. Kontakt-AO, Mikro-Korn, Höhen-Mikrorelief und Holz-Normalen ebenfalls — Niedrig bleibt mobil-sicher (kein Schattenmarsch, kein Höhen-Mikro, gedämpftes Specular).
 - Der Sim-Worker hält höchstens einen Schritt in der Luft; hinterher wird nicht aufgeholt. Auf dem iPhone/iPad pausiert die Schleife im Hintergrund-Tab, damit WebKit den WebGL-Kontext nicht wegnimmt.
 - Texturen: Mittel/Niedrig bleiben bei 512er- (bzw. 256er-) Karten und niedriger Anisotropie, damit ein Qualitätswechsel die Albedo nicht neu ableitet.
 - Wenn es hakelt: Qualität senken, Tempo auf 0,5×, weniger Quellen, Ultra meiden.
 
 ## Speichern und teilen
 
-JSON (Speichern) nimmt Höhe, Wasser, Quellen und Materialparameter in voller Genauigkeit mit. **Teilen** schreibt einen kompakten Zustand in den URL-Hash (`#sf2.…`) oder als Share-JSON — ohne Cloud. Der Link trägt Vorlage, Quellen, Tempo, Kamera, Kiesel und ein grobes Höhenfeld (64²). Nur extrem lange Links lassen das Gelände weg. **Bild** in der Transportleiste lädt ein PNG aus der aktuellen Kamera. Trocken- und Nass-Sand unter `public/textures/` werden kachelbar nachbearbeitet und mischen sich nach Feuchte; der Wannenrand nimmt Beton/`concrete-albedo.jpg` (Laborlook), sonst Holz, sonst eine lokale Prozedur.
+JSON (Speichern) nimmt Höhe, Wasser, Quellen und Materialparameter in voller Genauigkeit mit. **Teilen** schreibt einen kompakten Zustand in den URL-Hash (`#sf2.…`) oder als Share-JSON — ohne Cloud. Der Link trägt Vorlage, Quellen, Tempo, Kamera, Kiesel und ein grobes Höhenfeld (64²). Nur extrem lange Links lassen das Gelände weg. **Bild** in der Transportleiste lädt ein PNG aus der aktuellen Kamera. Trocken- und Nass-Sand unter `public/textures/` werden kachelbar nachbearbeitet und mischen sich nach Feuchte. Der Wannenrahmen nimmt `wood-rim.jpg` (Eiche, sichtbare Fugen); in-sim Beton bleibt `concrete-albedo.jpg`. Fehlt Holz, greift eine lokale Diele.
 
 ## V1.x — was jetzt drin ist
 
@@ -70,11 +70,11 @@ Gegen die ursprüngliche V1-Skizze ist der spielbare Kern gewachsen. Neu bzw. fe
 - Wasser über virtuelle Rohre (Mei / O’Brien): Fluxkarte → Geschwindigkeit → Sediment per MacCormack-Advektion. Kapazität im Gleichgewicht (C ∝ sin α · |v|), Erosion nur bei Fluss×Gefälle — stehende Tropfen brennen nicht ein. Nach dem Schnitt rutschen Ufer über den Böschungswinkel (thermisch). Flaches, lesbares Wasser über dem Bett; Wellen-Normalen folgen der Fließrichtung. Tieferes Wasser färbt sich sandbraun; weicher Schaum an der Uferlinie nur bei Strömung, plus Turbulenz an Stufen. Transiente Blasen-Cluster an Schub/Stufen, dünne Bedload-Körner in schnellem klarem Fluss. Weiches Key-/Fill-Licht und Höhenfeld-AO, damit Relief lesbar bleibt, ohne die Höhe aufzublasen.
 - Zielring (AimCursor) sitzt auf der verformten Sandoberfläche, nicht auf der flachen Mesh-Ebene.
 - Quellenpins sitzen auf derselben Höhe (UV → verdrängtes Gelände). Quelle ziehen verschiebt den Pin auf dem Sand.
-- Werkzeuge **Feststampfen**, **Rinne**, **Einebnen**, **Beton** (nicht erodierbar), plus **Kiesel** und **Radierer**.
+- Werkzeuge **Feststampfen**, **Rinne**, **Einebnen**, **Beton** (nicht erodierbar), plus **Kiesel** (Hartinsel unter dem Stein, kein Betonfleck) und **Radierer**.
 - Vorlagen inkl. Referenz-Rinne, dünnen Adern, Beton-Szenen (Kanal, Becken, Treppe, Wehr, Regenhang, Staudamm); Heatmap für Fluss oder Tiefe. Quellen können als Regenband sprühen (`kind: rain`).
 - Kurzanleitung, Tempo bis 8× / Zeitraffer mit optionaler Höhenspur, PNG-Export neben Play, Auto-Qualität, Szene oder nur Wasser zurücksetzen.
 - Teilen per URL-Hash oder Share-JSON (ohne Cloud).
-- Gebackene Trocken-/Nass-Sand- und Laborrand-Texturen (kachelbar, abgeleitete Normalen/Rauheit); Nass mischt sich nach Feuchte. Hoch/Ultra nutzen stärkere Anisotropie. Mittel auf dem Telefon bleibt bei 512er-Karten, damit die Texturen nicht bei jedem Qualitätswechsel neu entstehen.
+- Gebackene Trocken-/Nass-Sand-, Holzrahmen- und Beton-Texturen (kachelbar, abgeleitete Normalen/Rauheit); Nass mischt sich nach Feuchte. Hoch/Ultra nutzen stärkere Anisotropie und Holz-Normalen. Mittel auf dem Telefon bleibt bei 512er-Karten, damit die Texturen nicht bei jedem Qualitätswechsel neu entstehen. Sand-Mikrorelief kommt billig aus Höhen-Normalen (`dFdx` der Bett-Höhe) — aus auf Niedrig.
 
 ## Noch zurückgestellt
 

@@ -3,7 +3,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { GeneratedMaps } from "../assets/AssetService";
 import { SimClient, type SimFrame, type SimSnapshot } from "../sim/SimClient";
 import type { BrushKind } from "../sim/types";
-import { packMapsRgba, resampleMask, unpackRgba } from "../sim/mapsContract";
+import { packMapsRgba, resampleMask, stoneIslandUvRadius, unpackRgba } from "../sim/mapsContract";
 import { getPreset, resampleHeight, type CameraPose } from "../sim/presets";
 import { History } from "../state/history";
 import type { Store } from "../state/store";
@@ -338,15 +338,16 @@ export class Viewport {
     this.particles.setBudget(profile.particles);
     this.sand.setQuality(quality, TRAY_SIZE);
     this.water.setQuality(quality, TRAY_SIZE);
+    this.propsLite.setQuality(quality);
     this.fill.intensity = 0.18 + profile.lookFill * 0.35;
     this.syncSunUniforms();
     const gpuSize = gpuTexelBudget(quality);
     if (this.labMaps && gpuSize !== this.labGpuSize) {
       this.labGpuSize = gpuSize;
       this.sand.applyMaps(this.labMaps, quality);
-      if (this.labMaps.wood) {
-        applyTrayWood(this.tray, this.labMaps.wood, this.labMaps.woodNormal, this.labMaps.woodRough, quality);
-      }
+    }
+    if (this.labMaps?.wood) {
+      applyTrayWood(this.tray, this.labMaps.wood, this.labMaps.woodNormal, this.labMaps.woodRough, quality);
     }
 
     const grid = profile.grid;
@@ -821,13 +822,14 @@ export class Viewport {
     }
     this.lastStroke = { u, v };
     const scale = THREE.MathUtils.clamp(0.034 + this.store.state.brushRadius * 0.55, 0.03, 0.14);
+    const used = scale * (0.82 + Math.random() * 0.36);
     const kind = (Math.floor(Math.random() * 3) % 3) as 0 | 1 | 2;
     this.propsLite.add(
       {
         id: `p-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4).toString(36)}`,
         u,
         v,
-        scale: scale * (0.82 + Math.random() * 0.36),
+        scale: used,
         rot: Math.random() * Math.PI * 2,
         kind,
       },
@@ -835,6 +837,8 @@ export class Viewport {
       TRAY_SIZE,
       this.heightScale,
     );
+    const grid = this.lastSize || qualityProfile(this.store.state.quality).grid;
+    this.sim.brush("stone", u, v, stoneIslandUvRadius(used, grid, TRAY_SIZE), 1);
   }
 
   private onPointerDown = async (ev: PointerEvent): Promise<void> => {

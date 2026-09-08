@@ -102,7 +102,7 @@ self.onmessage = (ev: MessageEvent<WorkerIn>) => {
     case "brush": {
       if (!sim) return;
       sim.brush(msg.kind, msg.x, msg.y, msg.radius, msg.strength);
-      if (msg.kind === "concrete" || msg.kind === "soft") hardDirty = true;
+      if (msg.kind === "concrete" || msg.kind === "stone" || msg.kind === "soft") hardDirty = true;
       emitFrame();
       break;
     }

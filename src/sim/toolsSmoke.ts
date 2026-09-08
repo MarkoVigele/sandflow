@@ -1,6 +1,14 @@
 import { History } from "../state/history";
 import { DEFAULT_PARAMS } from "../state/types";
-import { countHardCells, HARD_THRESHOLD, resampleMask } from "./mapsContract";
+import {
+  countHardCells,
+  HARD_STONE,
+  HARD_THRESHOLD,
+  isConcreteCell,
+  isStoneCell,
+  resampleMask,
+  stoneIslandUvRadius,
+} from "./mapsContract";
 import { ErosionSim } from "./erosionCore";
 import { PRESETS, getPreset } from "./presets";
 import type { SimSnapshot } from "./SimClient";
@@ -105,6 +113,33 @@ const wallBefore = wall.terrain[mid];
 wall.brush("dig", 0.5, 0.5, 0.1, 2);
 if (Math.abs(wall.terrain[mid] - wallBefore) > 1e-6) fail("Graben darf Beton nicht abtragen");
 
+const peb = new ErosionSim(size, DEFAULT_PARAMS, flat.slice());
+const islandR = stoneIslandUvRadius(0.08, size, 8);
+peb.brush("stone", 0.5, 0.5, islandR, 1);
+if (peb.hardmask[mid] < HARD_THRESHOLD) fail(`Kiesel setzt keine Hartinsel: ${peb.hardmask[mid]}`);
+if (!isStoneCell(peb.hardmask[mid])) fail(`Kiesel muss HARD_STONE sein, nicht Beton: ${peb.hardmask[mid]}`);
+if (Math.abs(peb.hardmask[mid] - HARD_STONE) > 1e-6) fail(`Kiesel-Wert ${peb.hardmask[mid]}`);
+if (Math.abs(peb.terrain[mid] - 0.52) > 1e-6) fail("Kiesel darf keine Platte anheben");
+const pebH = peb.terrain[mid];
+peb.brush("dig", 0.5, 0.5, 0.1, 2);
+if (Math.abs(peb.terrain[mid] - pebH) > 1e-6) fail("Graben darf die Kieselinsel nicht abtragen");
+let stoneHalo = 0;
+for (let i = 0; i < peb.hardmask.length; i++) {
+  const h = peb.hardmask[i];
+  if (h > 0 && h < HARD_THRESHOLD) stoneHalo++;
+}
+if (stoneHalo > 0) fail(`Kiesel darf keinen weichen Hof malen: ${stoneHalo}`);
+
+const keepConc = new ErosionSim(size, DEFAULT_PARAMS, flat.slice());
+keepConc.brush("concrete", 0.5, 0.5, 0.08, 0.7);
+keepConc.brush("stone", 0.5, 0.5, islandR, 1);
+if (!isConcreteCell(keepConc.hardmask[mid])) fail("Kiesel darf Beton nicht aufweichen");
+
+const rLow = stoneIslandUvRadius(0.04, 128, 8);
+const rHigh = stoneIslandUvRadius(0.14, 512, 8);
+if (rLow * 128 < 2.2) fail(`Low-Gitter braucht ≥2.4 Zellen, got ${rLow * 128}`);
+if (rHigh <= rLow) fail("größere Kiesel brauchen größere Inseln");
+
 const needed = [
   "canyon",
   "delta",
@@ -154,6 +189,12 @@ const up = resampleMask(mask, 16, 32);
 if (up[0] < HARD_THRESHOLD || up[31] >= HARD_THRESHOLD) fail("resampleMask nearest");
 if (countHardCells(up) < 32 * 14) fail("resampleMask lost hard band");
 
+const stoneMask = new Float32Array(16 * 16);
+stoneMask[0] = HARD_STONE;
+const upStone = resampleMask(stoneMask, 16, 32);
+if (Math.abs(upStone[0] - HARD_STONE) > 1e-6) fail(`resample must keep stone value, got ${upStone[0]}`);
+if (upStone[31] >= HARD_THRESHOLD) fail("empty stone resample stayed hard");
+
 for (const p of PRESETS) {
   if (!p.camera?.position || !p.camera?.target) fail(`Kamera fehlt: ${p.id}`);
 }
@@ -195,6 +236,7 @@ console.log(
     flattenVar: [+beforeVar.toFixed(5), +afterVar.toFixed(5)],
     presets: PRESETS.map((p) => p.id),
     concrete: +slab.hardmask[mid].toFixed(3),
+    stone: +peb.hardmask[mid].toFixed(3),
     undoOk: true,
   }),
 );

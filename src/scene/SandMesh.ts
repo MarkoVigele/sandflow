@@ -73,6 +73,7 @@ export class SandMesh {
         uGrain: { value: 0.55 },
         uAoSteps: { value: lookAoSteps(quality) },
         uLookGrain: { value: qualityProfile(quality).lookGrain },
+        uHeightMicro: { value: qualityProfile(quality).lookHeightMicro },
         uUvScale: { value: sandUvScale(0.55) },
         uHeatMode: { value: 0 },
       },
@@ -118,6 +119,7 @@ export class SandMesh {
     this.material.uniforms.uReceiveShadow.value = shadows ? 1 : 0;
     this.material.uniforms.uAoSteps.value = lookAoSteps(quality);
     this.material.uniforms.uLookGrain.value = qualityProfile(quality).lookGrain;
+    this.material.uniforms.uHeightMicro.value = qualityProfile(quality).lookHeightMicro;
     this.mesh.receiveShadow = shadows;
   }
 

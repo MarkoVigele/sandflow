@@ -171,8 +171,9 @@ void main() {
   }
 
   float thin = 1.0 - smoothstep(0.01, 0.058, vDepth);
-  float flat = smoothstep(0.62, 0.88, geoUp);
-  float contact = smoothstep(0.55, 2.6, dryN) * thin * flat;
+  // `flat` is a reserved GLSL qualifier — do not use it as a name.
+  float upFacing = smoothstep(0.62, 0.88, geoUp);
+  float contact = smoothstep(0.55, 2.6, dryN) * thin * upFacing;
   // Turbulence foam at steps / obstacles. Shore lace only at high velocity.
   float bedJump = abs(sL.r - sR.r) + abs(sVm.r - sVp.r);
   float drop = smoothstep(0.014, 0.055, edge) * smoothstep(0.055, 0.14, flow);

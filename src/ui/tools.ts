@@ -135,7 +135,7 @@ export const TOOLBAR_TOOLS: ToolSpec[] = [
     label: "Kiesel",
     hint: "Kleine Steine auf den Sand legen",
     title: "Kiesel legen",
-    body: "Kleine Steine auf den Sand. Mit der Pinselgröße stellst du die Kieselgröße. Der Radierer nimmt sie weg.",
+    body: "Kleine Steine auf den Sand. Mit der Pinselgröße stellst du die Kieselgröße. Unter jedem Stein bleibt eine Hartinsel — Wasser fließt darüber, Erosion nicht. Der Radierer nimmt sie weg.",
     brushSize: true,
     brushSizeLabel: "Pinselgröße",
     strength: false,

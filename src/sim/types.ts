@@ -9,6 +9,7 @@ export type BrushKind =
   | "groove"
   | "flatten"
   | "concrete"
+  | "stone"
   | "soft";
 
 export type WorkerIn =

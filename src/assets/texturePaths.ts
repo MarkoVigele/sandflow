@@ -4,7 +4,8 @@ export const DEFAULT_TEXTURE_PROMPT = "feiner Quarzsand, warm, trocken";
 
 /**
  * Filenames under `public/textures/`.
- * The same `concrete-albedo.jpg` is the tray rim *and* in-sim Beton.
+ * `wood-rim.jpg` is the tray frame. `concrete-albedo.jpg` is in-sim Beton
+ * (and the lab-rim fallback if wood is missing).
  */
 export const BAKED_TEXTURE_FILES = {
   sandDry: "sand-dry-albedo.jpg",
