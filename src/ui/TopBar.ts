@@ -62,7 +62,7 @@ export class TopBar {
             <input type="range" min="0" max="${SPEEDS.length - 1}" step="1" value="${idx}" data-speed aria-label="Simulationstempo" />
           </label>
           <button class="chip ${lapse ? "is-on" : ""}" data-lapse title="Zeitraffer 8×">${lapseOn ? "Zeitraffer an" : "Zeitraffer"}</button>
-          <button class="chip ${s.trailFade ? "is-on" : ""}" data-trail title="Sanfte Höhenspur im Zeitraffer">${s.trailFade ? "Spur an" : "Spur"}</button>
+          <button class="chip ${s.trailFade ? "is-on" : ""}" data-trail title="Sanfte Höhenspur im Zeitraffer">Spur</button>
         </div>
         <div class="top-desktop">
           <button class="icon-btn" data-step title="Einzelschritt">${ICONS.step}</button>
