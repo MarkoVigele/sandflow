@@ -76,7 +76,19 @@ const wallBefore = wall.terrain[mid];
 wall.brush("dig", 0.5, 0.5, 0.1, 2);
 if (Math.abs(wall.terrain[mid] - wallBefore) > 1e-6) fail("Graben darf Beton nicht abtragen");
 
-const needed = ["canyon", "delta", "referenz", "veins", "meet", "betonkanal", "auffangbecken", "treppenueberlauf", "betonwehr"];
+const needed = [
+  "canyon",
+  "delta",
+  "referenz",
+  "veins",
+  "meet",
+  "betonkanal",
+  "auffangbecken",
+  "treppenueberlauf",
+  "betonwehr",
+  "regen-hang",
+  "staudamm",
+];
 for (const id of needed) {
   const p = getPreset(id);
   if (p.id !== id) fail(`Preset fehlt: ${id}`);
@@ -93,7 +105,9 @@ for (const id of needed) {
   if (max - min < 0.12) fail(`Preset ${id} zu flach: ${max - min}`);
 }
 
-const hardPresets = ["betonkanal", "auffangbecken", "treppenueberlauf", "betonwehr"];
+if (getPreset("beton-kanal").id !== "betonkanal") fail("beton-kanal alias fehlt");
+
+const hardPresets = ["betonkanal", "auffangbecken", "treppenueberlauf", "betonwehr", "regen-hang", "staudamm"];
 for (const id of hardPresets) {
   const built = getPreset(id).build(size);
   const nHard = countHardCells(built.hardmask);

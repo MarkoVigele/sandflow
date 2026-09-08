@@ -152,17 +152,49 @@ export class ErosionSim {
   }
 
   private addSources(): void {
+    for (const src of this.sources) {
+      if (src.kind === "rain") this.addRain(src);
+      else this.addPointSource(src);
+    }
+  }
+
+  private addPointSource(src: WaterSource): void {
     const { size } = this;
     const water = this.water;
-    for (const src of this.sources) {
-      const x = Math.max(1, Math.min(size - 2, Math.round(src.x * (size - 1))));
-      const y = Math.max(1, Math.min(size - 2, Math.round(src.y * (size - 1))));
-      const add = src.rate * 0.048;
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          const fall = Math.exp(-(dx * dx + dy * dy) * 0.95);
-          water[this.i(x + dx, y + dy)] += add * fall * 0.62;
-        }
+    const x = Math.max(1, Math.min(size - 2, Math.round(src.x * (size - 1))));
+    const y = Math.max(1, Math.min(size - 2, Math.round(src.y * (size - 1))));
+    const add = src.rate * 0.048;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const fall = Math.exp(-(dx * dx + dy * dy) * 0.95);
+        water[this.i(x + dx, y + dy)] += add * fall * 0.62;
+      }
+    }
+  }
+
+  /** Sparse rain band: seeds rivulets instead of a sheet. */
+  private addRain(src: WaterSource): void {
+    const { size } = this;
+    const water = this.water;
+    const halfU = Math.max(0.08, src.spread ?? 0.4);
+    const halfV = Math.max(0.028, halfU * 0.14);
+    const x0 = Math.max(1, Math.floor((src.x - halfU) * (size - 1)));
+    const x1 = Math.min(size - 2, Math.ceil((src.x + halfU) * (size - 1)));
+    const y0 = Math.max(1, Math.floor((src.y - halfV) * (size - 1)));
+    const y1 = Math.min(size - 2, Math.ceil((src.y + halfV) * (size - 1)));
+    const cells = Math.max(1, (x1 - x0 + 1) * (y1 - y0 + 1));
+    const add = (src.rate * 0.28) / cells;
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const u = x / (size - 1);
+        const v = y / (size - 1);
+        const du = (u - src.x) / halfU;
+        const dv = (v - src.y) / halfV;
+        const fall = Math.exp(-(du * du + dv * dv) * 1.15);
+        if (fall < 0.08) continue;
+        const drop = hash2(x, y, this.tick + 17);
+        if (drop < 0.52) continue;
+        water[this.i(x, y)] += add * fall * (0.5 + drop);
       }
     }
   }
@@ -294,7 +326,7 @@ export class ErosionSim {
           continue;
         }
         const inThread = bedFall > 0.006;
-        const reserve = inThread ? Math.min(w * 0.28, 0.022) : Math.min(w * 0.18, 0.012);
+        const reserve = inThread ? Math.min(w * 0.36, 0.026) : Math.min(w * 0.22, 0.014);
         const movable = Math.min(
           Math.max(0, w - reserve) * transfer,
           Math.max(0, w - reserve) * 0.72,
@@ -686,13 +718,13 @@ export class ErosionSim {
     const { size } = this;
     const cx = Math.round(u * (size - 1));
     const cy = Math.round(v * (size - 1));
-    for (let dy = -3; dy <= 3; dy++) {
-      for (let dx = -3; dx <= 3; dx++) {
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
         const x = cx + dx;
         const y = cy + dy;
         if (x < 1 || y < 1 || x >= size - 1 || y >= size - 1) continue;
-        const fall = Math.exp(-(dx * dx + dy * dy) * 0.38);
-        this.water[this.i(x, y)] += amount * fall * 0.32;
+        const fall = Math.exp(-(dx * dx + dy * dy) * 0.58);
+        this.water[this.i(x, y)] += amount * fall * 0.5;
       }
     }
   }
