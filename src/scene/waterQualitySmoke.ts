@@ -39,17 +39,19 @@ if (low.waveDisplace !== 0) fail("Low must skip vertex wave displacement");
 if (low.waveOctaves !== 1) fail("Low is a single cheap ripple");
 if (ultra.waveOctaves < 4) fail("Ultra needs four wave octaves");
 if (ultra.meshSegs < 320) fail("Ultra mesh should resolve vertex waves");
-if (low.meshSegs > 80) fail("Low mesh should stay cheaper than the old 80² default");
+if (low.meshSegs > 96) fail("Low mesh should stay cheaper than Medium");
+if (low.meshSegs < 64) fail("Low mesh should still cover the tray");
 if (low.beerStrength >= ultra.beerStrength) fail("Ultra absorbs more than Low");
 
-const sigma: [number, number, number] = [4.6, 1.25, 0.88];
+const sigma: [number, number, number] = [3.4, 0.95, 0.62];
 const shallow = beerTransmittance(0.004, 0.92, sigma, 1);
 const deep = beerTransmittance(0.12, 0.55, sigma, 1.28);
 if (shallow[0] <= deep[0]) fail("deep water should absorb more red");
 if (shallow[1] <= deep[1]) fail("deep water should absorb more green");
 if (deep[0] >= deep[2]) fail("Beer: red absorbs more than blue");
 if (shallow[2] < 0.85) fail(`shallow should stay clear, T.b=${shallow[2]}`);
-if (deep[0] > 0.35) fail(`deep should look inky, T.r=${deep[0]}`);
+if (deep[0] > 0.45) fail(`deep should look darker, T.r=${deep[0]}`);
+if (deep[2] < 0.55) fail(`deep should stay teal, T.b=${deep[2]}`);
 
 const facing = schlickFresnel(0.95, 0.02, 1);
 const grazing = schlickFresnel(0.08, 0.02, 1);

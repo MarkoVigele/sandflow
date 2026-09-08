@@ -36,6 +36,7 @@ export class WaterMesh {
         uQuality: { value: waterQualityIndex(quality) },
         uWaveDisplace: { value: tier.waveDisplace },
         uWaveOctaves: { value: tier.waveOctaves },
+        uWaveAmp: { value: 1 },
         uBeerStrength: { value: tier.beerStrength },
         uFresnelScale: { value: tier.fresnelScale },
         uFoamDetail: { value: tier.foamDetail },
@@ -75,6 +76,12 @@ export class WaterMesh {
 
   setRelief(relief: number): void {
     this.material.uniforms.uRelief.value = relief;
+  }
+
+  /** Amplitude scale from the Wellen slider (physics PR). 1 = default. */
+  setWaves(amp: number): void {
+    const a = Number.isFinite(amp) ? Math.max(0, amp) : 1;
+    this.material.uniforms.uWaveAmp.value = a;
   }
 
   setSun(dir: THREE.Vector3, color: THREE.Color): void {

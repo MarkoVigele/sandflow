@@ -7,6 +7,7 @@ uniform float uTime;
 uniform float uQuality;
 uniform float uWaveDisplace;
 uniform float uWaveOctaves;
+uniform float uWaveAmp;
 
 varying vec2 vUv;
 varying vec3 vWorldPos;
@@ -24,10 +25,12 @@ vec2 safeDir(vec2 g, vec2 fallback) {
 }
 
 float flowWave(vec2 uv, float water, float flow) {
-  if (uWaveDisplace <= 1.0e-6 || uQuality < 0.5 || water < 0.004) return 0.0;
+  float ampScale = uWaveAmp > 0.0 ? uWaveAmp : 0.0;
+  if (!(ampScale == ampScale)) ampScale = 1.0;
+  if (uWaveDisplace <= 1.0e-6 || uQuality < 0.5 || water < 0.004 || ampScale <= 1.0e-5) return 0.0;
   float body = smoothstep(0.005, 0.05, water);
   float fl = clamp(flow, 0.0, 0.4);
-  float amp = uWaveDisplace * body * (0.28 + fl * 2.4);
+  float amp = uWaveDisplace * ampScale * body * (0.28 + fl * 2.4);
   if (amp < 1.0e-6) return 0.0;
 
   float texel = max(uTexel, 0.0015);

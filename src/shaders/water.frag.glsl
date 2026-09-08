@@ -127,12 +127,12 @@ void main() {
   // Beer's law: longer optical path in deep / glancing water, red absorbed first.
   float optical = vDepth / max(ndv, 0.12);
   if (uQuality > 0.5) optical = mix(optical, vDepth / max(ssFacing, 0.12), 0.35);
-  vec3 sigma = vec3(4.6, 1.25, 0.88) * beer;
+  vec3 sigma = vec3(3.4, 0.95, 0.62) * beer;
   vec3 trans = exp(-sigma * optical);
   if (!(trans.x == trans.x)) trans = vec3(0.45, 0.62, 0.66);
 
-  vec3 shallow = vec3(0.62, 0.68, 0.60);
-  vec3 scatter = vec3(0.055, 0.145, 0.155);
+  vec3 shallow = vec3(0.58, 0.67, 0.63);
+  vec3 scatter = vec3(0.20, 0.38, 0.40);
   vec3 silt = vec3(0.56, 0.50, 0.38);
   vec3 foamC = vec3(0.90, 0.92, 0.88);
   vec3 wetSand = vec3(0.40, 0.32, 0.22);
@@ -157,7 +157,8 @@ void main() {
   }
 
   float thin = 1.0 - smoothstep(0.01, 0.058, vDepth);
-  float contact = smoothstep(0.55, 2.6, dryN) * thin;
+  float flat = smoothstep(0.62, 0.88, geoUp);
+  float contact = smoothstep(0.55, 2.6, dryN) * thin * flat;
   float contactFoam = contact * (0.42 + flow * 0.58) * (0.35 + foamDet * 0.65);
   if (foamDet > 0.35) {
     float lace = sin(dot(vUv, vec2(46.0, 39.0)) + uTime * 3.05 + flow * 8.0);
@@ -171,8 +172,8 @@ void main() {
   foam = clamp(foam + contactFoam, 0.0, 1.0);
 
   // Wet-sand lip: thin contact water picks up stained sand, then foam sits on top.
-  base = mix(base, wetSand, contact * (1.0 - foam) * mix(0.18, 0.34, foamDet));
-  base = mix(base, foamC, foam * mix(0.62, 0.86, foamDet));
+  base = mix(base, wetSand, contact * (1.0 - foam) * mix(0.10, 0.20, foamDet));
+  base = mix(base, foamC, foam * mix(0.55, 0.80, foamDet));
 
   vec3 L = safeNormalize(uSunDir, vec3(0.4, 0.8, 0.3));
   vec3 H = safeNormalize(V + L, vec3(0.0, 1.0, 0.0));
@@ -182,15 +183,15 @@ void main() {
   spec = min(spec, uQuality > 2.5 ? 0.16 : 0.13);
   float ndl = max(dot(N, L), 0.0);
 
-  vec3 color = base * (0.58 + ndl * 0.42) + uSunColor * (spec + fresnel * 0.72);
-  color = mix(color, vec3(0.48, 0.50, 0.47), 0.06);
-  color = clamp(color, vec3(0.04), vec3(0.84));
+  vec3 color = base * (0.70 + ndl * 0.32) + uSunColor * (spec + fresnel * 0.68);
+  color = mix(color, vec3(0.42, 0.50, 0.48), 0.05);
+  color = clamp(color, vec3(0.08), vec3(0.84));
 
   float absorbAlpha = 1.0 - clamp((trans.x + trans.y + trans.z) * 0.333, 0.0, 1.0);
   float alpha = mix(0.26, 0.50, depth) + absorbAlpha * mix(0.10, 0.22, beer * 0.5);
   alpha += turbid * 0.05 + foam * 0.15 + fresnel * 0.22;
   if (geoArea > 4.0e-4) alpha *= mix(0.45, 1.0, smoothstep(0.14, 0.40, geoUp));
-  float aMax = uQuality > 2.5 ? 0.74 : 0.64;
+  float aMax = uQuality > 2.5 ? 0.68 : 0.62;
   alpha = clamp(alpha, 0.17, aMax);
 
   gl_FragColor = vec4(color, alpha);
