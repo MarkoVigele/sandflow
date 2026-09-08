@@ -51,6 +51,9 @@ export class SandMesh {
     this.material = new THREE.ShaderMaterial({
       uniforms: {
         uMaps: { value: maps },
+        uMapsBefore: { value: maps },
+        uCompare: { value: 0 },
+        uWipe: { value: 0.5 },
         uAlbedo: { value: fallbackAlbedo },
         uAlbedoWet: { value: fallbackAlbedo },
         uHard: { value: fallbackHard },
@@ -97,6 +100,16 @@ export class SandMesh {
   setMaps(maps: THREE.DataTexture): void {
     this.material.uniforms.uMaps.value = maps;
     this.material.uniforms.uTexel.value = 1 / maps.image.width;
+  }
+
+  setBeforeMaps(maps: THREE.DataTexture): void {
+    this.material.uniforms.uMapsBefore.value = maps;
+  }
+
+  setCompare(mode: number, wipe: number): void {
+    this.material.uniforms.uCompare.value = Number.isFinite(mode) ? mode : 0;
+    const w = Number.isFinite(wipe) ? Math.max(0, Math.min(1, wipe)) : 0.5;
+    this.material.uniforms.uWipe.value = w;
   }
 
   setHard(hard: THREE.DataTexture): void {

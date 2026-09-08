@@ -14,6 +14,7 @@ WebGL2, am besten Chrome oder Firefox. Telefon geht, Mittel reicht dort meist.
 - Qualität von Niedrig bis Ultra, plus **Auto**. Auto bleibt an, bis wir eine feste Stufe wählen.
 - Vorlagen vom hellen Strand bis Staudamm, inkl. Quellen ziehen und Regenhang.
 - Tempo 0,25×–8×, Zeitraffer, optionale Höhenspur, PNG neben Play.
+- **Vorher/Nachher:** Vorher merken, dann Teilen (Wischer) oder die ganze Wanne als Vorher. **Höhe PNG** lädt die Höhenkarte (16-Bit) herunter — optional wieder einlesen.
 - Speichern als JSON, Teilen per Link oder Share-JSON — ohne Cloud.
 - Farbkarte (Strömung / Nässe) und ein Querschnitt rechts in der Leiste.
 
@@ -44,7 +45,7 @@ Links die Symbolleiste. Linke Taste oder ein Finger zeichnet. Der goldene Ring i
 
 Rechtsklick, Rad oder Mitteltaste (zwei Finger am Telefon) drehen und zoomen. **Kamera** braucht nur einen Finger. `1`–`9` wählen die ersten Werkzeuge. `[` / `]` ändern die Pinselgröße.
 
-Oben: Vorlagen, Qualität, Play/Pause (Leertaste), **Bild**, Tempo, **Zeitraffer**, **Spur**. Zurücksetzen (Szene oder nur Wasser), Teilen, Speichern, Laden, Rückgängig (`Strg+Z` / `Strg+Y`). Am Telefon bleiben Transport und Bild sichtbar, der Rest liegt unter **Mehr**.
+Oben: Vorlagen, Qualität, Play/Pause (Leertaste), **Bild**, Tempo, **Zeitraffer**, **Spur**, **Vergleich**. Zurücksetzen (Szene oder nur Wasser), Teilen, Speichern, Laden, **Höhe PNG**, Rückgängig (`Strg+Z` / `Strg+Y`). Am Telefon bleiben Transport und Vergleich sichtbar, der Rest liegt unter **Mehr**. Die Vergleichsleiste sitzt oben in der Wanne: Vorher merken, Nachher / Teilen / Vorher, Höhe laden.
 
 ### Qualität
 

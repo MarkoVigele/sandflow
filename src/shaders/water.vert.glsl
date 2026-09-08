@@ -1,4 +1,7 @@
 uniform sampler2D uMaps;
+uniform sampler2D uMapsBefore;
+uniform float uCompare;
+uniform float uWipe;
 uniform float uHeightScale;
 uniform float uRelief;
 uniform float uPivot;
@@ -17,6 +20,7 @@ varying vec3 vViewPos;
 varying float vDepth;
 varying float vFlow;
 varying float vWave;
+varying float vComparePick;
 
 // Hard ceiling in heightmap units. Relief × world must never grow a needle.
 // 0.012 × 1.5 × 2.5 ≈ 4.5 cm on the tray — a coating, not a column.
@@ -29,13 +33,25 @@ vec2 safeDir(vec2 g, vec2 fallback) {
   return g * inversesqrt(len2);
 }
 
+float comparePick(vec3 pos) {
+  if (uCompare < 0.5) return 0.0;
+  if (uCompare > 1.5) return 1.0;
+  vec4 clipFlat = projectionMatrix * modelViewMatrix * vec4(pos.x, 0.0, pos.z, 1.0);
+  float sx = clipFlat.x / max(abs(clipFlat.w), 1.0e-5) * 0.5 + 0.5;
+  return step(sx, uWipe);
+}
+
+vec4 sampleMaps(vec2 coord, float pick) {
+  return mix(texture2D(uMaps, coord), texture2D(uMapsBefore, coord), pick);
+}
+
 float wat(vec2 p) {
-  float w = texture2D(uMaps, p).g;
+  float w = sampleMaps(p, vComparePick).g;
   return (w == w && w > 0.0) ? w : 0.0;
 }
 
 float ter(vec2 p, float fallback) {
-  float t = texture2D(uMaps, p).r;
+  float t = sampleMaps(p, vComparePick).r;
   return t == t ? t : fallback;
 }
 
@@ -106,8 +122,9 @@ float flowWave(vec2 uv, float water, float flow, vec2 dir) {
 
 void main() {
   vUv = uv;
+  vComparePick = comparePick(position);
   float texel = max(uTexel, 0.0015);
-  vec4 sampleH = texture2D(uMaps, uv);
+  vec4 sampleH = sampleMaps(uv, vComparePick);
   float terrain = sampleH.r;
   if (!(terrain == terrain)) terrain = 0.0;
 

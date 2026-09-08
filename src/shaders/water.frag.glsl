@@ -17,6 +17,9 @@ uniform float uSpecCap;
 uniform float uShoreFoam;
 uniform float uSheetCap;
 uniform sampler2D uMaps;
+uniform sampler2D uMapsBefore;
+uniform float uCompare;
+uniform float uWipe;
 
 varying vec2 vUv;
 varying vec3 vWorldPos;
@@ -25,6 +28,7 @@ varying vec3 vViewPos;
 varying float vDepth;
 varying float vFlow;
 varying float vWave;
+varying float vComparePick;
 
 const float SHEET_CAP_DEFAULT = 0.012;
 
@@ -43,13 +47,18 @@ vec2 safeDir(vec2 g, vec2 fallback) {
   return g * inversesqrt(len2);
 }
 
+vec4 sampleMaps(vec2 coord) {
+  float pick = vComparePick > 0.5 ? 1.0 : 0.0;
+  return mix(texture2D(uMaps, coord), texture2D(uMapsBefore, coord), pick);
+}
+
 float wat(vec2 p) {
-  float w = texture2D(uMaps, p).g;
+  float w = sampleMaps(p).g;
   return (w == w && w > 0.0) ? w : 0.0;
 }
 
 float ter(vec2 p, float fallback) {
-  float t = texture2D(uMaps, p).r;
+  float t = sampleMaps(p).r;
   return t == t ? t : fallback;
 }
 

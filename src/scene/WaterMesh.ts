@@ -27,6 +27,9 @@ export class WaterMesh {
       premultipliedAlpha: false,
       uniforms: {
         uMaps: { value: maps },
+        uMapsBefore: { value: maps },
+        uCompare: { value: 0 },
+        uWipe: { value: 0.5 },
         uHeightScale: { value: heightScale },
         uRelief: { value: DEFAULT_RELIEF },
         uPivot: { value: HEIGHT_PIVOT },
@@ -59,6 +62,16 @@ export class WaterMesh {
   setMaps(maps: THREE.DataTexture): void {
     this.material.uniforms.uMaps.value = maps;
     this.material.uniforms.uTexel.value = 1 / Math.max(1, maps.image.width);
+  }
+
+  setBeforeMaps(maps: THREE.DataTexture): void {
+    this.material.uniforms.uMapsBefore.value = maps;
+  }
+
+  setCompare(mode: number, wipe: number): void {
+    this.material.uniforms.uCompare.value = Number.isFinite(mode) ? mode : 0;
+    const w = Number.isFinite(wipe) ? Math.max(0, Math.min(1, wipe)) : 0.5;
+    this.material.uniforms.uWipe.value = w;
   }
 
   setQuality(quality: QualityId, traySize: number): void {

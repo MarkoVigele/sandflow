@@ -28,6 +28,9 @@
  * sand.vert normals: N = (hL-hR, 2·texel·tray, h(v+)-h(v−)) — same as AimCursor.heightfieldNormal.
  * Optional visual uniforms:
  *   uHard, uConcrete, uTrail, uTrailAmt (Zeitraffer height-change ghost)
+ * Optional compare uniforms (do not change the live sim):
+ *   uMapsBefore (same RGBA contract), uCompare (0 off / 1 wipe / 2 before),
+ *   uWipe (0..1 screen-X split; left = before)
  *
  * Particles: quads [u, v, height, attr] in 0..1 uv, height in sim units.
  *   attr = kind + life∈[0,1) — kind 0 foam, 1 bubble cluster, 2 bedload grain.

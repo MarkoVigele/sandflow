@@ -43,6 +43,7 @@ import {
   stepsThisFrame,
   togglePlaying,
 } from "./transport";
+import { COMPARE_LABEL, compareChipLabel, compareHint, nextCompareMode, wipeFromClientX } from "./compare";
 
 function assert(cond: boolean, msg: string): void {
   if (!cond) throw new Error(msg);
@@ -184,5 +185,14 @@ const round = parseScene(toJson(file));
 assert(round.quality === "low" && round.size === 8, "scene json quality");
 assert(unpackMaps(round).terrain[1] === terrain[1], "scene maps roundtrip");
 assert(round.sources[0]?.x === 0.2, "scene sources");
+
+assert(COMPARE_LABEL.off === "Nachher" && COMPARE_LABEL.wipe === "Teilen", "compare labels de");
+assert(compareChipLabel("off", true) === "Vergleich", "chip idle");
+assert(compareChipLabel("wipe", true) === "Teilen an", "chip wipe");
+assert(compareChipLabel("before", false) === "Vergleich", "chip without snap");
+assert(nextCompareMode("off", true) === "wipe" && nextCompareMode("before", true) === "off", "chip cycle");
+assert(compareHint(false, "off").includes("Vorher merken"), "hint capture first");
+assert(wipeFromClientX(150, 100, 200) === 0.25, "wipe from pointer");
+assert(wipeFromClientX(-20, 0, 100) === 0, "wipe clamp low");
 
 console.log("vision smoke ok");
