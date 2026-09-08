@@ -132,6 +132,7 @@ export class ErosionSim {
     const transfer = 0.76 * params.flowRate;
     const capK = params.sedimentCapacity;
     const cohesion = this.cohesion;
+    const wetness = this.wetness;
     const hard = this.hardmask;
     const mx = this.momX;
     const my = this.momY;
@@ -234,7 +235,8 @@ export class ErosionSim {
           shear > MIN_SHEAR &&
           bedFall > 0 &&
           hard[i] < HARD_THRESHOLD;
-        const localC = Math.min(0.95, params.cohesion + cohesion[i]);
+        const wetC = wetness[i] * 0.08;
+        const localC = Math.min(0.95, params.cohesion + cohesion[i] + wetC);
         const localErodeK = params.erosionRate * (1.05 - localC);
 
         const moving = !ponded && movable > 0.0015;
@@ -291,8 +293,8 @@ export class ErosionSim {
             (0.35 + 0.95 * shearN);
           const pick = Math.min(
             capacity * localErodeK,
-            Math.max(0, terrain[i] - MIN_SAND) * MAX_ERODE_FRAC,
-            share * 0.2,
+            Math.max(0, terrain[i] - MIN_SAND) * MAX_ERODE_FRAC * (0.85 + shearN * 0.5),
+            share * 0.28,
           );
           tD[i] -= pick;
           sD[j] += pick;
@@ -302,14 +304,21 @@ export class ErosionSim {
           tD[i] = -(terrain[i] - MIN_SAND) * MAX_ERODE_FRAC;
         }
 
-        if (carving && flux > 0.016) {
+        // Dam overflow / bank undercut: high head against a mound cuts through fast.
+        // Wet banks hold; dry dumped sand yields. Standing pools stay gated by ponded.
+        if (!ponded && hard[i] < HARD_THRESHOLD && (carving || head > 0.012)) {
           for (let k = 0; k < 4; k++) {
             const j = this.i(x + NEIGH[k][0], y + NEIGH[k][1]);
             const bank = terrain[j] - terrain[i];
-            if (bank > 0.012 && hard[j] < HARD_THRESHOLD) {
-              const nibble = Math.min(bank * 0.017 * localErodeK * Math.min(flux, 0.09), bank * 0.05);
+            if (bank > 0.008 && hard[j] < HARD_THRESHOLD) {
+              const hold = 1 - Math.min(0.5, wetness[j] * 0.45);
+              const overflowK = head > 0.01 ? 1.7 + head * 16 : 1;
+              const nibble = Math.min(
+                bank * 0.024 * localErodeK * Math.min(Math.max(flux, head), 0.14) * overflowK * hold,
+                bank * 0.1,
+              );
               tD[j] -= nibble;
-              sD[i] += nibble * 0.62;
+              sD[i] += nibble * 0.72;
             }
           }
         }
@@ -487,9 +496,10 @@ export class ErosionSim {
         const i = this.i(x, y);
         if (water[i] > 0.01) continue;
         if (this.hardmask[i] >= HARD_THRESHOLD) continue;
-        const localC = Math.min(0.95, params.cohesion + cohesion[i]);
-        const talus = 0.1 + params.grain * 0.045 + localC * 0.06;
-        const k = 0.028 * (1.05 - localC);
+        if (this.wetness[i] > 0.42) continue;
+        const localC = Math.min(0.95, params.cohesion + cohesion[i] + this.wetness[i] * 0.28);
+        const talus = 0.1 + params.grain * 0.045 + localC * 0.08;
+        const k = 0.028 * (1.05 - localC) * (1 - this.wetness[i] * 0.7);
         for (let kN = 0; kN < 4; kN++) {
           const j = this.i(x + NEIGH[kN][0], y + NEIGH[kN][1]);
           if (this.hardmask[j] >= HARD_THRESHOLD) continue;

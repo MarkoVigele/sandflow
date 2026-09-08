@@ -110,10 +110,10 @@ export class Viewport {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.camera = new THREE.PerspectiveCamera(48, 1, 0.12, 80);
-    this.camera.position.set(6.4, 5.6, 6.8);
+    this.camera.position.set(5.1, 7.4, 5.2);
 
     this.controls = new OrbitControls(this.camera, canvas);
-    this.controls.target.set(0, 0.55, 0);
+    this.controls.target.set(0, 0.48, 0);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
     this.controls.minDistance = 3.2;
@@ -131,14 +131,14 @@ export class Viewport {
       TWO: THREE.TOUCH.DOLLY_ROTATE,
     };
 
-    this.scene.fog = new THREE.Fog(0x14110e, 14, 28);
-    this.scene.background = new THREE.Color(0x14110e);
+    this.scene.fog = new THREE.Fog(0x1c1a17, 16, 32);
+    this.scene.background = new THREE.Color(0x1c1a17);
 
-    this.hemi = new THREE.HemisphereLight(0xd8e4f0, 0x4a3c2c, 0.42);
+    this.hemi = new THREE.HemisphereLight(0xe6edf2, 0x6a5c4a, 0.82);
     this.scene.add(this.hemi);
 
-    this.sun = new THREE.DirectionalLight(0xffd9a3, 2.15);
-    this.sun.position.set(8.6, 4.8, 5.4);
+    this.sun = new THREE.DirectionalLight(0xfff1dc, 1.08);
+    this.sun.position.set(4.6, 8.8, 3.4);
     this.sun.target.position.set(0, 0.7, 0);
     this.sun.castShadow = false;
     this.sun.shadow.mapSize.set(1024, 1024);
@@ -247,8 +247,8 @@ export class Viewport {
 
   private syncSunUniforms(): void {
     const dir = this.sun.position.clone().sub(this.sun.target.position).normalize();
-    const sunColor = this.sun.color.clone().multiplyScalar(0.95);
-    const ambient = new THREE.Color(0.18, 0.16, 0.13);
+    const sunColor = this.sun.color.clone().multiplyScalar(0.78);
+    const ambient = new THREE.Color(0.32, 0.31, 0.29);
     this.sand.setSun(dir, sunColor, ambient);
     this.water.setSun(dir, sunColor);
   }

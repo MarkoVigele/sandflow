@@ -95,10 +95,10 @@ void main() {
   if (!(nTex.x == nTex.x)) nTex = vec3(0.0, 0.0, 1.0);
   if (!(roughPair.x == roughPair.x)) roughPair = vec2(0.86, 0.30);
 
-  // Keep dry grain; wet photo is a stain, not a second albedo stamp.
-  float wetMask = smoothstep(0.02, 0.70, wet);
-  vec3 moistened = dryAlb * vec3(0.56, 0.48, 0.40);
-  vec3 wetCol = mix(moistened, wetAlb, 0.34);
+  // Sharp wet/dry: wet banks go dark and cohesive; dry stays light.
+  float wetMask = smoothstep(0.008, 0.18, wet);
+  vec3 moistened = dryAlb * vec3(0.34, 0.28, 0.22);
+  vec3 wetCol = mix(moistened, wetAlb, 0.18);
   vec3 albedo = mix(dryAlb, wetCol, wetMask);
 
   float hard = texture2D(uHard, vUv).r;
@@ -144,9 +144,8 @@ void main() {
   spec = min(spec, 0.09);
 
   vec3 color = albedo * (uAmbient * ao + uSunColor * wrap * shade) + uSunColor * spec * shade;
-  float underWater = smoothstep(0.003, 0.08, water);
-  float column = clamp(water * 6.2, 0.0, 0.72);
-  color = mix(color, color * vec3(0.70, 0.78, 0.74), underWater * mix(0.22, 0.62, column));
+  float underWater = smoothstep(0.002, 0.05, water);
+  color = mix(color, color * vec3(0.78, 0.68, 0.54), underWater * 0.38);
 
   if (uHeatMode > 0.5) {
     float flow = maps.a;

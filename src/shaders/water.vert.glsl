@@ -30,7 +30,7 @@ float flowWave(vec2 uv, float water, float flow) {
   if (uWaveDisplace <= 1.0e-6 || uQuality < 0.5 || water < 0.004 || ampScale <= 1.0e-5) return 0.0;
   float body = smoothstep(0.005, 0.05, water);
   float fl = clamp(flow, 0.0, 0.4);
-  float amp = uWaveDisplace * ampScale * body * (0.28 + fl * 2.4);
+  float amp = uWaveDisplace * ampScale * body * (0.16 + fl * 3.1);
   if (amp < 1.0e-6) return 0.0;
 
   float texel = max(uTexel, 0.0015);

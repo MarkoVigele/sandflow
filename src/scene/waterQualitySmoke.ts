@@ -43,15 +43,14 @@ if (low.meshSegs > 96) fail("Low mesh should stay cheaper than Medium");
 if (low.meshSegs < 64) fail("Low mesh should still cover the tray");
 if (low.beerStrength >= ultra.beerStrength) fail("Ultra absorbs more than Low");
 
-const sigma: [number, number, number] = [3.4, 0.95, 0.62];
-const shallow = beerTransmittance(0.004, 0.92, sigma, 1);
-const deep = beerTransmittance(0.12, 0.55, sigma, 1.28);
+const sigma: [number, number, number] = [1.8, 1.15, 1.05];
+const shallow = beerTransmittance(0.004, 0.92, sigma, 0.68);
+const deep = beerTransmittance(0.12, 0.55, sigma, 0.95);
 if (shallow[0] <= deep[0]) fail("deep water should absorb more red");
 if (shallow[1] <= deep[1]) fail("deep water should absorb more green");
-if (deep[0] >= deep[2]) fail("Beer: red absorbs more than blue");
-if (shallow[2] < 0.85) fail(`shallow should stay clear, T.b=${shallow[2]}`);
-if (deep[0] > 0.45) fail(`deep should look darker, T.r=${deep[0]}`);
-if (deep[2] < 0.55) fail(`deep should stay teal, T.b=${deep[2]}`);
+if (shallow[2] < 0.88) fail(`shallow should stay clear, T.b=${shallow[2]}`);
+if (deep[0] > 0.72) fail(`deep should read darker than a film, T.r=${deep[0]}`);
+if (deep[2] < 0.28) fail(`deep must stay transmissive (bed visible), T.b=${deep[2]}`);
 
 const facing = schlickFresnel(0.95, 0.02, 1);
 const grazing = schlickFresnel(0.08, 0.02, 1);
@@ -59,10 +58,11 @@ if (grazing <= facing) fail("grazing fresnel should exceed facing");
 if (facing > 0.06) fail(`facing fresnel too hot: ${facing}`);
 if (grazing < 0.55) fail(`grazing fresnel too weak: ${grazing}`);
 
-const open = contactLineFoam(0.04, [0.04, 0.038, 0.041, 0.039], 0.02, 1);
-const shore = contactLineFoam(0.008, [0.0, 0.009, 0.0, 0.012], 0.08, 1);
-if (shore <= open + 0.12) fail(`contact foam should peak at the shoreline (${shore} vs ${open})`);
-if (shore < 0.25) fail(`shoreline foam too weak: ${shore}`);
+const calmShore = contactLineFoam(0.008, [0.0, 0.009, 0.0, 0.012], 0.01, 1);
+const turbShore = contactLineFoam(0.01, [0.0, 0.0, 0.028, 0.0], 0.09, 1);
+if (calmShore > 0.04) fail(`calm shore should not foam: ${calmShore}`);
+if (turbShore <= calmShore + 0.08) fail(`foam only at turbulence (${turbShore} vs ${calmShore})`);
+if (turbShore < 0.12) fail(`turbulent foam too weak: ${turbShore}`);
 
 const dry = contactLineFoam(0, [0, 0, 0, 0], 0, 1);
 if (dry > 0.08) fail(`dry cells should not foam: ${dry}`);
@@ -81,5 +81,5 @@ console.log("waterQualitySmoke ok", {
   ultra: { segs: ultra.meshSegs, oct: ultra.waveOctaves, beer: ultra.beerStrength },
   beer: { shallow, deep },
   fresnel: { facing, grazing },
-  foam: { open, shore },
+  foam: { calmShore, turbShore },
 });

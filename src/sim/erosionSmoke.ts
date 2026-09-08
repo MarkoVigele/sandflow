@@ -316,3 +316,31 @@ const glideCy = mass > 0 ? massY / mass : 0;
 console.log(JSON.stringify({ glideCy: +glideCy.toFixed(1), glidePast: +past.toFixed(3), glideVol: +mass.toFixed(3) }));
 if (glideCy < size * 0.3) fail(`keine Trägheit / Welle: centroidY=${glideCy}`);
 if (past < 0.08) fail(`Wasser propagiert nicht wellenartig: past=${past}`);
+
+const damBuilt = getPreset("slope").build(size);
+const damSim = new ErosionSim(size, DEFAULT_PARAMS, damBuilt.terrain);
+damSim.sources = damBuilt.sources;
+damSim.step(50);
+const damY = (size * 0.42) | 0;
+const upMass = (sim: ErosionSim) => {
+  let s = 0;
+  for (let y = 2; y < damY; y++) {
+    for (let x = 2; x < size - 2; x++) s += sim.water[y * size + x];
+  }
+  return s;
+};
+const up0 = upMass(damSim);
+for (let u = 0.32; u <= 0.68; u += 0.03) {
+  damSim.brush("dam", u, 0.42, 0.07, 1.9);
+}
+const damRow = damSim.terrain.slice(damY * size, damY * size + size);
+damSim.step(18);
+const up1 = upMass(damSim);
+damSim.step(70);
+let damCut = 0;
+for (let x = 2; x < size - 2; x++) {
+  damCut = Math.max(damCut, damRow[x] - damSim.terrain[damY * size + x]);
+}
+console.log(JSON.stringify({ damUp0: +up0.toFixed(3), damUp1: +up1.toFixed(3), damCut: +damCut.toFixed(4) }));
+if (up1 < up0 * 0.95) fail(`Damm staut nicht: ${up0} → ${up1}`);
+if (damCut < 0.008) fail(`kein Unterspülen nach Überlauf: ${damCut}`);
