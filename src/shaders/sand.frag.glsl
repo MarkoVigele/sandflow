@@ -4,7 +4,9 @@ uniform sampler2D uAlbedoWet;
 uniform sampler2D uNormal;
 uniform sampler2D uRough;
 uniform sampler2D uHard;
+uniform sampler2D uTrail;
 uniform sampler2D uConcrete;
+uniform float uTrailAmt;
 uniform vec3 uSunDir;
 uniform vec3 uSunColor;
 uniform vec3 uFillDir;
@@ -191,6 +193,14 @@ void main() {
     + uSunColor * spec * shade;
   float underWater = smoothstep(0.002, 0.055, water);
   color = mix(color, color * vec3(0.74, 0.64, 0.50), underWater * 0.42);
+
+  float trail = texture2D(uTrail, vUv).r;
+  if (!(trail == trail)) trail = 0.0;
+  float tAmt = clamp(uTrailAmt, 0.0, 1.0);
+  float cut = clamp(-trail, 0.0, 1.0);
+  float fill = clamp(trail, 0.0, 1.0);
+  color *= mix(1.0, 0.90, cut * tAmt * 0.82);
+  color += vec3(0.042, 0.028, 0.012) * fill * tAmt;
 
   if (uHeatMode > 0.5) {
     float flow = maps.a;

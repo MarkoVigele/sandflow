@@ -14,8 +14,16 @@ export function speedFromIndex(index: number): number {
   return SPEEDS[i] ?? 1;
 }
 
+export const LAPSE_SPEED = 8;
+export const LAPSE_MARK = 4;
+
 export function lapseSpeed(current: number): number {
-  return current >= 8 ? 1 : 8;
+  return current >= LAPSE_SPEED ? 1 : LAPSE_SPEED;
+}
+
+/** Highlight / trail engage at 4×; the Zeitraffer chip jumps to 8×. */
+export function isLapse(speed: number): boolean {
+  return speed >= LAPSE_MARK;
 }
 
 export function applyPlay(playing: boolean, onboardStep: OnboardStep): {

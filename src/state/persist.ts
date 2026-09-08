@@ -92,3 +92,12 @@ export function downloadDataUrl(filename: string, dataUrl: string): void {
   a.download = filename;
   a.click();
 }
+
+export function screenshotFilename(now = new Date(), ext = "png"): string {
+  const stamp = now.toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  return `sandflow-${stamp}.${ext}`;
+}
+
+export function isPngDataUrl(url: string): boolean {
+  return /^data:image\/png;base64,[A-Za-z0-9+/=]+/i.test(url) && url.length > 40;
+}

@@ -30,7 +30,7 @@ import {
 import { CrossSectionView } from "../ui/crossSection";
 import { allowOneFingerOrbit, claimSourceGesture, pinGrabBeatsOrbit } from "../ui/sourceGesture";
 import { isShapeTool, strokeWaypoints, toolBrushKind } from "../ui/tools";
-import { stepsThisFrame } from "../ui/transport";
+import { isLapse, stepsThisFrame } from "../ui/transport";
 import {
   AimCursor,
   pickDeformedSand,
@@ -49,6 +49,15 @@ import {
   sourcePinWorld,
 } from "../ui/sourcePins";
 import { gpuTexelBudget } from "../assets/texturePaths";
+import {
+  copyField,
+  decayHeightTrail,
+  extractTerrain,
+  stepHeightTrail,
+  TRAIL_DECAY,
+  TRAIL_FADE,
+  TRAIL_GAIN,
+} from "./heightTrail";
 import { createHardTexture, createMapsTexture, uploadHard, uploadPacked } from "./mapsTexture";
 import { FlowParticles } from "./Particles";
 import { PropsLite, type PropLite } from "./PropsLite";
@@ -117,6 +126,11 @@ export class Viewport {
   private orbitLockedBySource = false;
   private hidden = false;
   private contextLost = false;
+  private trailTex!: THREE.DataTexture;
+  private trail = new Float32Array(0);
+  private prevHeight = new Float32Array(0);
+  private workHeight = new Float32Array(0);
+  private trailSize = 0;
   private iosWebKit = isIosWebKit();
 
   constructor(host: HTMLElement, store: Store, onUi: () => void) {
@@ -135,6 +149,7 @@ export class Viewport {
       stencil: false,
       depth: true,
       failIfMajorPerformanceCaveat: false,
+      preserveDrawingBuffer: true,
     });
     this.renderer.setPixelRatio(
       pixelRatioFor(store.state.quality, window.devicePixelRatio || 1, isMobile(), this.iosWebKit),
@@ -206,6 +221,7 @@ export class Viewport {
     this.hardTex = createHardTexture(grid);
     this.sand = new SandMesh(TRAY_SIZE, this.maps, q, this.heightScale);
     this.sand.setHard(this.hardTex);
+    this.allocTrail(grid);
     this.water = new WaterMesh(TRAY_SIZE, this.maps, q, this.heightScale);
     this.particles = new FlowParticles();
     this.scene.add(this.sand.mesh, this.water.mesh, this.particles.points, this.propsLite.group);
@@ -353,6 +369,7 @@ export class Viewport {
       this.lastPacked = packed;
       this.lastSize = grid;
       uploadPacked(this.maps, packed, grid);
+      this.seedTrail(packed, grid);
       if (h2) {
         this.lastHard = h2;
         uploadHard(this.hardTex, h2, grid);
@@ -368,6 +385,7 @@ export class Viewport {
       this.sand.setMaps(this.maps);
       this.sand.setHard(this.hardTex);
       this.water.setMaps(this.maps);
+      this.allocTrail(grid);
     }
   }
 
@@ -392,6 +410,7 @@ export class Viewport {
     this.lastPacked = packed;
     this.lastSize = grid;
     uploadPacked(this.maps, packed, grid);
+    this.seedTrail(packed, grid);
     this.sim.init(grid, this.store.state.params, built.terrain, this.sources, {
       hardmask: built.hardmask,
     });
@@ -450,6 +469,7 @@ export class Viewport {
     this.lastSize = snap.size;
     uploadPacked(this.maps, packed, snap.size);
     uploadHard(this.hardTex, this.lastHard, snap.size);
+    this.seedTrail(packed, snap.size);
     this.syncSourcePins();
     this.paintSection();
     this.onUi();
@@ -595,8 +615,46 @@ export class Viewport {
     this.propsLite.dispose();
     this.maps.dispose();
     this.hardTex.dispose();
+    this.trailTex?.dispose();
     this.section.dispose();
     this.renderer.dispose();
+  }
+
+  private allocTrail(size: number): void {
+    this.trailTex?.dispose();
+    this.trailTex = createHardTexture(size);
+    this.trail = new Float32Array(size * size);
+    this.prevHeight = new Float32Array(size * size);
+    this.workHeight = new Float32Array(size * size);
+    this.trailSize = size;
+    this.sand.setTrail(this.trailTex);
+    this.sand.setTrailAmount(0);
+  }
+
+  private seedTrail(packed: Float32Array, size: number): void {
+    if (size !== this.trailSize) this.allocTrail(size);
+    else this.trail.fill(0);
+    extractTerrain(packed, size, this.prevHeight);
+    uploadHard(this.trailTex, this.trail, size);
+    this.sand.setTrailAmount(0);
+  }
+
+  private syncTrail(packed: Float32Array, size: number): void {
+    if (size !== this.trailSize) {
+      this.seedTrail(packed, size);
+      return;
+    }
+    extractTerrain(packed, size, this.workHeight);
+    const lapse = isLapse(this.store.state.speed);
+    const show = this.store.state.trailFade;
+    if (show && lapse) {
+      stepHeightTrail(this.trail, this.workHeight, this.prevHeight, TRAIL_FADE, TRAIL_GAIN);
+    } else {
+      decayHeightTrail(this.trail, TRAIL_DECAY);
+    }
+    copyField(this.workHeight, this.prevHeight);
+    uploadHard(this.trailTex, this.trail, size);
+    this.sand.setTrailAmount(show ? 1 : 0);
   }
 
   private applyFrame(frame: SimFrame): void {
@@ -606,6 +664,7 @@ export class Viewport {
     this.waterVolume = frame.waterVolume;
     this.erodedSand = frame.erodedSand;
     uploadPacked(this.maps, frame.packed, frame.size);
+    this.syncTrail(frame.packed, frame.size);
     if (frame.hard) {
       this.lastHard = frame.hard;
       uploadHard(this.hardTex, frame.hard, frame.size);

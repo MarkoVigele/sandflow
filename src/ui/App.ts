@@ -8,7 +8,9 @@ import {
   downloadDataUrl,
   downloadText,
   encodeScene,
+  isPngDataUrl,
   packMaps,
+  screenshotFilename,
   toJson,
   unpackMaps,
 } from "../state/persist";
@@ -341,9 +343,17 @@ export class App {
   }
 
   private screenshot(): void {
-    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-    downloadDataUrl(`sandflow-${stamp}.png`, this.viewport.screenshotPng());
-    this.toast("Bild gespeichert.");
+    try {
+      const url = this.viewport.screenshotPng();
+      if (!isPngDataUrl(url)) {
+        this.toast("Bild konnte nicht gespeichert werden.");
+        return;
+      }
+      downloadDataUrl(screenshotFilename(), url);
+      this.toast("Bild gespeichert.");
+    } catch {
+      this.toast("Bild konnte nicht gespeichert werden.");
+    }
   }
 
   private bindAbout(host: HTMLElement): void {
@@ -362,7 +372,7 @@ export class App {
             <p>Wasser sucht sich Wege durch Sand: erst dünne Adern, dann ein Bett, später ein verzweigtes Netz. V1.x ist der spielbare Kern — Zielring, Werkzeuge, Teilen, Kiesel, Beton, gebackene Texturen. WebGPU und eine volle Requisitenbibliothek bleiben später.</p>
             <p>Kurzanleitung: <strong>Sand formen</strong> → <strong>Quelle setzen</strong> (<em>${SOURCE_TOOL_TIP}</em>) → <strong>Abspielen</strong>. Pins sitzen auf dem Sand; Ziehen verschiebt sie auch im Kameramodus.</p>
             <p>Rechtsklick oder zwei Finger drehen die Kamera. Ein Finger (oder die linke Taste) bedient das Werkzeug. Unter <em>Kamera</em> geht das Drehen auch mit einem Finger.</p>
-            <p>Oben: <em>Tempo</em> und <em>Zeitraffer</em>, Qualität inkl. Auto, Szene oder nur Wasser zurücksetzen, Teilen per Link oder JSON. <em>Beton</em> setzt Hartstoff (Platte oder Wand). Kiesel sind kleine Steine — der Radierer nimmt Kiesel und Beton weg.</p>
+            <p>Oben neben Play: <em>Bild</em> (PNG der aktuellen Kamera), <em>Tempo</em>, <em>Zeitraffer</em> (8× Ticks) und optionale <em>Spur</em> (sanfte Höhenspur). Qualität inkl. Auto, Szene oder nur Wasser zurücksetzen, Teilen per Link oder JSON. <em>Beton</em> setzt Hartstoff (Platte oder Wand). Kiesel sind kleine Steine — der Radierer nimmt Kiesel und Beton weg.</p>
             <p>Unter <em>Erweitert</em> liegen Farbkarte (Strömung oder Nässe) und <em>Relief</em>, das die Höhen in der Wanne überhöht. Texturen entstehen lokal aus einer kurzen Beschreibung.</p>
           </div>
         </div>`

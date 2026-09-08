@@ -33,6 +33,7 @@ export interface UiState {
   tool: ToolId;
   playing: boolean;
   speed: number;
+  trailFade: boolean;
   quality: QualityId;
   autoQuality: boolean;
   params: SimParams;
@@ -63,6 +64,7 @@ export const initialUiState = (): UiState => {
     tool: onboardStep === 1 ? "pile" : "pour",
     playing: onboardStep === 0,
     speed: 1,
+    trailFade: true,
     quality: defaultQuality(),
     autoQuality: true,
     params: { ...DEFAULT_PARAMS },
