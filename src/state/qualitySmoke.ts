@@ -1,5 +1,5 @@
 import { MAX_PARTICLES } from "../sim/flowFx";
-import { MAX_STEP_BACKLOG, MAX_STEP_BATCH, planSimStep } from "../sim/SimClient";
+import { MAX_STEP_BACKLOG, MAX_STEP_BATCH, planFlushBacklog, planSimStep } from "../sim/SimClient";
 import {
   AUTO_FPS_FLOOR,
   AUTO_FPS_HOLD_MS,
@@ -113,6 +113,14 @@ assert(busy.send === 0 && busy.backlog === MAX_STEP_BACKLOG && busy.skipped === 
 const flooded = planSimStep(8, 1, 1);
 assert(flooded.send === 0 && flooded.backlog === 1 && flooded.skipped === 8, "no flood while behind");
 assert(planSimStep(0, 0, 0).send === 0, "zero steps");
+const pausedFlush = planFlushBacklog(false, 0, 1);
+assert(pausedFlush.send === 0 && pausedFlush.backlog === 0, "pause drops backlog");
+const pausedBusy = planFlushBacklog(false, 1, 1);
+assert(pausedBusy.send === 0 && pausedBusy.backlog === 0, "pause drops backlog while a frame is in flight");
+const playFlush = planFlushBacklog(true, 0, 1);
+assert(playFlush.send === 1 && playFlush.backlog === 0, "play flushes one backlog tick");
+const playBusy = planFlushBacklog(true, 1, 1);
+assert(playBusy.send === 0 && playBusy.backlog === 1, "play keeps backlog while busy");
 
 console.log("qualitySmoke ok", {
   grids: { low: low.grid, med: med.grid, high: high.grid, ultra: ultra.grid },

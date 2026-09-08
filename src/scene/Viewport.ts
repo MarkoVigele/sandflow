@@ -31,7 +31,7 @@ import {
 import { CrossSectionView } from "../ui/crossSection";
 import { allowOneFingerOrbit, claimSourceGesture, pinGrabBeatsOrbit } from "../ui/sourceGesture";
 import { strokeWaypoints, toolBrushKind } from "../ui/tools";
-import { isLapse, stepsThisFrame } from "../ui/transport";
+import { isLapse, stepAccumAfterTransport, stepsThisFrame } from "../ui/transport";
 import {
   AimCursor,
   pickDeformedSand,
@@ -111,6 +111,7 @@ export class Viewport {
   private fpsFrames = 0;
   private lowFpsMs = 0;
   private stepAccum = 0;
+  private lastSpeed = 1;
   private clock = new THREE.Clock();
   private aim = new AimCursor();
   private propsLite = new PropsLite();
@@ -139,6 +140,7 @@ export class Viewport {
     this.host = host;
     this.store = store;
     this.onUi = onUi;
+    this.lastSpeed = store.state.speed;
 
     const canvas = document.createElement("canvas");
     host.appendChild(canvas);
@@ -1007,8 +1009,14 @@ export class Viewport {
 
     this.syncSourcePins();
 
-    if (this.store.state.playing) {
-      const tick = stepsThisFrame(this.store.state.speed, this.stepAccum);
+    const playing = this.store.state.playing;
+    const speed = this.store.state.speed;
+    const speedChanged = speed !== this.lastSpeed;
+    this.lastSpeed = speed;
+    this.stepAccum = stepAccumAfterTransport(playing, speedChanged, this.stepAccum);
+    this.sim.setPlaying(playing);
+    if (playing) {
+      const tick = stepsThisFrame(speed, this.stepAccum);
       this.stepAccum = tick.accum;
       if (tick.steps > 0) this.sim.step(tick.steps);
     }
