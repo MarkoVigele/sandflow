@@ -8,7 +8,13 @@ import {
 import { encodeScene, packMaps, parseScene, toJson, unpackMaps } from "../state/persist";
 import { DEFAULT_PARAMS } from "../state/types";
 import { sampleCrossSection } from "./crossSection";
-import { claimSourceGesture, SOURCE_TOOL_TIP, sourceTipVisible } from "./sourceGesture";
+import {
+  allowOneFingerOrbit,
+  claimSourceGesture,
+  pinGrabBeatsOrbit,
+  SOURCE_TOOL_TIP,
+  sourceTipVisible,
+} from "./sourceGesture";
 import { applyPlay, lapseSpeed, speedFromIndex, speedIndex, stepsThisFrame, togglePlaying } from "./transport";
 
 function assert(cond: boolean, msg: string): void {
@@ -34,7 +40,7 @@ assert(pixelRatioFor("high", 3) === 1.5, "high caps dpr at 1.5");
 assert(pixelRatioFor("ultra", 3) === 2, "ultra caps dpr at 2");
 assert(qualityChangesSim("low", "high") && !qualityChangesSim("high", "ultra"), "grid change only when size moves");
 
-assert(SOURCE_TOOL_TIP === "tippen = wählen, ziehen = verschieben", "canonical source tip");
+assert(SOURCE_TOOL_TIP === "Tippen wählt die Quelle, Ziehen verschiebt sie.", "canonical source tip");
 assert(sourceTipVisible("source", 0) && !sourceTipVisible("source", 2) && !sourceTipVisible("pile", 0), "tip visibility");
 
 const pin = claimSourceGesture({
@@ -44,6 +50,16 @@ const pin = claimSourceGesture({
   draggingSource: null,
 });
 assert(pin.tool && !pin.orbit && pin.sourceId === "s-1", "source pin beats camera orbit");
+assert(pinGrabBeatsOrbit(pin), "pin grab stops OrbitControls");
+
+const camPin = claimSourceGesture({
+  tool: "pile",
+  cameraMode: true,
+  hitSourceId: "s-1",
+  draggingSource: null,
+});
+assert(camPin.tool && !camPin.orbit && camPin.sourceId === "s-1", "pin grab beats orbit even off source tool");
+assert(pinGrabBeatsOrbit(camPin), "camera-mode pin grab is exclusive");
 
 const drag = claimSourceGesture({
   tool: "source",
@@ -60,6 +76,7 @@ const cam = claimSourceGesture({
   draggingSource: null,
 });
 assert(cam.orbit && !cam.tool, "empty camera-mode tap still orbits");
+assert(!pinGrabBeatsOrbit(cam), "empty camera tap leaves orbit to controls");
 
 const tool = claimSourceGesture({
   tool: "pile",
@@ -68,6 +85,8 @@ const tool = claimSourceGesture({
   draggingSource: null,
 });
 assert(tool.tool && !tool.orbit, "brush tool keeps one-finger orbit off");
+assert(allowOneFingerOrbit(true, false) && !allowOneFingerOrbit(true, true), "orbit off while source active");
+assert(!allowOneFingerOrbit(false, false), "no one-finger orbit outside camera mode");
 
 assert(togglePlaying(true) === false && togglePlaying(false) === true, "play toggle");
 assert(speedFromIndex(speedIndex(2)) === 2, "speed index roundtrip");

@@ -6,12 +6,12 @@ const STEPS: Record<Exclude<OnboardStep, 0>, { kicker: string; title: string; bo
   1: {
     kicker: "Schritt 1 von 3",
     title: "Sand formen",
-    body: "Zieh mit Aufschütten oder Graben. Hügel und Rinnen geben dem Wasser später eine Spur.",
+    body: "Zieh mit Hügel oder Graben. Hügel und Rinnen geben dem Wasser später eine Spur.",
   },
   2: {
     kicker: "Schritt 2 von 3",
     title: "Quelle setzen",
-    body: `${SOURCE_TOOL_TIP}. Quelle ziehen: Pin halten und über das Gelände schieben.`,
+    body: `${SOURCE_TOOL_TIP} Den Stift auf dem Sand halten und schieben, um sie zu verschieben.`,
   },
   3: {
     kicker: "Schritt 3 von 3",

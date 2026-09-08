@@ -30,7 +30,7 @@ export class TopBar {
     let sig = "";
     store.subscribe(() => {
       const st = store.state;
-      const next = `${st.playing}|${st.speed}|${st.quality}|${st.autoQuality}|${st.onboardStep}|${st.menuOpen}`;
+      const next = `${st.playing}|${st.speed}|${st.quality}|${st.autoQuality}|${st.onboardStep}|${st.menuOpen}|${st.canUndo}|${st.canRedo}`;
       if (next !== sig) {
         sig = next;
         this.render();
@@ -63,8 +63,8 @@ export class TopBar {
         <div class="top-desktop">
           <button class="icon-btn" data-step title="Einzelschritt">${ICONS.step}</button>
           <button class="chip ${lapse ? "is-on" : ""}" data-lapse title="Zeitraffer 8×">${lapse && s.speed >= 8 ? "Zeitraffer an" : "Zeitraffer"}</button>
-          <button class="icon-btn" data-undo title="Rückgängig">${ICONS.undo}</button>
-          <button class="icon-btn" data-redo title="Wiederholen">${ICONS.redo}</button>
+          <button class="icon-btn" data-undo title="Rückgängig (Strg+Z)" ${s.canUndo ? "" : "disabled"} aria-disabled="${!s.canUndo}">${ICONS.undo}</button>
+          <button class="icon-btn" data-redo title="Wiederholen (Strg+Y)" ${s.canRedo ? "" : "disabled"} aria-disabled="${!s.canRedo}">${ICONS.redo}</button>
           <div class="menu-wrap">
             <button class="icon-btn ${s.menuOpen === "reset" ? "is-open" : ""}" data-reset-menu title="Zurücksetzen">${ICONS.reset}</button>
             ${
@@ -99,8 +99,8 @@ export class TopBar {
               ? `<div class="menu menu-more" role="menu">
                   <button data-step>Einzelschritt</button>
                   <button data-lapse>${lapse && s.speed >= 8 ? "Zeitraffer aus" : "Zeitraffer 8×"}</button>
-                  <button data-undo>Rückgängig</button>
-                  <button data-redo>Wiederholen</button>
+                  <button data-undo ${s.canUndo ? "" : "disabled"}>Rückgängig (Strg+Z)</button>
+                  <button data-redo ${s.canRedo ? "" : "disabled"}>Wiederholen (Strg+Y)</button>
                   <button data-reset-all>Szene zurücksetzen</button>
                   <button data-reset-water>Nur Wasser</button>
                   <button data-share-link>Link kopieren</button>

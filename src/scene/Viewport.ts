@@ -19,7 +19,7 @@ import {
   type WaterSource,
 } from "../state/types";
 import { CrossSectionView } from "../ui/crossSection";
-import { claimSourceGesture } from "../ui/sourceGesture";
+import { allowOneFingerOrbit, claimSourceGesture, pinGrabBeatsOrbit } from "../ui/sourceGesture";
 import { stepsThisFrame } from "../ui/transport";
 import {
   AimCursor,
@@ -223,7 +223,7 @@ export class Viewport {
     this.applyQuality(q, false);
     this.loadPreset(store.state.presetId, false);
 
-    canvas.addEventListener("pointerdown", this.onPointerDown);
+    canvas.addEventListener("pointerdown", this.onPointerDown, true);
     canvas.addEventListener("pointermove", this.onPointerMove);
     canvas.addEventListener("pointerup", this.onPointerUp);
     canvas.addEventListener("pointercancel", this.onPointerUp);
@@ -484,6 +484,12 @@ export class Viewport {
   /** Pin-drag agent hook: keep one-finger orbit off while a source is moved. */
   lockOrbitForSource(active: boolean): void {
     this.orbitLockedBySource = active;
+    if (active) this.applyOneFingerOrbit(false);
+  }
+
+  private applyOneFingerOrbit(allow: boolean): void {
+    this.controls.mouseButtons.LEFT = allow ? THREE.MOUSE.ROTATE : (-1 as unknown as THREE.MOUSE);
+    this.controls.touches.ONE = allow ? THREE.TOUCH.ROTATE : (-1 as unknown as THREE.TOUCH);
   }
 
   sourceGestureActive(): boolean {
@@ -777,28 +783,31 @@ export class Viewport {
       hitSourceId: hitSource,
       draggingSource: this.draggingSource ?? this.pendingSource?.id ?? null,
     });
+    if (pinGrabBeatsOrbit(claim)) {
+      ev.stopImmediatePropagation();
+      this.lockOrbitForSource(true);
+    }
     if (claim.orbit) return;
     this.pointerDown = true;
     this.canvas.setPointerCapture(ev.pointerId);
-    if (claim.tool && claim.sourceId) this.lockOrbitForSource(true);
+
+    if (claim.sourceId) {
+      this.pendingSource = {
+        id: claim.sourceId,
+        x: ev.clientX,
+        y: ev.clientY,
+        pointerType: ev.pointerType,
+      };
+      this.lockOrbitForSource(true);
+      this.store.patch({ selectedSourceId: claim.sourceId });
+      this.syncMarkerStyles();
+      this.onUi();
+      const hit = this.hitUv(ev);
+      if (hit) this.refreshAim(hit, ev);
+      return;
+    }
 
     if (tool === "source") {
-      const id = this.pickSource(ev);
-      if (id) {
-        this.pendingSource = {
-          id,
-          x: ev.clientX,
-          y: ev.clientY,
-          pointerType: ev.pointerType,
-        };
-        this.lockOrbitForSource(true);
-        this.store.patch({ selectedSourceId: id });
-        this.syncMarkerStyles();
-        this.onUi();
-        const hit = this.hitUv(ev);
-        if (hit) this.refreshAim(hit, ev);
-        return;
-      }
       const hit = this.hitUv(ev);
       if (hit) {
         await this.pushHistory();
@@ -906,9 +915,7 @@ export class Viewport {
     this.controls.update();
     this.clampCamera();
 
-    const cam = this.store.state.cameraMode && !this.sourceGestureActive();
-    this.controls.mouseButtons.LEFT = cam ? THREE.MOUSE.ROTATE : (-1 as unknown as THREE.MOUSE);
-    this.controls.touches.ONE = cam ? THREE.TOUCH.ROTATE : (-1 as unknown as THREE.TOUCH);
+    this.applyOneFingerOrbit(allowOneFingerOrbit(this.store.state.cameraMode, this.sourceGestureActive()));
 
     this.syncSourcePins();
 

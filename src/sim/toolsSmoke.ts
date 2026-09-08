@@ -148,10 +148,12 @@ const after: SimSnapshot = {
   terrain: tamp.terrain.slice(),
   cohesion: tamp.cohesion.slice(),
 };
+if (!hist.flags().canUndo || hist.flags().canRedo) fail("history flags after push");
 const undone = hist.undo(after);
 if (!undone || undone.cohesion[mid] >= after.cohesion[mid]) {
   fail("Undo stellt lokale Kohäsion nicht wieder her");
 }
+if (!hist.flags().canRedo) fail("history flags after undo");
 const redone = hist.redo(undone);
 if (!redone || redone.cohesion[mid] < undone.cohesion[mid]) {
   fail("Redo bringt lokale Kohäsion nicht zurück");

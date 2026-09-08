@@ -9,6 +9,11 @@ import {
   uvToWorldXZ,
 } from "./AimCursor";
 import {
+  allowOneFingerOrbit,
+  claimSourceGesture,
+  pinGrabBeatsOrbit,
+} from "./sourceGesture";
+import {
   SOURCE_PIN_PLANT,
   SOURCE_PIN_STEM_H,
   applySourceMarkerStyle,
@@ -128,5 +133,21 @@ const pinSame = sourcePinWorld(0.3, 0.6, 0.5, tray, heightScale);
 almost(aimStatePour.x, pinSame.x, 1e-9, "shared helper x");
 almost(aimStatePour.y, pinSame.y, 1e-9, "shared helper y");
 almost(aimStatePour.z, pinSame.z, 1e-9, "shared helper z");
+
+const grab = claimSourceGesture({
+  tool: "source",
+  cameraMode: true,
+  hitSourceId: "a",
+  draggingSource: null,
+});
+assert(pinGrabBeatsOrbit(grab), "pin grab wins over camera orbit");
+const camEmpty = claimSourceGesture({
+  tool: "pour",
+  cameraMode: true,
+  hitSourceId: null,
+  draggingSource: null,
+});
+assert(camEmpty.orbit && !pinGrabBeatsOrbit(camEmpty), "missed pin still orbits");
+assert(allowOneFingerOrbit(true, false) && !allowOneFingerOrbit(true, true), "orbit yields while pin claimed");
 
 console.log("source-pins smoke ok");
