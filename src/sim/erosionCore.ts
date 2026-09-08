@@ -25,7 +25,9 @@ import {
   applyPipeFlux,
   bedSlopeAt,
   canPickSediment,
+  clampWaterField,
   equilibriumTransfer,
+  maxWaterDepthFor,
   sedimentCapacity,
   updatePipeFlux,
 } from "./hydraulic";
@@ -158,6 +160,7 @@ export class ErosionSim {
       if (src.kind === "rain") this.addRain(src);
       else this.addPointSource(src);
     }
+    clampWaterField(this.water, maxWaterDepthFor(this.size));
   }
 
   private addPointSource(src: WaterSource): void {
@@ -380,6 +383,7 @@ export class ErosionSim {
     for (let i = 0; i < n; i++) {
       water[i] = Math.max(0, water[i] + wD[i]);
     }
+    clampWaterField(water, maxWaterDepthFor(size));
   }
 
   /**
@@ -767,6 +771,7 @@ export class ErosionSim {
         this.water[this.i(x, y)] += amount * fall * 0.5;
       }
     }
+    clampWaterField(this.water, maxWaterDepthFor(size));
   }
 
   resetWater(): void {

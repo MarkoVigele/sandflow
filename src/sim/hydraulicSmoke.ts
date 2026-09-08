@@ -1,16 +1,22 @@
 import { DEFAULT_PARAMS } from "../state/types";
 import { ErosionSim } from "./erosionCore";
 import {
+  MAX_PIPE_SPEED,
+  MAX_WATER_DEPTH,
+  MAX_WATER_DEPTH_ULTRA,
   STILL_SPEED,
   advectMacCormack,
   applyPipeFlux,
   canPickSediment,
+  clampWaterDepth,
+  clampWaterField,
   equilibriumTransfer,
+  maxWaterDepthFor,
   sedimentCapacity,
   updatePipeFlux,
 } from "./hydraulic";
 import { HARD_THRESHOLD } from "./mapsContract";
-import { hardSupportCount, talusLimit, thermalSlip } from "./thermalErosion";
+import { hardSupportCount, talusLimit, thermalRateScale, thermalSlip } from "./thermalErosion";
 
 function fail(msg: string): never {
   console.error(msg);
@@ -19,6 +25,30 @@ function fail(msg: string): never {
 
 const size = 32;
 const n = size * size;
+
+{
+  if (clampWaterDepth(-1) !== 0) fail("negative depth clamps to 0");
+  if (clampWaterDepth(0.05) !== 0.05) fail("shallow water stays");
+  if (clampWaterDepth(MAX_WATER_DEPTH + 0.4) !== MAX_WATER_DEPTH) fail("deep column hits the cap");
+  if (maxWaterDepthFor(128) !== MAX_WATER_DEPTH) fail("Low keeps the coarse cap");
+  if (maxWaterDepthFor(768) !== MAX_WATER_DEPTH_ULTRA) fail("Ultra uses the tight cap");
+  if (!(maxWaterDepthFor(768) < maxWaterDepthFor(128))) fail("Ultra cap must be tighter than Low");
+  const field = new Float32Array([0, 0.04, MAX_WATER_DEPTH + 1, Number.NaN]);
+  clampWaterField(field);
+  if (
+    field[0] !== 0 ||
+    Math.abs(field[1] - 0.04) > 1e-6 ||
+    Math.abs(field[2] - MAX_WATER_DEPTH) > 1e-6 ||
+    field[3] !== 0
+  ) {
+    fail(`clampWaterField ${Array.from(field)}`);
+  }
+  if (thermalRateScale(768) !== 1 || thermalRateScale(256) !== 1) fail("fine grids keep full thermal");
+  if (!(thermalRateScale(128) < 0.62 && thermalRateScale(128) >= 0.48)) {
+    fail(`Low thermal should stay gentle: ${thermalRateScale(128)}`);
+  }
+  if (!(thermalRateScale(128) < thermalRateScale(256))) fail("Low thermal must be gentler than Medium");
+}
 
 {
   if (sedimentCapacity(0, 0.2, 0.05, 0.58) !== 0) fail("still speed must have C=0");
@@ -210,5 +240,41 @@ const n = size * size;
   if (cut > 1e-5) fail(`hardmask eroded under pipes: ${cut}`);
   if (sim.hardmask[0] < HARD_THRESHOLD) fail("hardmask cleared");
 }
+
+{
+  // Ultra-class pile-up: a dammed bowl must not blow past the depth cap or spawn NaNs.
+  const sizeU = 96;
+  const bowl = new Float32Array(sizeU * sizeU);
+  for (let y = 0; y < sizeU; y++) {
+    for (let x = 0; x < sizeU; x++) {
+      const u = x / (sizeU - 1) - 0.5;
+      const v = y / (sizeU - 1) - 0.5;
+      bowl[y * sizeU + x] = 0.52 - Math.max(0, 0.28 - Math.hypot(u, v)) * 0.7;
+    }
+  }
+  const flood = new ErosionSim(sizeU, { ...DEFAULT_PARAMS, infiltration: 0, evaporation: 0 }, bowl);
+  for (let s = 0; s < 40; s++) {
+    flood.pour(0.5, 0.5, 2.4);
+    flood.step(1);
+  }
+  let maxW = 0;
+  let bad = 0;
+  for (let i = 0; i < flood.water.length; i++) {
+    const w = flood.water[i];
+    if (w > maxW) maxW = w;
+    if (!Number.isFinite(w)) bad++;
+  }
+  console.log(JSON.stringify({ ultraCap: { maxW: +maxW.toFixed(4), bad } }));
+  if (maxW > maxWaterDepthFor(sizeU) + 1e-6) fail(`water blew past the cap: ${maxW}`);
+  if (bad) fail(`non-finite water after flood: ${bad}`);
+  if (maxW < 0.05) fail(`cap test never filled the bowl: ${maxW}`);
+  const ultraField = new Float32Array([2.4, 0.9, 0.1]);
+  clampWaterField(ultraField, maxWaterDepthFor(768));
+  if (Math.abs(ultraField[0] - MAX_WATER_DEPTH_ULTRA) > 1e-6) fail("Ultra clamp");
+  if (Math.abs(ultraField[1] - MAX_WATER_DEPTH_ULTRA) > 1e-6) fail("Ultra clamp mid");
+  if (Math.abs(ultraField[2] - 0.1) > 1e-6) fail("Ultra clamp left shallow water");
+}
+
+if (!(MAX_PIPE_SPEED > 1) || !Number.isFinite(MAX_PIPE_SPEED)) fail("pipe speed cap");
 
 console.log("hydraulicSmoke ok");

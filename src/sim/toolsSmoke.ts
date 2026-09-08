@@ -10,7 +10,7 @@ import {
   stoneIslandUvRadius,
 } from "./mapsContract";
 import { ErosionSim } from "./erosionCore";
-import { PRESETS, getPreset } from "./presets";
+import { PRESETS, getPreset, sourceSitsOnTerrain } from "./presets";
 import type { SimSnapshot } from "./SimClient";
 
 function fail(msg: string): never {
@@ -177,6 +177,14 @@ for (const id of hardPresets) {
   const nHard = countHardCells(built.hardmask);
   if (nHard < size * 6) fail(`Preset ${id} zu wenig Beton: ${nHard}`);
   if (nHard > size * size * 0.92) fail(`Preset ${id} fast nur Beton: ${nHard}`);
+}
+
+for (const id of ["regen-hang", "staudamm"] as const) {
+  const built = getPreset(id).build(size);
+  const src = built.sources[0];
+  if (!src || !sourceSitsOnTerrain(built.terrain, built.hardmask, size, src)) {
+    fail(`${id} source must sit on sand, not rim/hardmask`);
+  }
 }
 
 const mask = new Float32Array(16 * 16);

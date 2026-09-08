@@ -5,9 +5,16 @@
 import { fbm } from "../assets/noise";
 import { DEFAULT_PARAMS } from "../state/types";
 import { ErosionSim } from "./erosionCore";
+import { MAX_WATER_DEPTH } from "./hydraulic";
 import { HARD_THRESHOLD } from "./mapsContract";
-import { getPreset } from "./presets";
-import { hardSupportCount, thermalSlip } from "./thermalErosion";
+import {
+  getPreset,
+  placeSourceOnTerrain,
+  SENSIBLE_SOURCE_RATE_MAX,
+  SENSIBLE_SOURCE_RATE_MIN,
+  sourceSitsOnTerrain,
+} from "./presets";
+import { hardSupportCount, thermalRateScale, thermalSlip } from "./thermalErosion";
 
 function fail(msg: string): never {
   console.error(msg);
@@ -248,6 +255,17 @@ function massCentroidY(sim: ErosionSim, size: number) {
   const built = getPreset("regen-hang").build(size);
   if (!built.hardmask) fail("regen-hang has no hardmask");
   if (built.sources[0]?.kind !== "rain") fail("regen-hang should use a rain source");
+  const rain = built.sources[0];
+  if (!sourceSitsOnTerrain(built.terrain, built.hardmask, size, rain)) {
+    fail(`regen-hang source is not on sand: ${JSON.stringify(rain)}`);
+  }
+  if (rain.rate < SENSIBLE_SOURCE_RATE_MIN || rain.rate > SENSIBLE_SOURCE_RATE_MAX) {
+    fail(`regen-hang rain rate is not sensible: ${rain.rate}`);
+  }
+  const planted = placeSourceOnTerrain(built.terrain, built.hardmask, size, rain.x, rain.y);
+  if (Math.hypot(planted.x - rain.x, planted.y - rain.y) > 0.04) {
+    fail(`regen-hang pin would snap away from the bed: ${JSON.stringify({ rain, planted })}`);
+  }
   const sim = new ErosionSim(size, DEFAULT_PARAMS, built.terrain);
   sim.hardmask.set(built.hardmask);
   sim.sources = built.sources;
@@ -292,12 +310,21 @@ function massCentroidY(sim: ErosionSim, size: number) {
   if (basin.wet < 6) fail(`regen-hang did not pool at the foot: ${JSON.stringify(basin)}`);
   if (basinCut > 0.02) fail(`regen-hang basin burned in: ${basinCut}`);
   if (slopeCut > 0.03) fail(`regen-hang rain burned the hang: ${slopeCut}`);
+  if (basin.maxW > MAX_WATER_DEPTH + 1e-6) fail(`regen-hang water blew the cap: ${basin.maxW}`);
 }
 
 {
   const size = 80;
   const built = getPreset("staudamm").build(size);
   if (!built.hardmask) fail("staudamm has no hardmask");
+  const inlet = built.sources[0];
+  if (!inlet) fail("staudamm has no source");
+  if (!sourceSitsOnTerrain(built.terrain, built.hardmask, size, inlet)) {
+    fail(`staudamm source is not on sand: ${JSON.stringify(inlet)}`);
+  }
+  if (inlet.rate < SENSIBLE_SOURCE_RATE_MIN || inlet.rate > SENSIBLE_SOURCE_RATE_MAX) {
+    fail(`staudamm rate is not sensible: ${inlet.rate}`);
+  }
   const sim = new ErosionSim(size, DEFAULT_PARAMS, built.terrain);
   sim.hardmask.set(built.hardmask);
   sim.sources = built.sources;
@@ -334,6 +361,31 @@ function massCentroidY(sim: ErosionSim, size: number) {
   if (hardMove > 1e-6) fail(`staudamm hardmask moved: ${hardMove}`);
   if (up < down * 0.55) fail(`staudamm did not pond upstream: up=${up} down=${down}`);
   if (lakeCut > 0.03) fail(`staudamm reservoir burned in: ${lakeCut}`);
+  let maxW = 0;
+  for (let i = 0; i < sim.water.length; i++) if (sim.water[i] > maxW) maxW = sim.water[i];
+  if (maxW > MAX_WATER_DEPTH + 1e-6) fail(`staudamm water blew the cap: ${maxW}`);
+}
+
+{
+  const size = 128;
+  if (!(thermalRateScale(size) < thermalRateScale(256))) fail("Low thermal scale");
+  const t = new Float32Array(size * size);
+  const hard = new Float32Array(size * size);
+  const water = new Float32Array(size * size);
+  const wet = new Float32Array(size * size);
+  const coh = new Float32Array(size * size);
+  const delta = new Float32Array(size * size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      t[y * size + x] = x < size * 0.5 ? 0.78 : 0.4;
+    }
+  }
+  const t0 = t.slice();
+  thermalSlip(t, water, wet, coh, hard, delta, size, 0.55, 0.28);
+  let moved = 0;
+  for (let i = 0; i < t.length; i++) moved += Math.abs(t[i] - t0[i]);
+  console.log(JSON.stringify({ lowThermal: { moved: +moved.toFixed(4), k: +thermalRateScale(size).toFixed(3) } }));
+  if (moved > 1.8) fail(`Low thermal melted the tray: ${moved}`);
 }
 
 if (getPreset("beton-kanal").id !== "betonkanal") fail("beton-kanal alias");

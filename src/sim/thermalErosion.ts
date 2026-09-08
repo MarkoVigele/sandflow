@@ -10,6 +10,21 @@
 import { HARD_THRESHOLD } from "./mapsContract";
 import { MIN_SAND } from "./hydraulic";
 
+/** Medium (256²) is the authored slip rate. Coarser cells have larger neighbor Δh. */
+const THERMAL_REF_SIZE = 256;
+/** Smoke kernels sit below this; only production Low (128) is eased. */
+const THERMAL_LOW_GRID = 96;
+
+/**
+ * Mobile Low is 128² — the same physical bank spans fewer cells, so raw Δh
+ * looks steeper. Scale the slip rate down so phones do not melt the tray.
+ */
+export function thermalRateScale(size: number): number {
+  if (!(size > 0) || size >= THERMAL_REF_SIZE) return 1;
+  if (size < THERMAL_LOW_GRID) return 1;
+  return Math.max(0.52, size / THERMAL_REF_SIZE);
+}
+
 const CARDINALS = [
   [1, 0],
   [-1, 0],
@@ -70,7 +85,13 @@ export function thermalSlip(
       // Dry sand creeps slowly; wet banks after a cut slump faster.
       const wetBoost = water[i] > 0.003 && water[i] < 0.05 ? 1.85 : 1;
       const wallHold = support > 0 ? 0.38 : 1;
-      const k = 0.07 * (1.05 - localC) * (1 - Math.min(0.5, wetness[i] * 0.5)) * wetBoost * wallHold;
+      const k =
+        0.07 *
+        (1.05 - localC) *
+        (1 - Math.min(0.5, wetness[i] * 0.5)) *
+        wetBoost *
+        wallHold *
+        thermalRateScale(size);
 
       for (let nK = 0; nK < 4; nK++) {
         const nx = x + CARDINALS[nK][0];
