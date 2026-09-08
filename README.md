@@ -49,12 +49,30 @@ Zusätzliche Werkzeuge: **Feststampfen** (Kohäsion lokal), **Rinne** vorzeichne
 - **Mittel** ist die Vorgabe auf dem Telefon, **Hoch** am Rechner.
 - **Auto** bleibt an, bis eine feste Stufe gewählt wird. Unter 25 Bildern/s rutscht die Qualität eine Stufe tiefer (Toast).
 - Gitter: Niedrig 128², Mittel 256², Hoch/Ultra 512². Schatten und Partikel nur auf Hoch und Ultra.
+- Texturen: Mittel/Niedrig bleiben bei 512er- (bzw. 256er-) Karten und niedriger Anisotropie, damit ein Qualitätswechsel die Albedo nicht neu ableitet.
 - Wenn es hakelt: Qualität senken, Tempo auf 0,5×, weniger Quellen, Ultra meiden.
 
 ## Speichern und teilen
 
-JSON (Speichern) nimmt Höhe, Wasser, Quellen und Materialparameter in voller Genauigkeit mit. **Teilen** schreibt einen kompakten Zustand in den URL-Hash (`#sf2.…`) oder als Share-JSON — ohne Cloud. Der Link trägt Vorlage, Quellen, Tempo, Kamera, Kiesel und ein grobes Höhenfeld (64²). Fehlt Platz, bleibt die Vorlage ohne Gelände. PNG ist ein Blick aus der aktuellen Kamera. Trocken- und Nass-Sand unter `public/textures/` mischen sich nach Feuchte; der Wannenrand trägt Holz. Fehlt eine Datei, bleibt die lokale Prozedur.
+JSON (Speichern) nimmt Höhe, Wasser, Quellen und Materialparameter in voller Genauigkeit mit. **Teilen** schreibt einen kompakten Zustand in den URL-Hash (`#sf2.…`) oder als Share-JSON — ohne Cloud. Der Link trägt Vorlage, Quellen, Tempo, Kamera, Kiesel und ein grobes Höhenfeld (64²). Nur extrem lange Links lassen das Gelände weg. PNG ist ein Blick aus der aktuellen Kamera. Trocken- und Nass-Sand unter `public/textures/` mischen sich nach Feuchte; der Wannenrand trägt Holz. Fehlt eine Datei, bleibt die lokale Prozedur.
 
-## Was V1 nicht ist
+## V1.x — was jetzt drin ist
 
-Kein WebGPU, kein fremdes Bild-API, keine komplette Requisitenbibliothek. Erst muss das Wasser glaubwürdig graben.
+Gegen die ursprüngliche V1-Skizze ist der spielbare Kern gewachsen. Neu bzw. fest verdrahtet:
+
+- Zielring (AimCursor) sitzt auf der verformten Sandoberfläche, nicht auf der flachen Mesh-Ebene.
+- Werkzeuge **Feststampfen**, **Rinne**, **Einebnen**, plus **Kiesel** und **Radierer**.
+- Vorlagen inkl. Referenz-Rinne und dünnen Adern; Heatmap für Fluss oder Tiefe.
+- Kurzanleitung, Tempo bis 8× / Zeitraffer, Auto-Qualität, Szene oder nur Wasser zurücksetzen.
+- Teilen per URL-Hash oder Share-JSON (ohne Cloud).
+- Gebackene Trocken-/Nass-Sand- und Holztexturen; Nassmischt sich nach Feuchte. Mittel auf dem Telefon bleibt bei 512er-Karten, damit die Texturen nicht bei jedem Qualitätswechsel neu entstehen.
+
+## Noch zurückgestellt
+
+Die ursprüngliche Vision bleibt an ein paar Stellen bewusst offen:
+
+- **WebGPU** — weiter WebGL2.
+- **Echtes externes Bild-API** — nur Platzhalter (`VITE_ASSET_API`), sonst lokal / gebacken.
+- **Volle Requisitenbibliothek** — nur leichte Kiesel, keine Möbel oder Figuren.
+- **Hohe Share-Genauigkeit / Cloud** — Hash bleibt grob (64²), volles Gelände nur im JSON.
+- **Physik-Feinschliff** jenseits des Erosionskerns (Nassbruch, echte Turbidität, Mehrphasen).

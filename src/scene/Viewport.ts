@@ -3,13 +3,14 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { GeneratedMaps } from "../assets/AssetService";
 import { SimClient, type SimFrame, type SimSnapshot } from "../sim/SimClient";
 import type { BrushKind } from "../sim/types";
-import { unpackRgba } from "../sim/mapsContract";
+import { packMapsRgba, unpackRgba } from "../sim/mapsContract";
 import { getPreset, resampleHeight, type CameraPose } from "../sim/presets";
 import { History } from "../state/history";
 import type { Store } from "../state/store";
 import {
   QUALITY_GRID,
   QUALITY_LABEL,
+  isMobile,
   type QualityId,
   type ToolId,
   type WaterSource,
@@ -21,6 +22,7 @@ import {
   type AimCursorState,
   type AimHit,
 } from "../ui/AimCursor";
+import { gpuTexelBudget } from "../assets/texturePaths";
 import { createMapsTexture, uploadPacked } from "./mapsTexture";
 import { FlowParticles } from "./Particles";
 import { PropsLite, type PropLite } from "./PropsLite";
@@ -72,6 +74,8 @@ export class Viewport {
   private clock = new THREE.Clock();
   private aim = new AimCursor();
   private propsLite = new PropsLite();
+  private labMaps: GeneratedMaps | null = null;
+  private labGpuSize = 0;
   private propsUndo: PropLite[][] = [];
   private propsRedo: PropLite[][] = [];
   private lastPointer: { clientX: number; clientY: number } | null = null;
@@ -89,11 +93,11 @@ export class Viewport {
 
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: store.state.quality !== "low",
+      antialias: !(isMobile() || store.state.quality === "low"),
       alpha: false,
       powerPreference: "high-performance",
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, store.state.quality === "ultra" ? 2 : 1.5));
+    this.renderer.setPixelRatio(pixelRatioFor(store.state.quality));
     this.renderer.setClearColor(0x14110e, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -193,8 +197,11 @@ export class Viewport {
   }
 
   applyGeneratedMaps(maps: GeneratedMaps): void {
-    this.sand.applyMaps(maps);
-    if (maps.wood) applyTrayWood(this.tray, maps.wood, maps.woodNormal, maps.woodRough);
+    this.labMaps = maps;
+    const q = this.store.state.quality;
+    this.labGpuSize = gpuTexelBudget(q);
+    this.sand.applyMaps(maps, q);
+    if (maps.wood) applyTrayWood(this.tray, maps.wood, maps.woodNormal, maps.woodRough, q);
   }
 
   applyParams(): void {
@@ -207,11 +214,17 @@ export class Viewport {
     this.renderer.shadowMap.enabled = shadows;
     this.sun.castShadow = shadows;
     this.sun.shadow.mapSize.set(quality === "ultra" ? 2048 : 1024, quality === "ultra" ? 2048 : 1024);
-    this.renderer.setPixelRatio(
-      Math.min(window.devicePixelRatio, quality === "low" ? 1 : quality === "ultra" ? 2 : 1.5),
-    );
+    this.renderer.setPixelRatio(pixelRatioFor(quality));
     this.sand.setQuality(quality, TRAY_SIZE);
     this.water.setQuality(quality, TRAY_SIZE);
+    const gpuSize = gpuTexelBudget(quality);
+    if (this.labMaps && gpuSize !== this.labGpuSize) {
+      this.labGpuSize = gpuSize;
+      this.sand.applyMaps(this.labMaps, quality);
+      if (this.labMaps.wood) {
+        applyTrayWood(this.tray, this.labMaps.wood, this.labMaps.woodNormal, this.labMaps.woodRough, quality);
+      }
+    }
 
     const grid = QUALITY_GRID[quality];
     if (this.lastPacked && resample && this.lastSize !== grid) {
@@ -282,6 +295,15 @@ export class Viewport {
       sediment: snap.sediment,
       cohesion: snap.cohesion,
     });
+    const packed = packMapsRgba(
+      snap.terrain,
+      snap.water,
+      snap.wetness,
+      new Float32Array(snap.size * snap.size),
+    );
+    this.lastPacked = packed;
+    this.lastSize = snap.size;
+    uploadPacked(this.maps, packed, snap.size);
     this.onUi();
   }
 
@@ -686,7 +708,6 @@ export class Viewport {
       }
     }
 
-    this.sand.setHeatMode(this.store.state.heatmap);
     this.water.tick(t);
     if (this.lastPointer && !this.store.state.cameraMode) {
       const hit = this.hitFromClient(this.lastPointer.clientX, this.lastPointer.clientY);
@@ -747,5 +768,10 @@ export class Viewport {
       this.lowFpsMs = 0;
     }
   }
+}
+
+function pixelRatioFor(quality: QualityId): number {
+  const cap = quality === "low" ? 1 : quality === "ultra" ? 2 : quality === "medium" && isMobile() ? 1.15 : 1.5;
+  return Math.min(window.devicePixelRatio || 1, cap);
 }
 

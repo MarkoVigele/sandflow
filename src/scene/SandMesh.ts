@@ -3,6 +3,8 @@ import sandVert from "../shaders/sand.vert.glsl?raw";
 import sandFrag from "../shaders/sand.frag.glsl?raw";
 import type { HeatmapMode, QualityId } from "../state/types";
 import { canvasTexture } from "./mapsTexture";
+import { fitCanvas } from "../assets/deriveMaps";
+import { gpuAnisotropy, gpuTexelBudget, sandUvScale } from "../assets/texturePaths";
 import type { GeneratedMaps } from "../assets/AssetService";
 
 const MESH_SEGS: Record<QualityId, number> = {
@@ -51,16 +53,22 @@ export class SandMesh {
         uAmbient: { value: new THREE.Color(0.24, 0.21, 0.17) },
         uReceiveShadow: { value: 0 },
         uGrain: { value: 0.55 },
+        uUvScale: { value: sandUvScale(0.55) },
         uHeatMode: { value: 0 },
       },
       vertexShader: sandVert,
       fragmentShader: sandFrag,
     });
 
+    this.material.polygonOffset = true;
+    this.material.polygonOffsetFactor = -1;
+    this.material.polygonOffsetUnits = -1;
+
     this.mesh = new THREE.Mesh(geo, this.material);
     this.mesh.receiveShadow = true;
     this.mesh.castShadow = false;
     this.mesh.name = "sand";
+    this.mesh.renderOrder = 1;
   }
 
   setMaps(maps: THREE.DataTexture): void {
@@ -79,25 +87,29 @@ export class SandMesh {
     this.mesh.receiveShadow = shadows;
   }
 
-  applyMaps(maps: GeneratedMaps): void {
+  applyMaps(maps: GeneratedMaps, quality: QualityId = "high"): void {
     this.albedo?.dispose();
     this.albedoWet?.dispose();
     this.normal?.dispose();
     this.rough?.dispose();
-    this.albedo = canvasTexture(maps.albedo);
-    this.albedoWet = canvasTexture(maps.albedoWet ?? maps.albedo);
-    this.normal = canvasTexture(maps.normal);
+    const size = gpuTexelBudget(quality);
+    const aniso = gpuAnisotropy(quality);
+    this.albedo = canvasTexture(fitCanvas(maps.albedo, size), aniso);
+    this.albedoWet = canvasTexture(fitCanvas(maps.albedoWet ?? maps.albedo, size), aniso);
+    this.normal = canvasTexture(fitCanvas(maps.normal, size), aniso);
     this.normal.colorSpace = THREE.LinearSRGBColorSpace;
-    this.rough = canvasTexture(maps.roughness);
+    this.rough = canvasTexture(fitCanvas(maps.roughness, size), aniso);
     this.rough.colorSpace = THREE.LinearSRGBColorSpace;
     this.material.uniforms.uAlbedo.value = this.albedo;
     this.material.uniforms.uAlbedoWet.value = this.albedoWet;
     this.material.uniforms.uNormal.value = this.normal;
     this.material.uniforms.uRough.value = this.rough;
+    this.material.uniforms.uUvScale.value = sandUvScale(this.material.uniforms.uGrain.value);
   }
 
   setGrain(grain: number): void {
     this.material.uniforms.uGrain.value = grain;
+    this.material.uniforms.uUvScale.value = sandUvScale(grain);
   }
 
   setHeatMode(mode: HeatmapMode): void {

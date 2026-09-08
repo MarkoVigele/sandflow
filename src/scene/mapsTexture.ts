@@ -28,11 +28,11 @@ export function uploadPacked(tex: THREE.DataTexture, packed: Float32Array, size:
   tex.needsUpdate = true;
 }
 
-export function canvasTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
+export function canvasTexture(canvas: HTMLCanvasElement, anisotropy = 2): THREE.CanvasTexture {
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
+  tex.anisotropy = Math.max(1, anisotropy);
   tex.generateMipmaps = true;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.magFilter = THREE.LinearFilter;

@@ -3,11 +3,16 @@ import {
   luma01,
   packRoughnessRG,
 } from "./deriveMaps";
+import { TRAY_SAND_CLEARANCE } from "../scene/Tray";
 import {
   BAKED_TEXTURE_FILES,
   bakedTextureUrl,
   DEFAULT_TEXTURE_PROMPT,
+  gpuAnisotropy,
+  gpuTexelBudget,
+  labTexelBudget,
   preferBakedSand,
+  sandUvScale,
 } from "./texturePaths";
 
 function assert(cond: boolean, msg: string): void {
@@ -29,6 +34,14 @@ assert(
 assert(preferBakedSand(DEFAULT_TEXTURE_PROMPT), "default prompt uses baked sand");
 assert(preferBakedSand("  "), "empty prompt uses baked sand");
 assert(!preferBakedSand("grober roter Laterit"), "custom prompt skips baked dry");
+
+assert(gpuTexelBudget("medium") === 512, "medium GPU budget");
+assert(gpuTexelBudget("low") === 256, "low GPU budget");
+assert(labTexelBudget("medium") === 512 && labTexelBudget("high") === 1024, "lab tiers");
+assert(gpuAnisotropy("medium") === 2, "medium aniso stays modest");
+assert(sandUvScale(0.55) < 3.4, "UV scale below the old stamp repeat");
+assert(sandUvScale(0) >= 2 && sandUvScale(1) <= 3.4, "UV scale in a grainy but tileable band");
+assert(TRAY_SAND_CLEARANCE > 0.02, "rim sits outside the sand plane");
 
 const w = 16;
 const h = 16;

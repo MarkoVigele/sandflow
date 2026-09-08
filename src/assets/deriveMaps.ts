@@ -113,6 +113,23 @@ export function imageToCanvas(img: CanvasImageSource, maxSize = 1024): HTMLCanva
   return c;
 }
 
+/** Downscale for GPU upload. Reuses the source when it already fits the budget. */
+export function fitCanvas(src: HTMLCanvasElement, maxSize: number): HTMLCanvasElement {
+  const longest = Math.max(src.width, src.height, 1);
+  if (longest <= maxSize) return src;
+  const scale = maxSize / longest;
+  const w = Math.max(1, Math.round(src.width * scale));
+  const h = Math.max(1, Math.round(src.height * scale));
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d")!;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(src, 0, 0, w, h);
+  return c;
+}
+
 export function readRgba(canvas: HTMLCanvasElement): {
   data: Uint8ClampedArray;
   width: number;

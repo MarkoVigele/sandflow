@@ -1,5 +1,11 @@
 import * as THREE from "three";
+import { fitCanvas } from "../assets/deriveMaps";
+import { gpuAnisotropy, gpuTexelBudget } from "../assets/texturePaths";
+import type { QualityId } from "../state/types";
 import { canvasTexture } from "./mapsTexture";
+
+/** Inner wall sits outside the sand plane so the rim does not z-fight the bed. */
+export const TRAY_SAND_CLEARANCE = 0.05;
 
 export type TrayHandle = {
   group: THREE.Group;
@@ -16,11 +22,17 @@ export function createTray(traySize: number): TrayHandle {
     color: 0x5a4632,
     roughness: 0.82,
     metalness: 0.04,
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1,
   });
   const rimDark = new THREE.MeshStandardMaterial({
     color: 0x2c241c,
     roughness: 0.7,
     metalness: 0.08,
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 2,
   });
   const bench = new THREE.MeshStandardMaterial({
     color: 0x1a1714,
@@ -31,7 +43,7 @@ export function createTray(traySize: number): TrayHandle {
   // Sand sits at ~BASE * HEIGHT_SCALE ≈ 1.05; rim must clear that so wood is visible.
   const wallH = 1.18;
   const wallT = 0.3;
-  const inner = traySize;
+  const inner = traySize + TRAY_SAND_CLEARANCE * 2;
   const outer = inner + wallT * 2;
 
   const mk = (w: number, h: number, d: number, mat: THREE.Material) => {
@@ -51,16 +63,18 @@ export function createTray(traySize: number): TrayHandle {
   east.position.set(inner / 2 + wallT / 2, wallH / 2, 0);
 
   // Frame only — a solid slab here would cap the sand once the rim clears the bed.
+  // N/S take the corners; E/W are shorter so the lips do not occupy the same volume.
   const lipH = 0.07;
   const lipOver = 0.07;
-  const lipY = wallH + lipH / 2;
+  const lipY = wallH + lipH / 2 + 0.003;
   const lipN = mk(outer + lipOver * 2, lipH, wallT + lipOver, rimDark);
   lipN.position.set(0, lipY, -inner / 2 - wallT / 2);
   const lipS = mk(outer + lipOver * 2, lipH, wallT + lipOver, rimDark);
   lipS.position.set(0, lipY, inner / 2 + wallT / 2);
-  const lipW = mk(wallT + lipOver, lipH, inner, rimDark);
+  const lipSpanEW = inner - (wallT + lipOver) - 0.01;
+  const lipW = mk(wallT + lipOver, lipH, Math.max(0.2, lipSpanEW), rimDark);
   lipW.position.set(-inner / 2 - wallT / 2, lipY, 0);
-  const lipE = mk(wallT + lipOver, lipH, inner, rimDark);
+  const lipE = mk(wallT + lipOver, lipH, Math.max(0.2, lipSpanEW), rimDark);
   lipE.position.set(inner / 2 + wallT / 2, lipY, 0);
 
   const table = mk(outer + 3.4, 0.16, outer + 3.4, bench);
@@ -82,12 +96,15 @@ export function applyTrayWood(
   albedo: HTMLCanvasElement,
   normal?: HTMLCanvasElement,
   roughness?: HTMLCanvasElement,
+  quality: QualityId = "high",
 ): void {
   for (const tex of tray.maps) tex.dispose();
   tray.maps.length = 0;
 
-  const map = canvasTexture(albedo);
-  map.repeat.set(3.2, 1.15);
+  const size = Math.min(512, gpuTexelBudget(quality));
+  const aniso = gpuAnisotropy(quality);
+  const map = canvasTexture(fitCanvas(albedo, size), aniso);
+  map.repeat.set(2.4, 0.95);
   tray.maps.push(map);
   tray.wood.map = map;
   tray.wood.color.set(0xf3e6d2);
@@ -101,7 +118,7 @@ export function applyTrayWood(
   tray.lip.envMapIntensity = 0.3;
 
   if (normal) {
-    const n = canvasTexture(normal);
+    const n = canvasTexture(fitCanvas(normal, size), aniso);
     n.colorSpace = THREE.LinearSRGBColorSpace;
     n.repeat.copy(map.repeat);
     tray.maps.push(n);
@@ -111,7 +128,7 @@ export function applyTrayWood(
     tray.lip.normalScale.set(0.3, 0.3);
   }
   if (roughness) {
-    const r = canvasTexture(roughness);
+    const r = canvasTexture(fitCanvas(roughness, size), aniso);
     r.colorSpace = THREE.LinearSRGBColorSpace;
     r.repeat.copy(map.repeat);
     tray.maps.push(r);

@@ -35,6 +35,11 @@ export function propsFromShare(list: ShareProp[] | undefined): PropLite[] {
   }));
 }
 
+/** Lift from surface to mesh origin. Geometries are radius ≈ 1; bury ~20% so they sit in the sand. */
+export function pebbleSitY(scale: number, geomMinY = -1): number {
+  return -geomMinY * scale * 0.8;
+}
+
 export class PropsLite {
   readonly group = new THREE.Group();
   private items = new Map<string, { prop: PropLite; mesh: THREE.Mesh }>();
@@ -125,7 +130,9 @@ export class PropsLite {
     heightScale: number,
   ): void {
     const world = surfaceWorld(prop.u, prop.v, heightAt(prop.u, prop.v), tray, heightScale);
+    if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+    const minY = mesh.geometry.boundingBox?.min.y ?? -1;
     mesh.position.copy(world);
-    mesh.position.y += prop.scale * 0.42;
+    mesh.position.y += pebbleSitY(prop.scale, minY);
   }
 }
