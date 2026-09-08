@@ -54,7 +54,7 @@ Zusätzliche Werkzeuge: **Feststampfen** (Kohäsion lokal), **Rinne** vorzeichne
 
 ## Speichern und teilen
 
-JSON (Speichern) nimmt Höhe, Wasser, Quellen und Materialparameter in voller Genauigkeit mit. **Teilen** schreibt einen kompakten Zustand in den URL-Hash (`#sf2.…`) oder als Share-JSON — ohne Cloud. Der Link trägt Vorlage, Quellen, Tempo, Kamera, Kiesel und ein grobes Höhenfeld (64²). Nur extrem lange Links lassen das Gelände weg. PNG ist ein Blick aus der aktuellen Kamera. Trocken- und Nass-Sand unter `public/textures/` mischen sich nach Feuchte; der Wannenrand trägt Holz. Fehlt eine Datei, bleibt die lokale Prozedur.
+JSON (Speichern) nimmt Höhe, Wasser, Quellen und Materialparameter in voller Genauigkeit mit. **Teilen** schreibt einen kompakten Zustand in den URL-Hash (`#sf2.…`) oder als Share-JSON — ohne Cloud. Der Link trägt Vorlage, Quellen, Tempo, Kamera, Kiesel und ein grobes Höhenfeld (64²). Nur extrem lange Links lassen das Gelände weg. PNG ist ein Blick aus der aktuellen Kamera. Trocken- und Nass-Sand unter `public/textures/` werden kachelbar nachbearbeitet und mischen sich nach Feuchte; der Wannenrand nimmt Beton/`concrete-albedo.jpg` (Laborlook), sonst Holz, sonst eine lokale Prozedur.
 
 ## V1.x — was jetzt drin ist
 
@@ -65,7 +65,7 @@ Gegen die ursprüngliche V1-Skizze ist der spielbare Kern gewachsen. Neu bzw. fe
 - Vorlagen inkl. Referenz-Rinne und dünnen Adern; Heatmap für Fluss oder Tiefe.
 - Kurzanleitung, Tempo bis 8× / Zeitraffer, Auto-Qualität, Szene oder nur Wasser zurücksetzen.
 - Teilen per URL-Hash oder Share-JSON (ohne Cloud).
-- Gebackene Trocken-/Nass-Sand- und Holztexturen; Nassmischt sich nach Feuchte. Mittel auf dem Telefon bleibt bei 512er-Karten, damit die Texturen nicht bei jedem Qualitätswechsel neu entstehen.
+- Gebackene Trocken-/Nass-Sand- und Laborrand-Texturen (kachelbar, abgeleitete Normalen/Rauheit); Nass mischt sich nach Feuchte. Hoch/Ultra nutzen stärkere Anisotropie. Mittel auf dem Telefon bleibt bei 512er-Karten, damit die Texturen nicht bei jedem Qualitätswechsel neu entstehen.
 
 ## Noch zurückgestellt
 

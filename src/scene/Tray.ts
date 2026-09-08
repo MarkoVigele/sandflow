@@ -19,25 +19,25 @@ export function createTray(traySize: number): TrayHandle {
   g.name = "tray";
 
   const wood = new THREE.MeshStandardMaterial({
-    color: 0x5a4632,
-    roughness: 0.82,
-    metalness: 0.04,
+    color: 0x6a6560,
+    roughness: 0.86,
+    metalness: 0.05,
     polygonOffset: true,
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1,
   });
   const rimDark = new THREE.MeshStandardMaterial({
-    color: 0x2c241c,
-    roughness: 0.7,
-    metalness: 0.08,
+    color: 0x3a3834,
+    roughness: 0.74,
+    metalness: 0.06,
     polygonOffset: true,
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 2,
   });
   const bench = new THREE.MeshStandardMaterial({
-    color: 0x1a1714,
-    roughness: 0.9,
-    metalness: 0.02,
+    color: 0x161514,
+    roughness: 0.92,
+    metalness: 0.03,
   });
 
   // Flat bed stays near BASE * HEIGHT_WORLD ≈ 1.05; Relief exaggerates ridges, not the slab.
@@ -82,7 +82,7 @@ export function createTray(traySize: number): TrayHandle {
 
   const under = new THREE.Mesh(
     new THREE.BoxGeometry(inner, 0.12, inner),
-    new THREE.MeshStandardMaterial({ color: 0x3d3226, roughness: 0.95 }),
+    new THREE.MeshStandardMaterial({ color: 0x3a3834, roughness: 0.95 }),
   );
   under.position.y = -0.02;
   under.receiveShadow = true;
@@ -101,21 +101,21 @@ export function applyTrayWood(
   for (const tex of tray.maps) tex.dispose();
   tray.maps.length = 0;
 
-  const size = Math.min(512, gpuTexelBudget(quality));
+  const size = gpuTexelBudget(quality);
   const aniso = gpuAnisotropy(quality);
   const map = canvasTexture(fitCanvas(albedo, size), aniso);
-  map.repeat.set(2.4, 0.95);
+  map.repeat.set(1.15, 0.72);
   tray.maps.push(map);
   tray.wood.map = map;
-  tray.wood.color.set(0xf3e6d2);
-  tray.wood.roughness = 0.7;
-  tray.wood.metalness = 0.02;
-  tray.wood.envMapIntensity = 0.35;
+  tray.wood.color.set(0xe8e4dc);
+  tray.wood.roughness = 0.78;
+  tray.wood.metalness = 0.04;
+  tray.wood.envMapIntensity = 0.28;
 
   tray.lip.map = map;
-  tray.lip.color.set(0xe4d2b4);
-  tray.lip.roughness = 0.68;
-  tray.lip.envMapIntensity = 0.3;
+  tray.lip.color.set(0xc9c4ba);
+  tray.lip.roughness = 0.72;
+  tray.lip.envMapIntensity = 0.24;
 
   if (normal) {
     const n = canvasTexture(fitCanvas(normal, size), aniso);
@@ -123,9 +123,9 @@ export function applyTrayWood(
     n.repeat.copy(map.repeat);
     tray.maps.push(n);
     tray.wood.normalMap = n;
-    tray.wood.normalScale.set(0.42, 0.42);
+    tray.wood.normalScale.set(0.22, 0.22);
     tray.lip.normalMap = n;
-    tray.lip.normalScale.set(0.3, 0.3);
+    tray.lip.normalScale.set(0.16, 0.16);
   }
   if (roughness) {
     const r = canvasTexture(fitCanvas(roughness, size), aniso);
