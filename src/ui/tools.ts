@@ -12,7 +12,7 @@ export const TOOLBAR_TOOLS: { id: ToolId; label: string; hint: string }[] = [
   { id: "stone", label: "Kiesel", hint: "Kleine Steine setzen" },
   { id: "erase", label: "Radierer", hint: "Kiesel und Beton entfernen" },
   { id: "pour", label: "Gießen", hint: "Halten zum Gießen" },
-  { id: "source", label: "Quelle", hint: "Setzen, ziehen, löschen" },
+  { id: "source", label: "Quelle", hint: "Setzen oder Quelle ziehen" },
 ];
 
 export const TOOL_HOTKEYS: ToolId[] = [

@@ -22,7 +22,10 @@ const TOOL_COPY: Record<ToolId, { title: string; body: string }> = {
   stone: { title: "Kiesel", body: "Kleine Steine auf den Sand setzen. Radius steuert die Größe. Der Radierer nimmt sie wieder weg." },
   erase: { title: "Radierer", body: "Kiesel und Beton in Reichweite entfernen. Sandhöhe und Wasser bleiben unberührt." },
   pour: { title: "Gießen", body: "Der Kreis auf dem Sand zeigt die Tropfstelle. Halten zum Gießen." },
-  source: { title: "Quelle", body: "Kreis unter dem Finger: Tippen setzt, Ziehen verschiebt." },
+  source: {
+    title: "Quelle",
+    body: "Quelle ziehen: Pin antippen und auf dem Sand verschieben. Freier Sand setzt eine neue, Löschen nimmt sie weg. Durchfluss nur mit dem Regler.",
+  },
 };
 
 function slider(
@@ -155,6 +158,7 @@ export class Inspector {
       this.onTexture(prompt);
     });
     this.el.querySelectorAll<HTMLInputElement>("input[type=range]").forEach((input) => {
+      input.addEventListener("pointerdown", (e) => e.stopPropagation());
       input.addEventListener("input", () => this.onSlider(input));
     });
     this.el.querySelectorAll<HTMLButtonElement>("[data-heat]").forEach((btn) => {

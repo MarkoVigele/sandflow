@@ -24,12 +24,22 @@ import {
   type AimCursorState,
   type AimHit,
 } from "../ui/AimCursor";
+import {
+  applySourceMarkerStyle,
+  createSourceMarker,
+  pickNearestSourceId,
+  pointerPixelDelta,
+  shouldStartSourceDrag,
+  sourcePickRadiusPx,
+  sourcePinPlantedY,
+  sourcePinWorld,
+} from "../ui/sourcePins";
 import { gpuTexelBudget } from "../assets/texturePaths";
 import { createHardTexture, createMapsTexture, uploadHard, uploadPacked } from "./mapsTexture";
 import { FlowParticles } from "./Particles";
 import { PropsLite, type PropLite } from "./PropsLite";
 import { SandMesh } from "./SandMesh";
-import { applyTrayWood, createSourceMarker, createTray, type TrayHandle } from "./Tray";
+import { applyTrayWood, createTray, type TrayHandle } from "./Tray";
 import { WaterMesh } from "./WaterMesh";
 
 export const TRAY_SIZE = 8;
@@ -68,6 +78,7 @@ export class Viewport {
   private pointerDown = false;
   private strokeActive = false;
   private draggingSource: string | null = null;
+  private pendingSource: { id: string; x: number; y: number; pointerType: string } | null = null;
   private sourceGroup = new THREE.Group();
   private markers = new Map<string, THREE.Group>();
   private raf = 0;
@@ -527,11 +538,30 @@ export class Viewport {
       this.sourceGroup.add(m);
       this.markers.set(s.id, m);
     }
+    this.syncMarkerStyles();
+  }
+
+  /** Re-plant every pin on the current heightfield so erosion cannot leave them hovering. */
+  private syncSourcePins(): void {
+    for (const [id, m] of this.markers) {
+      const s = this.sources.find((x) => x.id === id);
+      if (s) this.placeMarker(m, s);
+    }
+    this.syncMarkerStyles();
+  }
+
+  private syncMarkerStyles(): void {
+    const selected = this.store.state.selectedSourceId;
+    for (const [id, m] of this.markers) {
+      applySourceMarkerStyle(m, id === selected, id === this.draggingSource);
+    }
   }
 
   private placeMarker(m: THREE.Group, s: WaterSource): void {
     const h = this.sampleHeight(s.x, s.y);
-    m.position.set((s.x - 0.5) * TRAY_SIZE, h * this.heightScale, (s.y - 0.5) * TRAY_SIZE);
+    const world = sourcePinWorld(s.x, s.y, h, TRAY_SIZE, this.heightScale);
+    m.position.copy(world);
+    m.position.y = sourcePinPlantedY(h, this.heightScale);
   }
 
   private sampleHeight(u: number, v: number): number {
@@ -581,15 +611,18 @@ export class Viewport {
 
   private pickSource(ev: PointerEvent): string | null {
     const rect = this.canvas.getBoundingClientRect();
-    this.pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
-    this.pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
-    this.raycaster.setFromCamera(this.pointer, this.camera);
-    const objs = [...this.markers.values()];
-    const hits = this.raycaster.intersectObjects(objs, true);
-    if (!hits.length) return null;
-    let o: THREE.Object3D | null = hits[0].object;
-    while (o && !o.userData.id) o = o.parent;
-    return (o?.userData.id as string) ?? null;
+    this.camera.updateMatrixWorld();
+    return pickNearestSourceId(
+      ev.clientX,
+      ev.clientY,
+      rect,
+      this.camera,
+      this.sources,
+      (u, v) => this.sampleHeight(u, v),
+      TRAY_SIZE,
+      this.heightScale,
+      sourcePickRadiusPx(ev.pointerType),
+    );
   }
 
   private toolAt(tool: ToolId, u: number, v: number): void {
@@ -682,9 +715,14 @@ export class Viewport {
     if (tool === "source") {
       const id = this.pickSource(ev);
       if (id) {
-        this.draggingSource = id;
+        this.pendingSource = {
+          id,
+          x: ev.clientX,
+          y: ev.clientY,
+          pointerType: ev.pointerType,
+        };
         this.store.patch({ selectedSourceId: id });
-        await this.pushHistory();
+        this.syncMarkerStyles();
         this.onUi();
         const hit = this.hitUv(ev);
         if (hit) this.refreshAim(hit, ev);
@@ -718,6 +756,19 @@ export class Viewport {
 
     if (!this.pointerDown) return;
 
+    if (this.pendingSource && !this.draggingSource) {
+      const delta = pointerPixelDelta(
+        { x: this.pendingSource.x, y: this.pendingSource.y },
+        { x: ev.clientX, y: ev.clientY },
+      );
+      if (shouldStartSourceDrag(delta, this.pendingSource.pointerType)) {
+        this.draggingSource = this.pendingSource.id;
+        this.pendingSource = null;
+        void this.pushHistory();
+        this.syncMarkerStyles();
+      }
+    }
+
     if (this.draggingSource && hit) {
       const s = this.sources.find((x) => x.id === this.draggingSource);
       if (s) {
@@ -726,9 +777,12 @@ export class Viewport {
         this.sim.moveSource(s.id, s.x, s.y);
         const m = this.markers.get(s.id);
         if (m) this.placeMarker(m, s);
+        this.syncMarkerStyles();
       }
       return;
     }
+
+    if (this.pendingSource) return;
 
     if (this.strokeActive && hit) {
       this.toolAt(this.store.state.tool, hit.u, hit.v);
@@ -742,7 +796,9 @@ export class Viewport {
     this.pointerDown = false;
     this.strokeActive = false;
     this.draggingSource = null;
+    this.pendingSource = null;
     this.lastStroke = null;
+    this.syncMarkerStyles();
     if (ev.pointerType === "touch" || ev.pointerType === "pen") {
       this.hideAim();
     } else if (this.lastPointer) {
@@ -781,15 +837,7 @@ export class Viewport {
     this.controls.mouseButtons.LEFT = cam ? THREE.MOUSE.ROTATE : (-1 as unknown as THREE.MOUSE);
     this.controls.touches.ONE = cam ? THREE.TOUCH.ROTATE : (-1 as unknown as THREE.TOUCH);
 
-    for (const [id, m] of this.markers) {
-      const s = this.sources.find((x) => x.id === id);
-      if (s) this.placeMarker(m, s);
-      const sphere = m.userData.drop as THREE.Mesh;
-      if (sphere) {
-        const sel = id === this.store.state.selectedSourceId;
-        sphere.scale.setScalar(sel ? 1.25 : 1);
-      }
-    }
+    this.syncSourcePins();
 
     if (this.store.state.playing) {
       const speed = this.store.state.speed;

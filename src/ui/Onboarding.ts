@@ -10,7 +10,7 @@ const STEPS: Record<Exclude<OnboardStep, 0>, { kicker: string; title: string; bo
   2: {
     kicker: "Schritt 2 von 3",
     title: "Quelle setzen",
-    body: "Tippe auf den Sand. Die Quelle tropft von allein — ziehen verschiebt sie.",
+    body: "Tippe auf den Sand. Quelle ziehen: Pin halten und über das Gelände schieben.",
   },
   3: {
     kicker: "Schritt 3 von 3",
