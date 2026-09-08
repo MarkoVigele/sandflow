@@ -755,7 +755,7 @@ const PRESET_DEFS: PresetDef[] = [
     id: "staudamm",
     title: "Staudamm",
     blurb: "Staumauer staut den See. Ist er voll, läuft er über die Krone.",
-    camera: { position: [5.4, 6.2, 5.4], target: [0, 0.48, 0.35] },
+    camera: { position: [0.15, 7.6, 6.4], target: [0, 0.62, 0.55] },
     build(size) {
       const terrain = new Float32Array(size * size);
       const hard = blankHard(size);
@@ -830,7 +830,7 @@ const PRESET_DEFS: PresetDef[] = [
           if (hard[i] >= HARD_THRESHOLD) continue;
           const head = crest - terrain[i];
           if (head < 0.04) continue;
-          water[i] = Math.min(0.045, head * 0.22);
+          water[i] = Math.min(0.07, head * 0.32);
         }
       }
       const inlet = placeSourceOnTerrain(terrain, hard, size, 0.5, 0.16);

@@ -441,7 +441,9 @@ export class Viewport {
     if (this.lastHard) uploadHard(this.hardTex, this.lastHard, grid);
     const empty = new Float32Array(grid * grid);
     const water0 = built.water ?? empty;
-    const packed = packMapsRgba(built.terrain, water0, empty, empty);
+    const packed = built.water
+      ? packDisplayMapsRgba(built.terrain, water0, empty, empty, grid)
+      : packMapsRgba(built.terrain, empty, empty, empty);
     this.lastPacked = packed;
     this.lastSize = grid;
     uploadPacked(this.maps, packed, grid);
