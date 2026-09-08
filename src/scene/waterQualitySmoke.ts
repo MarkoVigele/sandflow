@@ -60,9 +60,11 @@ if (grazing < 0.55) fail(`grazing fresnel too weak: ${grazing}`);
 
 const calmShore = contactLineFoam(0.008, [0.0, 0.009, 0.0, 0.012], 0.01, 1);
 const turbShore = contactLineFoam(0.01, [0.0, 0.0, 0.028, 0.0], 0.09, 1);
+const velShore = contactLineFoam(0.012, [0.0, 0.011, 0.0, 0.013], 0.08, 1);
 if (calmShore > 0.04) fail(`calm shore should not foam: ${calmShore}`);
 if (turbShore <= calmShore + 0.08) fail(`foam only at turbulence (${turbShore} vs ${calmShore})`);
 if (turbShore < 0.12) fail(`turbulent foam too weak: ${turbShore}`);
+if (velShore <= calmShore + 0.06) fail(`velocity should lace the shore (${velShore} vs ${calmShore})`);
 
 const dry = contactLineFoam(0, [0, 0, 0, 0], 0, 1);
 if (dry > 0.08) fail(`dry cells should not foam: ${dry}`);
@@ -81,5 +83,5 @@ console.log("waterQualitySmoke ok", {
   ultra: { segs: ultra.meshSegs, oct: ultra.waveOctaves, beer: ultra.beerStrength },
   beer: { shallow, deep },
   fresnel: { facing, grazing },
-  foam: { calmShore, turbShore },
+  foam: { calmShore, turbShore, velShore },
 });

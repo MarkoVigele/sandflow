@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import waterVert from "../shaders/water.vert.glsl?raw";
 import waterFrag from "../shaders/water.frag.glsl?raw";
+import { qualityProfile } from "../state/quality";
 import { DEFAULT_RELIEF, HEIGHT_PIVOT, type QualityId } from "../state/types";
+import { waterSpecCap } from "./look";
 import { waterQualityIndex, waterQualityTier } from "./waterQuality";
 
 export class WaterMesh {
@@ -41,6 +43,8 @@ export class WaterMesh {
         uFresnelScale: { value: tier.fresnelScale },
         uFoamDetail: { value: tier.foamDetail },
         uSpecPower: { value: tier.specPower },
+        uSpecCap: { value: waterSpecCap(quality) },
+        uShoreFoam: { value: qualityProfile(quality).lookShoreFoam },
       },
       vertexShader: waterVert,
       fragmentShader: waterFrag,
@@ -68,6 +72,8 @@ export class WaterMesh {
     this.material.uniforms.uFresnelScale.value = tier.fresnelScale;
     this.material.uniforms.uFoamDetail.value = tier.foamDetail;
     this.material.uniforms.uSpecPower.value = tier.specPower;
+    this.material.uniforms.uSpecCap.value = waterSpecCap(quality);
+    this.material.uniforms.uShoreFoam.value = qualityProfile(quality).lookShoreFoam;
   }
 
   setHeightScale(scale: number): void {

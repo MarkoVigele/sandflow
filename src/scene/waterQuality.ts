@@ -32,9 +32,9 @@ export const WATER_QUALITY: Record<QualityId, WaterQualityTier> = {
     waveOctaves: 1,
     waveDisplace: 0,
     foamDetail: 0.28,
-    beerStrength: 0.48,
-    fresnelScale: 0.82,
-    specPower: 14,
+    beerStrength: 0.52,
+    fresnelScale: 0.68,
+    specPower: 10,
   },
   medium: {
     id: "medium",
@@ -42,9 +42,9 @@ export const WATER_QUALITY: Record<QualityId, WaterQualityTier> = {
     waveOctaves: 2,
     waveDisplace: 0.00115,
     foamDetail: 0.52,
-    beerStrength: 0.68,
-    fresnelScale: 1.08,
-    specPower: 20,
+    beerStrength: 0.74,
+    fresnelScale: 0.92,
+    specPower: 16,
   },
   high: {
     id: "high",
@@ -52,9 +52,9 @@ export const WATER_QUALITY: Record<QualityId, WaterQualityTier> = {
     waveOctaves: 3,
     waveDisplace: 0.00225,
     foamDetail: 0.72,
-    beerStrength: 0.82,
-    fresnelScale: 1.2,
-    specPower: 24,
+    beerStrength: 0.9,
+    fresnelScale: 1.12,
+    specPower: 22,
   },
   ultra: {
     id: "ultra",
@@ -62,9 +62,9 @@ export const WATER_QUALITY: Record<QualityId, WaterQualityTier> = {
     waveOctaves: 4,
     waveDisplace: 0.00355,
     foamDetail: 0.88,
-    beerStrength: 0.95,
-    fresnelScale: 1.32,
-    specPower: 28,
+    beerStrength: 1.08,
+    fresnelScale: 1.22,
+    specPower: 24,
   },
 };
 
@@ -129,9 +129,16 @@ export function contactLineFoam(
     jump = Math.max(jump, Math.abs(ww - depth));
   }
   const turb = fl > 0.035 || jump > 0.018;
-  if (!turb) return 0;
   const flowBoost = 0.2 + fl * 0.9;
-  return clamp01(edge * thin * flowBoost * (0.3 + detail * 0.55));
+  const turbFoam = turb ? clamp01(edge * thin * flowBoost * (0.3 + detail * 0.55)) : 0;
+  // Soft velocity lace at the contact line — still pools stay clear.
+  const moving = smoothstep(0.018, 0.09, fl);
+  const velFoam = clamp01(edge * thin * moving * mix(0.35, 1, clamp01(detail)));
+  return Math.max(turbFoam, velFoam);
+}
+
+function mix(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
 }
 
 export function flowWaveAmp(depth: number, flow: number, displace: number): number {

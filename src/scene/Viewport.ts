@@ -76,6 +76,7 @@ export class Viewport {
   private water: WaterMesh;
   private particles: FlowParticles;
   private sun: THREE.DirectionalLight;
+  private fill: THREE.DirectionalLight;
   private hemi: THREE.HemisphereLight;
   private raycaster = new THREE.Raycaster();
   private pointer = new THREE.Vector2();
@@ -123,7 +124,7 @@ export class Viewport {
     this.renderer.setClearColor(0x14110e, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.18;
+    this.renderer.toneMappingExposure = 1.1;
     this.renderer.shadowMap.enabled = false;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -152,11 +153,11 @@ export class Viewport {
     this.scene.fog = new THREE.Fog(0x1c1a17, 16, 32);
     this.scene.background = new THREE.Color(0x1c1a17);
 
-    this.hemi = new THREE.HemisphereLight(0xe6edf2, 0x6a5c4a, 0.82);
+    this.hemi = new THREE.HemisphereLight(0xe8eef3, 0x5c5348, 0.56);
     this.scene.add(this.hemi);
 
-    this.sun = new THREE.DirectionalLight(0xfff1dc, 1.08);
-    this.sun.position.set(4.6, 8.8, 3.4);
+    this.sun = new THREE.DirectionalLight(0xfff0d8, 0.86);
+    this.sun.position.set(4.2, 9.6, 3.8);
     this.sun.target.position.set(0, 0.7, 0);
     this.sun.castShadow = false;
     this.sun.shadow.mapSize.set(1024, 1024);
@@ -167,9 +168,16 @@ export class Viewport {
     this.sun.shadow.camera.top = 7;
     this.sun.shadow.camera.bottom = -7;
     this.sun.shadow.bias = -0.0009;
-    this.sun.shadow.radius = 3.2;
+    this.sun.shadow.radius = 4.6;
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);
+
+    this.fill = new THREE.DirectionalLight(0xc5d2e0, 0.28);
+    this.fill.position.set(-5.4, 5.2, -3.6);
+    this.fill.target.position.set(0, 0.55, 0);
+    this.fill.castShadow = false;
+    this.scene.add(this.fill);
+    this.scene.add(this.fill.target);
 
     this.tray = createTray(TRAY_SIZE);
     this.scene.add(this.tray.group);
@@ -269,10 +277,13 @@ export class Viewport {
   }
 
   private syncSunUniforms(): void {
+    const look = qualityProfile(this.store.state.quality);
     const dir = this.sun.position.clone().sub(this.sun.target.position).normalize();
-    const sunColor = this.sun.color.clone().multiplyScalar(0.78);
-    const ambient = new THREE.Color(0.32, 0.31, 0.29);
-    this.sand.setSun(dir, sunColor, ambient);
+    const fillDir = this.fill.position.clone().sub(this.fill.target.position).normalize();
+    const sunColor = this.sun.color.clone().multiplyScalar(0.72);
+    const fillColor = this.fill.color.clone().multiplyScalar(look.lookFill);
+    const ambient = new THREE.Color(0.26, 0.25, 0.23);
+    this.sand.setSun(dir, sunColor, ambient, fillDir, fillColor);
     this.water.setSun(dir, sunColor);
   }
 
@@ -285,6 +296,8 @@ export class Viewport {
     this.renderer.setPixelRatio(pixelRatioFor(quality, window.devicePixelRatio || 1));
     this.sand.setQuality(quality, TRAY_SIZE);
     this.water.setQuality(quality, TRAY_SIZE);
+    this.fill.intensity = 0.18 + profile.lookFill * 0.35;
+    this.syncSunUniforms();
     const gpuSize = gpuTexelBudget(quality);
     if (this.labMaps && gpuSize !== this.labGpuSize) {
       this.labGpuSize = gpuSize;
