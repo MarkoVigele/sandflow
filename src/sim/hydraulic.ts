@@ -25,6 +25,14 @@ export const STILL_SPEED = 0.012;
 export const MIN_SHEAR = 2.2e-6;
 export const MIN_SAND = 0.04;
 export const MAX_ERODE_FRAC = 0.014;
+/** Established thread flux — rain speckles sit below this. */
+export const PICK_MIN_FLOW = 0.016;
+export const PICK_MIN_SPEED = 0.045;
+/** Thin films / filling pools stay outside the pick window (Jáko lmax). */
+export const PICK_MIN_WATER = 0.007;
+export const PICK_MAX_WATER = 0.048;
+/** Filling sheets on a flat bed stop earlier than a sloped thread. */
+export const PICK_MAX_WATER_FLAT = 0.026;
 
 export function clamp(x: number, lo: number, hi: number): number {
   return x < lo ? lo : x > hi ? hi : x;
@@ -142,10 +150,41 @@ export function sedimentCapacity(
   if (!(speed > STILL_SPEED) || !(water > 1e-5)) return 0;
   const shear = speed * Math.max(0, bedSlope);
   if (shear < MIN_SHEAR) return 0;
+  // Isolated rain films on a hang are not a thread — they must concentrate first.
+  if (water < 0.012 && speed < 0.12) return 0;
   const tilt = Math.max(sinTilt(bedSlope), MIN_SIN_TILT);
   // Shallow threads pick; filling / deep pools do not (Jako lmax, original curve).
   const depthRamp = water < 0.026 ? 1 : water > 0.052 ? 0 : 1 - (water - 0.026) / 0.026;
   return capacityK * tilt * speed * depthRamp * (0.07 + water * 0.85);
+}
+
+export type PickProbe = {
+  ponded: boolean;
+  flow: number;
+  speed: number;
+  shear: number;
+  bedFrac: number;
+  slope: number;
+  water: number;
+  /** Cardinal neighbors that already look like a wet thread. Isolated rain = 0. */
+  threadNeighbors?: number;
+};
+
+/**
+ * Pick only in an established shallow thread.
+ * Standing rain, circulating basins, and source mounds stay at C≈0.
+ */
+export function canPickSediment(p: PickProbe): boolean {
+  if (p.ponded) return false;
+  if (!((p.threadNeighbors ?? 2) >= 1)) return false;
+  if (!(p.flow > PICK_MIN_FLOW)) return false;
+  if (!(p.speed > PICK_MIN_SPEED)) return false;
+  if (!(p.shear > MIN_SHEAR)) return false;
+  if (!(p.bedFrac >= 0.28)) return false;
+  if (!(p.slope > 0.0014)) return false;
+  const maxW = p.slope > 0.0038 ? PICK_MAX_WATER : PICK_MAX_WATER_FLAT;
+  if (!(p.water > PICK_MIN_WATER) || !(p.water < maxW)) return false;
+  return true;
 }
 
 /**

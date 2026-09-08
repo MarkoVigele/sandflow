@@ -71,16 +71,21 @@ if (blocked < 0.55) fail(`contact stays subtle, got ${blocked}`);
 
 const filmTint = depthTint(0.004);
 const deepTint = depthTint(0.1);
+const poolTint = depthTint(0.16);
 if (filmTint[0] < 0.97 || filmTint[2] < 0.97) fail(`shallow tint should stay clear: ${filmTint}`);
 if (deepTint[0] >= filmTint[0]) fail("deep water should tint more");
 if (deepTint[0] <= deepTint[2]) fail("depth tint is sand-brown (red stays above blue)");
 if (deepTint[2] < 0.7) fail(`deep tint must not go ink-black: ${deepTint}`);
+if (poolTint[0] >= deepTint[0]) fail("deeper pools should tint further");
+if (poolTint[2] < 0.52) fail(`pool tint must keep the bed readable: ${poolTint}`);
 
 const still = shoreFoamFromVelocity(0.01, 2.2, 0.01, 1);
-const moving = shoreFoamFromVelocity(0.01, 2.2, 0.08, 1);
+const midFlow = shoreFoamFromVelocity(0.01, 2.2, 0.03, 1);
+const moving = shoreFoamFromVelocity(0.01, 2.2, 0.11, 1);
 const dryCell = shoreFoamFromVelocity(0, 4, 0.2, 1);
 if (still > 0.04) fail(`still shore should not foam: ${still}`);
-if (moving <= still + 0.08) fail(`velocity should lace the shore (${moving} vs ${still})`);
+if (midFlow > 0.04) fail(`mid-flow shore should not foam: ${midFlow}`);
+if (moving <= still + 0.08) fail(`high velocity should lace the shore (${moving} vs ${still})`);
 if (dryCell > 0) fail("dry cells never foam");
 
 const lowCap = waterSpecCap("low", true);
@@ -94,7 +99,7 @@ console.log("lookSmoke ok", {
   wet: { dry, damp, shore, film },
   grain: { flatGrain, brightGrain, darkGrain },
   ao: { flatAo, valleyAo, blocked },
-  tint: { filmTint, deepTint },
-  foam: { still, moving },
+  tint: { filmTint, deepTint, poolTint },
+  foam: { still, midFlow, moving },
   spec: { lowCap, medMobile, highDesk },
 });
