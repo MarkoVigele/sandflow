@@ -257,9 +257,32 @@ function massCentroidY(sim: ErosionSim, size: number) {
   const mid = rowWet(sim, size, 0.42);
   const basin = bandWet(sim, size, 0.78, 0.92, 0.0015);
   const mass = massCentroidY(sim, size);
+  let basinCut = 0;
+  let slopeCut = 0;
+  for (let y = 2; y < size - 2; y++) {
+    const v = y / (size - 1);
+    for (let x = 2; x < size - 2; x++) {
+      const i = y * size + x;
+      if (sim.hardmask[i] >= HARD_THRESHOLD) continue;
+      const cut = t0[i] - sim.terrain[i];
+      const u = x / (size - 1);
+      if (v >= 0.8 && v <= 0.92 && u >= 0.18 && u <= 0.82) {
+        basinCut = Math.max(basinCut, cut);
+      }
+      if (v < 0.7) slopeCut = Math.max(slopeCut, cut);
+    }
+  }
   console.log(
     JSON.stringify({
-      regenHang: { hardMove: +hardMove.toFixed(6), mid, basin, cy: +mass.cy.toFixed(1), vol: +mass.vol.toFixed(3) },
+      regenHang: {
+        hardMove: +hardMove.toFixed(6),
+        mid,
+        basin,
+        cy: +mass.cy.toFixed(1),
+        vol: +mass.vol.toFixed(3),
+        basinCut: +basinCut.toFixed(4),
+        slopeCut: +slopeCut.toFixed(4),
+      },
     }),
   );
   if (hardMove > 1e-6) fail(`regen-hang hardmask moved: ${hardMove}`);
@@ -267,6 +290,8 @@ function massCentroidY(sim: ErosionSim, size: number) {
   if (mid.wet > size * 0.55) fail(`regen-hang rained as a sheet: wet=${mid.wet}`);
   if (mid.clusters < 1) fail("regen-hang formed no rivulet");
   if (basin.wet < 6) fail(`regen-hang did not pool at the foot: ${JSON.stringify(basin)}`);
+  if (basinCut > 0.02) fail(`regen-hang basin burned in: ${basinCut}`);
+  if (slopeCut > 0.03) fail(`regen-hang rain burned the hang: ${slopeCut}`);
 }
 
 {
@@ -288,9 +313,27 @@ function massCentroidY(sim: ErosionSim, size: number) {
     for (let x = 2; x < size - 2; x++) down += sim.water[y * size + x];
   }
   const hardMove = maxAbsHardMove(t0, sim.terrain, sim.hardmask);
-  console.log(JSON.stringify({ staudamm: { up: +up.toFixed(3), down: +down.toFixed(3), hardMove: +hardMove.toFixed(6) } }));
+  let lakeCut = 0;
+  for (let y = 2; y < damY; y++) {
+    for (let x = 2; x < size - 2; x++) {
+      const i = y * size + x;
+      if (sim.hardmask[i] >= HARD_THRESHOLD) continue;
+      lakeCut = Math.max(lakeCut, t0[i] - sim.terrain[i]);
+    }
+  }
+  console.log(
+    JSON.stringify({
+      staudamm: {
+        up: +up.toFixed(3),
+        down: +down.toFixed(3),
+        hardMove: +hardMove.toFixed(6),
+        lakeCut: +lakeCut.toFixed(4),
+      },
+    }),
+  );
   if (hardMove > 1e-6) fail(`staudamm hardmask moved: ${hardMove}`);
   if (up < down * 0.55) fail(`staudamm did not pond upstream: up=${up} down=${down}`);
+  if (lakeCut > 0.03) fail(`staudamm reservoir burned in: ${lakeCut}`);
 }
 
 if (getPreset("beton-kanal").id !== "betonkanal") fail("beton-kanal alias");

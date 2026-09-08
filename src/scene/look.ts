@@ -90,8 +90,8 @@ export function contactShadow(
  */
 export function depthTint(depth: number): [number, number, number] {
   const d = Number.isFinite(depth) && depth > 0 ? depth : 0;
-  const t = smoothstep(0.015, 0.11, d) * 0.55;
-  return [mix(1, 0.62, t), mix(1, 0.54, t), mix(1, 0.46, t)];
+  const t = smoothstep(0.02, 0.16, d) * 0.72;
+  return [mix(1, 0.56, t), mix(1, 0.48, t), mix(1, 0.4, t)];
 }
 
 /**
@@ -110,7 +110,7 @@ export function shoreFoamFromVelocity(
   const dry = Number.isFinite(dryNeighbors) ? Math.max(0, dryNeighbors) : 0;
   const thin = 1 - smoothstep(0.01, 0.058, d);
   const contact = smoothstep(0.55, 2.6, dry) * thin;
-  const moving = smoothstep(0.018, 0.09, fl);
+  const moving = smoothstep(0.045, 0.14, fl);
   return clamp01(contact * moving * mix(0.35, 1, clamp01(detail)));
 }
 

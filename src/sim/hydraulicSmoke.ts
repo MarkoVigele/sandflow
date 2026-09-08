@@ -4,6 +4,7 @@ import {
   STILL_SPEED,
   advectMacCormack,
   applyPipeFlux,
+  canPickSediment,
   equilibriumTransfer,
   sedimentCapacity,
   updatePipeFlux,
@@ -22,15 +23,32 @@ const n = size * size;
 {
   if (sedimentCapacity(0, 0.2, 0.05, 0.58) !== 0) fail("still speed must have C=0");
   if (sedimentCapacity(STILL_SPEED, 0.2, 0.05, 0.58) !== 0) fail("threshold speed must have C=0");
-  if (sedimentCapacity(0.4, 0.012, 0.05, 0.58) <= 0) fail("gentle floor tilt still carries");
-  if (sedimentCapacity(0.4, 0, 0.05, 0.58) !== 0) fail("zero slope must not pick");
-  const moving = sedimentCapacity(0.35, 0.08, 0.04, 0.58);
+  if (sedimentCapacity(0.4, 0.012, 0.022, 0.58) <= 0) fail("gentle floor tilt still carries");
+  if (sedimentCapacity(0.4, 0, 0.022, 0.58) !== 0) fail("zero slope must not pick");
+  if (sedimentCapacity(0.08, 0.08, 0.008, 0.58) !== 0) fail("rain film must not pick");
+  const moving = sedimentCapacity(0.35, 0.08, 0.02, 0.58);
   const pond = sedimentCapacity(0.35, 0.08, 0.2, 0.58);
   if (!(moving > 0)) fail("flow×slope should pick");
   if (!(pond < moving)) fail("deep water should not pick more than a thread");
+  if (pond !== 0) fail("filling pool capacity must be 0");
   const pick = equilibriumTransfer(0.04, 0.01, 0.6, 0.3);
   const drop = equilibriumTransfer(0.01, 0.04, 0.6, 0.3);
   if (!(pick > 0) || !(drop < 0)) fail("equilibrium should chase capacity");
+  const thread = {
+    ponded: false,
+    flow: 0.06,
+    speed: 0.12,
+    shear: 0.12 * 0.01,
+    bedFrac: 0.6,
+    slope: 0.01,
+    water: 0.018,
+    threadNeighbors: 2,
+  };
+  if (!canPickSediment(thread)) fail("established thread should pick");
+  if (canPickSediment({ ...thread, ponded: true })) fail("ponded must not pick");
+  if (canPickSediment({ ...thread, water: 0.03, slope: 0.003 })) fail("filling pool must not pick");
+  if (canPickSediment({ ...thread, threadNeighbors: 0 })) fail("isolated rain must not pick");
+  if (canPickSediment({ ...thread, flow: 0.01 })) fail("weak flow must not pick");
 }
 
 {

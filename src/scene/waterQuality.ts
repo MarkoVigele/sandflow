@@ -128,11 +128,11 @@ export function contactLineFoam(
     const ww = Number.isFinite(w) ? w : 0;
     jump = Math.max(jump, Math.abs(ww - depth));
   }
-  const turb = fl > 0.035 || jump > 0.018;
+  const turb = fl > 0.055 && jump > 0.016;
   const flowBoost = 0.2 + fl * 0.9;
   const turbFoam = turb ? clamp01(edge * thin * flowBoost * (0.3 + detail * 0.55)) : 0;
-  // Soft velocity lace at the contact line — still pools stay clear.
-  const moving = smoothstep(0.018, 0.09, fl);
+  // Shore lace only at high velocity — mid-flow and still pools stay clear.
+  const moving = smoothstep(0.045, 0.14, fl);
   const velFoam = clamp01(edge * thin * moving * mix(0.35, 1, clamp01(detail)));
   return Math.max(turbFoam, velFoam);
 }
@@ -145,7 +145,28 @@ export function flowWaveAmp(depth: number, flow: number, displace: number): numb
   if (displace <= 0) return 0;
   const body = smoothstep(0.005, 0.05, Number.isFinite(depth) ? depth : 0);
   const fl = Number.isFinite(flow) ? Math.min(0.4, Math.max(0, flow)) : 0;
-  return displace * body * (0.3 + fl * 2.55);
+  const stream = smoothstep(0.012, 0.1, fl);
+  return displace * body * stream * (0.22 + fl * 3.2);
+}
+
+/**
+ * Visual sheet height above the bed. Films stay thin; pools lift so
+ * carved basins read as volume (matches `water.vert.glsl`).
+ */
+export function sheetHeight(water: number, flow = 0): number {
+  const w = Number.isFinite(water) && water > 0.0008 ? water : 0;
+  if (w <= 0) return 0;
+  const film = Math.min(w, 0.02);
+  const pool = Math.max(0, Math.min(w, 0.24) - 0.02);
+  const deep = smoothstep(0.022, 0.13, w);
+  const fl = Number.isFinite(flow) ? Math.min(0.18, Math.max(0, flow)) : 0;
+  return 0.0034 + film * 0.22 + pool * 0.44 + deep * 0.016 + fl * 0.008;
+}
+
+/** How much the water normal tilts from reconstructed flow. Still water ≈ 0. */
+export function flowWaveNormalScale(flow: number): number {
+  const fl = Number.isFinite(flow) ? Math.max(0, flow) : 0;
+  return smoothstep(0.012, 0.11, fl);
 }
 
 function smoothstep(e0: number, e1: number, x: number): number {

@@ -58,7 +58,7 @@ float schlick(float ndv, float scale) {
 void main() {
   if (!(vDepth == vDepth) || vDepth < 0.0009) discard;
 
-  float depth = clamp(vDepth * 11.0, 0.0, 1.0);
+  float depth = clamp(vDepth * 12.5, 0.0, 1.0);
   float flow = clamp(vFlow, 0.0, 1.0);
   if (!(flow == flow)) flow = 0.0;
   float turbid = clamp(flow * 1.1, 0.0, 0.45);
@@ -93,24 +93,26 @@ void main() {
   );
   vec2 fdir2 = vec2(-fdir.y, fdir.x);
   float spd = clamp(flow * 2.6, 0.0, 1.0);
-  vec2 vel = fdir * spd;
-  float flAmp = (0.38 + depth * 0.72) * (0.4 + flow * 1.65);
+  // Wave normals follow reconstructed flow. Standing water stays quiet.
+  float stream = smoothstep(0.012, 0.11, flow);
+  float flAmp = (0.42 + depth * 0.78) * stream * (0.28 + flow * 2.15);
   float along = dot(vUv, fdir);
-  float rip = sin(along * 22.0 + uTime * 1.55 + flow * 4.2) * 0.012 * flAmp;
+  float phase = along * 32.0 + uTime * (1.25 + spd * 2.2) + flow * 3.4;
+  float dAlong = cos(phase) * 0.026 * flAmp * (0.4 + spd);
+  float dCross = 0.0;
   if (uWaveOctaves > 1.5) {
-    rip += sin(dot(vUv, fdir2) * 37.0 - uTime * 1.85) * 0.007 * flAmp;
+    dCross = cos(dot(vUv, fdir2) * 44.0 - uTime * 2.05) * 0.010 * flAmp;
   }
   if (uWaveOctaves > 2.5) {
-    rip += sin(dot(vUv, fdir * 0.7 + fdir2 * 0.7) * 58.0 + uTime * 2.45) * 0.004 * flAmp;
+    dAlong += cos(dot(vUv, fdir * 0.75 + fdir2 * 0.35) * 62.0 + uTime * 2.6) * 0.006 * flAmp;
   }
   if (uWaveOctaves > 3.5) {
-    rip += sin((vUv.x * 1.6 - vUv.y) * 96.0 + uTime * 3.6 + flow * 6.0) * 0.0024 * flAmp;
+    dAlong += cos((vUv.x * 1.6 - vUv.y) * 96.0 + uTime * 3.6 + flow * 6.0) * 0.0032 * flAmp;
   }
-  rip += vWave * 0.55;
-  // Flow-velocity normal: derivative of the streamwise ripple.
-  float nRip = cos(along * 28.0 + uTime * 1.7 + flow * 3.2) * 0.02 * flAmp * (0.35 + spd);
+  dAlong += vWave * 8.0 * stream;
+  grad *= mix(0.28, 1.0, stream);
   vec3 N = safeNormalize(
-    vec3(grad.x + rip + nRip * vel.x, 2.0 * dx, grad.y + rip * 0.7 + nRip * vel.y),
+    vec3(grad.x + dAlong * fdir.x + dCross * fdir2.x, 2.0 * dx, grad.y + dAlong * fdir.y + dCross * fdir2.y),
     vec3(0.0, 1.0, 0.0)
   );
 
@@ -137,8 +139,8 @@ void main() {
   float optical = vDepth / max(ndv, 0.12);
   if (uQuality > 0.5) optical = mix(optical, vDepth / max(ssFacing, 0.12), 0.35);
   // Depth-weighted beer: films stay clear, carved beds pick up a sand-brown tint.
-  float beerDeep = beer * mix(0.72, 1.28, smoothstep(0.008, 0.10, vDepth));
-  vec3 sigma = vec3(2.05, 1.22, 1.06) * beerDeep;
+  float beerDeep = beer * mix(0.68, 1.42, smoothstep(0.012, 0.14, vDepth));
+  vec3 sigma = vec3(2.15, 1.26, 1.06) * beerDeep;
   vec3 trans = exp(-sigma * optical);
   if (!(trans.x == trans.x)) trans = vec3(0.72, 0.78, 0.80);
 
@@ -148,7 +150,7 @@ void main() {
   vec3 foamC = vec3(0.93, 0.94, 0.92);
   vec3 wetSand = vec3(0.34, 0.26, 0.18);
   vec3 body = mix(scatter, shallow, trans);
-  vec3 tint = mix(vec3(1.0), vec3(0.62, 0.54, 0.46), smoothstep(0.015, 0.11, vDepth) * 0.55);
+  vec3 tint = mix(vec3(1.0), vec3(0.56, 0.48, 0.40), smoothstep(0.02, 0.16, vDepth) * 0.72);
   vec3 base = mix(body, silt, turbid * 0.12) * tint;
 
   float edge =
@@ -171,15 +173,14 @@ void main() {
   float thin = 1.0 - smoothstep(0.01, 0.058, vDepth);
   float flat = smoothstep(0.62, 0.88, geoUp);
   float contact = smoothstep(0.55, 2.6, dryN) * thin * flat;
-  // Turbulence foam at steps / obstacles, plus soft velocity lace at the shore.
+  // Turbulence foam at steps / obstacles. Shore lace only at high velocity.
   float bedJump = abs(sL.r - sR.r) + abs(sVm.r - sVp.r);
-  float drop = smoothstep(0.014, 0.055, edge) * smoothstep(0.028, 0.11, flow);
-  float obstacle = smoothstep(0.016, 0.055, bedJump) * smoothstep(0.03, 0.12, flow);
+  float drop = smoothstep(0.014, 0.055, edge) * smoothstep(0.055, 0.14, flow);
+  float obstacle = smoothstep(0.016, 0.055, bedJump) * smoothstep(0.055, 0.14, flow);
   float turb = max(drop, obstacle);
   foam = turb * mix(0.5, 1.0, foamDet);
-  foam += smoothstep(0.09, 0.2, flow) * 0.22;
   float shoreAmt = uShoreFoam > 0.01 ? uShoreFoam : 0.4;
-  foam += contact * smoothstep(0.018, 0.09, flow) * mix(0.35, 1.0, foamDet) * shoreAmt;
+  foam += contact * smoothstep(0.045, 0.14, flow) * mix(0.35, 1.0, foamDet) * shoreAmt;
   if (foamDet > 0.35) {
     float lace = sin(dot(vUv, vec2(46.0, 39.0)) + uTime * 3.05 + flow * 8.0);
     if (uQuality > 2.5) {

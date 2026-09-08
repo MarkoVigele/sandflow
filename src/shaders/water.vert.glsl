@@ -30,7 +30,8 @@ float flowWave(vec2 uv, float water, float flow) {
   if (uWaveDisplace <= 1.0e-6 || uQuality < 0.5 || water < 0.004 || ampScale <= 1.0e-5) return 0.0;
   float body = smoothstep(0.005, 0.05, water);
   float fl = clamp(flow, 0.0, 0.4);
-  float amp = uWaveDisplace * ampScale * body * (0.16 + fl * 3.1);
+  float stream = smoothstep(0.012, 0.10, fl);
+  float amp = uWaveDisplace * ampScale * body * stream * (0.22 + fl * 3.2);
   if (amp < 1.0e-6) return 0.0;
 
   float texel = max(uTexel, 0.0015);
@@ -71,10 +72,11 @@ void main() {
   float sheet = 0.0;
   float wave = 0.0;
   if (water > 0.0008) {
-    // Readable depth: thin films stay a lab sheet; carved beds lift more.
-    float body = min(water, 0.16);
-    float deep = smoothstep(0.018, 0.09, water);
-    sheet = 0.0038 + body * 0.26 + deep * 0.006 + min(vFlow, 0.22) * 0.012;
+    // Films stay a lab sheet; carved / ponded beds lift so pools read as volume.
+    float film = min(water, 0.02);
+    float pool = max(0.0, min(water, 0.24) - 0.02);
+    float deep = smoothstep(0.022, 0.13, water);
+    sheet = 0.0034 + film * 0.22 + pool * 0.44 + deep * 0.016 + min(vFlow, 0.18) * 0.008;
     wave = flowWave(uv, water, vFlow);
     sheet += wave;
   }

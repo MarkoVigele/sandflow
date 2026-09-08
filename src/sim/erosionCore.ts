@@ -19,12 +19,12 @@ import {
 import {
   MAX_ERODE_FRAC,
   MIN_SAND,
-  MIN_SHEAR,
   PIPE_DT,
   STILL_SPEED,
   advectMacCormack,
   applyPipeFlux,
   bedSlopeAt,
+  canPickSediment,
   equilibriumTransfer,
   sedimentCapacity,
   updatePipeFlux,
@@ -416,19 +416,26 @@ export class ErosionSim {
         }
 
         if (hard[i] >= HARD_THRESHOLD) continue;
+        if (this.nearPointSource(x, y)) continue;
 
         const surface = this.surfaceSlopeAt(x, y);
         const bedFrac = slope / Math.max(surface, 1e-6);
-        // Bed must explain the drop — a water mound on flat sand does not pick.
-        const canPick =
-          !ponded &&
-          this.flow[i] > 0.016 &&
-          speed > 0.045 &&
-          shear > MIN_SHEAR &&
-          bedFrac >= 0.28 &&
-          slope > 0.0014 &&
-          w > 0.007 &&
-          w < 0.048;
+        let threadN = 0;
+        for (let k = 0; k < 4; k++) {
+          const j = this.i(x + NEIGH[k][0], y + NEIGH[k][1]);
+          if (this.flow[j] > 0.012 && water[j] > 0.005) threadN++;
+        }
+        // Bed must explain the drop — rain films and circulating pools do not pick.
+        const canPick = canPickSediment({
+          ponded,
+          flow: this.flow[i],
+          speed,
+          shear,
+          bedFrac,
+          slope,
+          water: w,
+          threadNeighbors: threadN,
+        });
 
         const cap = canPick ? sedimentCapacity(speed, slope, w, params.sedimentCapacity) : 0;
         const wetC = this.wetness[i] * 0.08;
@@ -461,14 +468,37 @@ export class ErosionSim {
 
   private pondedAt(x: number, y: number): boolean {
     const i = this.i(x, y);
-    const h = this.terrain[i] + this.water[i];
+    const w = this.water[i];
+    const h = this.terrain[i] + w;
     let maxDrop = 0;
+    let lowerBeds = 0;
     for (let k = 0; k < 4; k++) {
       const j = this.i(x + NEIGH[k][0], y + NEIGH[k][1]);
       const dh = h - (this.terrain[j] + this.water[j]);
       if (dh > maxDrop) maxDrop = dh;
+      if (this.terrain[j] < this.terrain[i] - 0.002) lowerBeds++;
     }
-    return maxDrop < MIN_SURFACE_SLOPE || Math.hypot(this.velX[i], this.velY[i]) < STILL_SPEED;
+    if (maxDrop < MIN_SURFACE_SLOPE) return true;
+    if (Math.hypot(this.velX[i], this.velY[i]) < STILL_SPEED) return true;
+    const slope = bedSlopeAt(this.terrain, this.size, x, y);
+    // Bowl / catch-basin floor — hang threads always have a downhill bed.
+    if (w > 0.016 && lowerBeds === 0) return true;
+    if (w > 0.02 && lowerBeds <= 1 && slope < 0.0032) return true;
+    return false;
+  }
+
+  /** Point-source kernel — a pour mound, not a thread. Rain bands are excluded. */
+  private nearPointSource(x: number, y: number): boolean {
+    const { size } = this;
+    for (const src of this.sources) {
+      if (src.kind === "rain") continue;
+      const sx = src.x * (size - 1);
+      const sy = src.y * (size - 1);
+      const dx = x - sx;
+      const dy = y - sy;
+      if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) return true;
+    }
+    return false;
   }
 
   private surfaceSlopeAt(x: number, y: number): number {
@@ -509,7 +539,7 @@ export class ErosionSim {
         const i = this.i(x, y);
         const w = water[i];
         if (w < 0.004 || hard[i] >= HARD_THRESHOLD) continue;
-        if (this.pondedAt(x, y)) continue;
+        if (this.pondedAt(x, y) || this.nearPointSource(x, y)) continue;
         const h = terrain[i] + w;
         let minHn = h;
         for (let k = 0; k < 4; k++) {
@@ -519,7 +549,7 @@ export class ErosionSim {
         }
         const head = h - minHn;
         const flux = this.flow[i];
-        if (flux < 0.008 && head < 0.012) continue;
+        if (flux < 0.018 && head < 0.016) continue;
         const wetC = this.wetness[i] * 0.08;
         const localC = Math.min(0.95, params.cohesion + this.cohesion[i] + wetC);
         const localErodeK = params.erosionRate * (1.05 - localC);
