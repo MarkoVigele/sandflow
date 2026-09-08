@@ -41,6 +41,8 @@ export class SandMesh {
     fallbackConcrete.needsUpdate = true;
     const fallbackHard = new THREE.DataTexture(new Float32Array([0]), 1, 1, THREE.RedFormat, THREE.FloatType);
     fallbackHard.needsUpdate = true;
+    const fallbackTrail = new THREE.DataTexture(new Float32Array([0]), 1, 1, THREE.RedFormat, THREE.FloatType);
+    fallbackTrail.needsUpdate = true;
     const fallbackNormal = new THREE.DataTexture(new Uint8Array([128, 128, 255, 255]), 1, 1);
     fallbackNormal.needsUpdate = true;
     const fallbackRough = new THREE.DataTexture(new Uint8Array([220, 220, 220, 255]), 1, 1);
@@ -52,6 +54,8 @@ export class SandMesh {
         uAlbedo: { value: fallbackAlbedo },
         uAlbedoWet: { value: fallbackAlbedo },
         uHard: { value: fallbackHard },
+        uTrail: { value: fallbackTrail },
+        uTrailAmt: { value: 0 },
         uConcrete: { value: fallbackConcrete },
         uNormal: { value: fallbackNormal },
         uRough: { value: fallbackRough },
@@ -94,6 +98,14 @@ export class SandMesh {
 
   setHard(hard: THREE.DataTexture): void {
     this.material.uniforms.uHard.value = hard;
+  }
+
+  setTrail(trail: THREE.DataTexture): void {
+    this.material.uniforms.uTrail.value = trail;
+  }
+
+  setTrailAmount(amount: number): void {
+    this.material.uniforms.uTrailAmt.value = amount;
   }
 
   setQuality(quality: QualityId, traySize: number): void {

@@ -24,7 +24,7 @@
  * Displacement: Y = (uPivot + (R − uPivot) * uRelief) * uHeightScale
  * sand.vert normals: N = (hL-hR, 2·texel·tray, h(v+)-h(v−)) — same as AimCursor.heightfieldNormal.
  * Optional visual uniforms:
- *   uHard, uConcrete
+ *   uHard, uConcrete, uTrail, uTrailAmt (Zeitraffer height-change ghost)
  *
  * Particles: quads [u, v, height, attr] in 0..1 uv, height in sim units.
  *   attr = kind + life∈[0,1) — kind 0 foam, 1 bubble cluster, 2 bedload grain.

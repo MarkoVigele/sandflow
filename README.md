@@ -29,7 +29,7 @@ Der Build landet in `docs/` (relativer Basispfad, bereit für GitHub Pages). Ein
 | Kiesel / Radierer / Beton | `K` / `R` / `B` | Symbolleiste |
 | Rückgängig / Wiederholen | `Strg+Z` / `Strg+Y` | Symbole oben |
 
-Oben: Vorlagen, Qualität (inkl. **Auto**), Tempo (0,25×–8×) und **Zeitraffer**, Zurücksetzen (Szene oder nur Wasser), Teilen, Speichern, Laden, Bild. Am Telefon wandert das in **Mehr**. Rechts (am Telefon unten): Kontext zum aktiven Werkzeug, inklusive Heatmap und einem optionalen **Querschnitt**. Beim ersten Start führt eine Kurzanleitung in drei Schritten: Sand formen → Quelle → Abspielen. Quelle: **tippen = wählen, ziehen = verschieben**.
+Oben neben Play/Pause: **Bild** (PNG der aktuellen Kamera), Tempo (0,25×–8×), **Zeitraffer** (8 Ticks pro Bild) und optionale **Spur** (sanfte Höhenspur der Bettänderung). Vorlagen, Qualität (inkl. **Auto**), Zurücksetzen, Teilen, Speichern, Laden. Am Telefon bleiben Transport und Bild sichtbar; der Rest wandert in **Mehr**. Rechts (am Telefon unten): Kontext zum aktiven Werkzeug, inklusive Heatmap und einem optionalen **Querschnitt**. Beim ersten Start führt eine Kurzanleitung in drei Schritten: Sand formen → Quelle → Abspielen. Quelle: **tippen = wählen, ziehen = verschieben**.
 
 ## Vorlagen
 
@@ -61,7 +61,7 @@ Zusätzliche Werkzeuge: **Feststampfen** (Kohäsion lokal), **Rinne** vorzeichne
 
 ## Speichern und teilen
 
-JSON (Speichern) nimmt Höhe, Wasser, Quellen und Materialparameter in voller Genauigkeit mit. **Teilen** schreibt einen kompakten Zustand in den URL-Hash (`#sf2.…`) oder als Share-JSON — ohne Cloud. Der Link trägt Vorlage, Quellen, Tempo, Kamera, Kiesel und ein grobes Höhenfeld (64²). Nur extrem lange Links lassen das Gelände weg. PNG ist ein Blick aus der aktuellen Kamera. Trocken- und Nass-Sand unter `public/textures/` werden kachelbar nachbearbeitet und mischen sich nach Feuchte; der Wannenrand nimmt Beton/`concrete-albedo.jpg` (Laborlook), sonst Holz, sonst eine lokale Prozedur.
+JSON (Speichern) nimmt Höhe, Wasser, Quellen und Materialparameter in voller Genauigkeit mit. **Teilen** schreibt einen kompakten Zustand in den URL-Hash (`#sf2.…`) oder als Share-JSON — ohne Cloud. Der Link trägt Vorlage, Quellen, Tempo, Kamera, Kiesel und ein grobes Höhenfeld (64²). Nur extrem lange Links lassen das Gelände weg. **Bild** in der Transportleiste lädt ein PNG aus der aktuellen Kamera. Trocken- und Nass-Sand unter `public/textures/` werden kachelbar nachbearbeitet und mischen sich nach Feuchte; der Wannenrand nimmt Beton/`concrete-albedo.jpg` (Laborlook), sonst Holz, sonst eine lokale Prozedur.
 
 ## V1.x — was jetzt drin ist
 
@@ -72,7 +72,7 @@ Gegen die ursprüngliche V1-Skizze ist der spielbare Kern gewachsen. Neu bzw. fe
 - Quellenpins sitzen auf derselben Höhe (UV → verdrängtes Gelände). Quelle ziehen verschiebt den Pin auf dem Sand.
 - Werkzeuge **Feststampfen**, **Rinne**, **Einebnen**, **Beton** (nicht erodierbar), plus **Kiesel** und **Radierer**.
 - Vorlagen inkl. Referenz-Rinne, dünnen Adern, Beton-Szenen (Kanal, Becken, Treppe, Wehr, Regenhang, Staudamm); Heatmap für Fluss oder Tiefe. Quellen können als Regenband sprühen (`kind: rain`).
-- Kurzanleitung, Tempo bis 8× / Zeitraffer, Auto-Qualität, Szene oder nur Wasser zurücksetzen.
+- Kurzanleitung, Tempo bis 8× / Zeitraffer mit optionaler Höhenspur, PNG-Export neben Play, Auto-Qualität, Szene oder nur Wasser zurücksetzen.
 - Teilen per URL-Hash oder Share-JSON (ohne Cloud).
 - Gebackene Trocken-/Nass-Sand- und Laborrand-Texturen (kachelbar, abgeleitete Normalen/Rauheit); Nass mischt sich nach Feuchte. Hoch/Ultra nutzen stärkere Anisotropie. Mittel auf dem Telefon bleibt bei 512er-Karten, damit die Texturen nicht bei jedem Qualitätswechsel neu entstehen.
 

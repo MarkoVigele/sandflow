@@ -3,7 +3,7 @@ import { SPEEDS, speedLabel } from "../state/types";
 import type { QualityId } from "../state/types";
 import { ICONS } from "./icons";
 import { QualitySwitcher } from "./QualitySwitcher";
-import { applyPlay, lapseSpeed, speedFromIndex, speedIndex } from "./transport";
+import { applyPlay, isLapse, lapseSpeed, speedFromIndex, speedIndex } from "./transport";
 
 export class TopBar {
   el: HTMLElement;
@@ -30,7 +30,7 @@ export class TopBar {
     let sig = "";
     store.subscribe(() => {
       const st = store.state;
-      const next = `${st.playing}|${st.speed}|${st.quality}|${st.autoQuality}|${st.onboardStep}|${st.menuOpen}|${st.canUndo}|${st.canRedo}`;
+      const next = `${st.playing}|${st.speed}|${st.trailFade}|${st.quality}|${st.autoQuality}|${st.onboardStep}|${st.menuOpen}|${st.canUndo}|${st.canRedo}`;
       if (next !== sig) {
         sig = next;
         this.render();
@@ -40,7 +40,8 @@ export class TopBar {
 
   private render(): void {
     const s = this.store.state;
-    const lapse = s.speed >= 4;
+    const lapse = isLapse(s.speed);
+    const lapseOn = s.speed >= 8;
     const idx = speedIndex(s.speed);
     this.el.innerHTML = `
       <div class="brand">
@@ -55,14 +56,16 @@ export class TopBar {
         <div class="q-slot"></div>
         <div class="transport">
           <button class="icon-btn ${s.onboardStep === 3 ? "is-hint" : ""}" data-play title="${s.playing ? "Pause" : "Abspielen"}">${s.playing ? ICONS.pause : ICONS.play}</button>
+          <button class="icon-btn" data-shot title="Bild als PNG speichern">${ICONS.shot}</button>
           <label class="speed">
             <span>Tempo ${speedLabel(s.speed)}</span>
             <input type="range" min="0" max="${SPEEDS.length - 1}" step="1" value="${idx}" data-speed aria-label="Simulationstempo" />
           </label>
+          <button class="chip ${lapse ? "is-on" : ""}" data-lapse title="Zeitraffer 8×">${lapseOn ? "Zeitraffer an" : "Zeitraffer"}</button>
+          <button class="chip ${s.trailFade ? "is-on" : ""}" data-trail title="Sanfte Höhenspur im Zeitraffer">Spur</button>
         </div>
         <div class="top-desktop">
           <button class="icon-btn" data-step title="Einzelschritt">${ICONS.step}</button>
-          <button class="chip ${lapse ? "is-on" : ""}" data-lapse title="Zeitraffer 8×">${lapse && s.speed >= 8 ? "Zeitraffer an" : "Zeitraffer"}</button>
           <button class="icon-btn" data-undo title="Rückgängig (Strg+Z)" ${s.canUndo ? "" : "disabled"} aria-disabled="${!s.canUndo}">${ICONS.undo}</button>
           <button class="icon-btn" data-redo title="Wiederholen (Strg+Y)" ${s.canRedo ? "" : "disabled"} aria-disabled="${!s.canRedo}">${ICONS.redo}</button>
           <div class="menu-wrap">
@@ -89,7 +92,6 @@ export class TopBar {
           </div>
           <button class="icon-btn" data-save title="Szene speichern">${ICONS.save}</button>
           <button class="icon-btn" data-load title="Szene laden">${ICONS.load}</button>
-          <button class="icon-btn" data-shot title="Bild speichern">${ICONS.shot}</button>
           <button class="chip ghost" data-about>Über</button>
         </div>
         <div class="menu-wrap top-more">
@@ -98,7 +100,8 @@ export class TopBar {
             s.menuOpen === "more"
               ? `<div class="menu menu-more" role="menu">
                   <button data-step>Einzelschritt</button>
-                  <button data-lapse>${lapse && s.speed >= 8 ? "Zeitraffer aus" : "Zeitraffer 8×"}</button>
+                  <button data-lapse>${lapseOn ? "Zeitraffer aus" : "Zeitraffer 8×"}</button>
+                  <button data-trail>${s.trailFade ? "Höhenspur aus" : "Höhenspur an"}</button>
                   <button data-undo ${s.canUndo ? "" : "disabled"}>Rückgängig (Strg+Z)</button>
                   <button data-redo ${s.canRedo ? "" : "disabled"}>Wiederholen (Strg+Y)</button>
                   <button data-reset-all>Szene zurücksetzen</button>
@@ -139,6 +142,11 @@ export class TopBar {
     this.el.querySelectorAll("[data-lapse]").forEach((btn) => {
       btn.addEventListener("click", () => {
         this.store.patch({ speed: lapseSpeed(this.store.state.speed), playing: true, menuOpen: null });
+      });
+    });
+    this.el.querySelectorAll("[data-trail]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this.store.patch({ trailFade: !this.store.state.trailFade, menuOpen: null });
       });
     });
     this.el.querySelector("[data-more-menu]")?.addEventListener("click", (e) => {

@@ -177,7 +177,8 @@ body {
   min-height: 44px; background: #1a1612; color: var(--text);
   border: 1px solid var(--panel-border); border-radius: 10px; padding: 0 8px; font: inherit;
 }
-.transport { display: flex; align-items: center; gap: 4px; }
+.transport { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.transport .chip { min-width: auto; padding: 0 10px; white-space: nowrap; }
 .speed { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; min-width: 118px; }
 .speed span { white-space: nowrap; }
 

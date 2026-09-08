@@ -5,7 +5,22 @@ import {
   qualityChangesSim,
   qualityProfile,
 } from "../state/quality";
-import { encodeScene, packMaps, parseScene, toJson, unpackMaps } from "../state/persist";
+import {
+  encodeScene,
+  isPngDataUrl,
+  packMaps,
+  parseScene,
+  screenshotFilename,
+  toJson,
+  unpackMaps,
+} from "../state/persist";
+import {
+  copyField,
+  decayHeightTrail,
+  extractTerrain,
+  stepHeightTrail,
+  trailVisible,
+} from "../scene/heightTrail";
 import { DEFAULT_PARAMS } from "../state/types";
 import { sampleCrossSection } from "./crossSection";
 import {
@@ -15,7 +30,15 @@ import {
   SOURCE_TOOL_TIP,
   sourceTipVisible,
 } from "./sourceGesture";
-import { applyPlay, lapseSpeed, speedFromIndex, speedIndex, stepsThisFrame, togglePlaying } from "./transport";
+import {
+  applyPlay,
+  isLapse,
+  lapseSpeed,
+  speedFromIndex,
+  speedIndex,
+  stepsThisFrame,
+  togglePlaying,
+} from "./transport";
 
 function assert(cond: boolean, msg: string): void {
   if (!cond) throw new Error(msg);
@@ -92,6 +115,32 @@ assert(!allowOneFingerOrbit(false, false), "no one-finger orbit outside camera m
 assert(togglePlaying(true) === false && togglePlaying(false) === true, "play toggle");
 assert(speedFromIndex(speedIndex(2)) === 2, "speed index roundtrip");
 assert(lapseSpeed(1) === 8 && lapseSpeed(8) === 1, "lapse toggle");
+assert(isLapse(4) && isLapse(8) && !isLapse(2), "lapse mark at 4×");
+assert(stepsThisFrame(8, 0).steps === 8, "zeitraffer 8× ticks");
+assert(screenshotFilename(new Date("2026-09-08T12:34:56.000Z")) === "sandflow-2026-09-08-12-34-56.png", "png name");
+assert(isPngDataUrl("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"), "png data url");
+assert(!isPngDataUrl("data:image/jpeg;base64,aaaa"), "reject jpeg");
+assert(trailVisible(true, true) && !trailVisible(true, false) && !trailVisible(false, true), "trail only in lapse");
+
+const cells = 4;
+const prev = new Float32Array(cells).fill(0.4);
+const cur = new Float32Array([0.4, 0.32, 0.48, 0.4]);
+const trail = new Float32Array(cells);
+stepHeightTrail(trail, cur, prev, 0.9, 10);
+assert(trail[1] < 0 && trail[2] > 0, "cut vs fill signed trail");
+assert(Math.abs(trail[0]) < 1e-6, "unchanged cell stays 0");
+const faded = trail[1];
+decayHeightTrail(trail, 0.5);
+assert(Math.abs(trail[1] - faded * 0.5) < 1e-6, "decay halves trail");
+const packedH = new Float32Array(cells * 4);
+for (let i = 0; i < cells; i++) packedH[i * 4] = i + 1;
+const extracted = new Float32Array(cells);
+extractTerrain(packedH, 2, extracted);
+assert(extracted[0] === 1 && extracted[1] === 2 && extracted[3] === 4, "extract terrain R");
+const dst = new Float32Array(cells);
+copyField(cur, dst);
+assert(dst[2] === cur[2] && dst[1] === cur[1], "copy field");
+
 const playOnboard = applyPlay(true, 3);
 assert(playOnboard.playing && playOnboard.onboardStep === 0 && playOnboard.persistOnboard, "play finishes onboard");
 assert(stepsThisFrame(0.25, 0.8).steps === 1, "sub-1 speed accumulates");
