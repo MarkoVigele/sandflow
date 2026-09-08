@@ -1,6 +1,8 @@
 import { claimSourceGesture, pinGrabBeatsOrbit } from "./sourceGesture";
 import {
   BRIEF_TRAY_TOOLS,
+  pointerLeaveEndsStroke,
+  strokeWaitsForHistory,
   strokeWaypoints,
   TOOLBAR_TOOLS,
   toolBrushKind,
@@ -37,6 +39,9 @@ if (!toolInterpolates("tamp") || !toolInterpolates("groove") || !toolInterpolate
   fail("stamp/channel/level must interpolate");
 }
 if (!toolInterpolates("concrete") || !toolInterpolates("erase")) fail("Beton/Radierer must interpolate");
+if (strokeWaitsForHistory()) fail("Beton stroke must not await history (touch moves arrive during snapshot)");
+if (pointerLeaveEndsStroke(true)) fail("captured Beton stroke must survive pointerleave");
+if (!pointerLeaveEndsStroke(false)) fail("uncaptured leave still ends the stroke");
 
 const first = strokeWaypoints(null, { u: 0.2, v: 0.3 }, 0.06);
 if (first.length !== 1 || first[0]!.u !== 0.2) fail("first stamp is a single point");

@@ -39,7 +39,7 @@ import {
   pointerLeaveEndsGesture,
   shouldApplyOrbitUpdate,
 } from "../ui/sourceGesture";
-import { strokeWaypoints, toolBrushKind } from "../ui/tools";
+import { strokeWaitsForHistory, strokeWaypoints, toolBrushKind } from "../ui/tools";
 import { isLapse, stepAccumAfterTransport, stepsThisFrame } from "../ui/transport";
 import {
   AimCursor,
@@ -936,9 +936,16 @@ export class Viewport {
 
     const hit = this.hitUv(ev);
     if (!hit) return;
-    await this.pushHistory();
     this.strokeActive = true;
     this.lastStroke = null;
+    if (!strokeWaitsForHistory()) {
+      void this.pushHistory();
+      this.toolAt(tool, hit.u, hit.v);
+      this.refreshAim(hit, ev);
+      return;
+    }
+    await this.pushHistory();
+    if (!this.pointerDown) return;
     this.toolAt(tool, hit.u, hit.v);
     this.refreshAim(hit, ev);
   };
