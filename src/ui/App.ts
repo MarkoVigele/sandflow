@@ -2,7 +2,7 @@ import { createAssetService } from "../assets/AssetService";
 import { labTexelBudget } from "../assets/texturePaths";
 import { propsFromShare, propsToShare } from "../scene/PropsLite";
 import { Viewport } from "../scene/Viewport";
-import { resampleHeight } from "../sim/presets";
+import { resampleMask } from "../sim/mapsContract";
 import type { SimSnapshot } from "../sim/SimClient";
 import {
   downloadDataUrl,
@@ -12,10 +12,12 @@ import {
   toJson,
   unpackMaps,
 } from "../state/persist";
+import { getPreset, resampleHeight } from "../sim/presets";
 import {
   buildSharePayload,
   compactShareForHash,
   decodeHeightField,
+  decodeMaskField,
   parseAnyScene,
   parseShareHash,
   sanitizeQuality,
@@ -134,7 +136,7 @@ export class App {
 
   private async saveScene(): Promise<void> {
     const snap = await this.viewport.snapshot();
-    const packed = packMaps(snap.terrain, snap.water, snap.wetness, snap.cohesion);
+    const packed = packMaps(snap.terrain, snap.water, snap.wetness, snap.cohesion, snap.hardmask);
     const file = encodeScene({
       name: `sandflow-${this.store.state.presetId}`,
       quality: this.store.state.quality,
@@ -174,6 +176,11 @@ export class App {
           ? maps.cohesion
           : resampleHeight(maps.cohesion, scene.size, grid)
         : undefined;
+      const hardmask = maps.hardmask
+        ? scene.size === grid
+          ? maps.hardmask
+          : resampleMask(maps.hardmask, scene.size, grid)
+        : undefined;
       this.store.patch({
         params: scene.params,
         presetId: scene.presetId,
@@ -188,6 +195,7 @@ export class App {
         wetness,
         sediment: new Float32Array(grid * grid),
         cohesion: cohesion ?? new Float32Array(grid * grid),
+        hardmask: hardmask ?? new Float32Array(grid * grid),
         sources: scene.sources,
         erodedSand: 0,
       });
@@ -224,6 +232,10 @@ export class App {
     const water = decodeHeightField(share.w, share.wn, grid);
     const sources = shareSources(share);
     if (terrain) {
+      const hard =
+        decodeMaskField(share.m, share.mn, grid) ??
+        getPreset(share.preset).build(grid).hardmask ??
+        new Float32Array(grid * grid);
       const snap: SimSnapshot = {
         size: grid,
         terrain,
@@ -231,6 +243,7 @@ export class App {
         wetness: new Float32Array(grid * grid),
         sediment: new Float32Array(grid * grid),
         cohesion: new Float32Array(grid * grid),
+        hardmask: hard,
         sources,
         erodedSand: 0,
       };
@@ -260,6 +273,7 @@ export class App {
       props: propsToShare(this.viewport.listProps()),
       terrain: snap.terrain,
       water: snap.water,
+      hardmask: snap.hardmask,
       size: snap.size,
     };
   }
@@ -313,10 +327,10 @@ export class App {
               </div>
               <button class="icon-btn" data-x>${ICONS.close}</button>
             </header>
-            <p>Wasser sucht sich Wege durch Sand: erst dünne Adern, dann ein Bett, später ein verzweigtes Netz. V1.x ist der spielbare Kern — Zielring, Werkzeuge, Teilen, Kiesel, gebackene Texturen. WebGPU und eine volle Requisitenbibliothek bleiben später.</p>
+            <p>Wasser sucht sich Wege durch Sand: erst dünne Adern, dann ein Bett, später ein verzweigtes Netz. V1.x ist der spielbare Kern — Zielring, Werkzeuge, Teilen, Kiesel, Beton, gebackene Texturen. WebGPU und eine volle Requisitenbibliothek bleiben später.</p>
             <p>Kurzanleitung: <strong>Sand formen</strong> → <strong>Quelle setzen</strong> → <strong>Abspielen</strong>.</p>
             <p>Rechtsklick oder zwei Finger drehen die Kamera. Ein Finger (oder die linke Taste) bedient das Werkzeug. Unter <em>Kamera</em> geht das Drehen auch mit einem Finger.</p>
-            <p>Oben: <em>Tempo</em> und <em>Zeitraffer</em>, Qualität inkl. Auto, Szene oder nur Wasser zurücksetzen, Teilen per Link oder JSON. Kiesel sind kleine Steine — der Radierer nimmt sie weg.</p>
+            <p>Oben: <em>Tempo</em> und <em>Zeitraffer</em>, Qualität inkl. Auto, Szene oder nur Wasser zurücksetzen, Teilen per Link oder JSON. <em>Beton</em> setzt Hartstoff (Platte oder Wand). Kiesel sind kleine Steine — der Radierer nimmt Kiesel und Beton weg.</p>
             <p>Unter <em>Erweitert</em> liegen Heatmap (Fluss oder Tiefe) und <em>Relief</em>, das die Höhen in der Wanne überhöht. Texturen entstehen lokal aus einer kurzen Beschreibung.</p>
           </div>
         </div>`

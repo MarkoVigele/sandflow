@@ -1,6 +1,15 @@
 import type { SimParams, WaterSource } from "../state/types";
 
-export type BrushKind = "pile" | "dig" | "smooth" | "dam" | "tamp" | "groove" | "flatten";
+export type BrushKind =
+  | "pile"
+  | "dig"
+  | "smooth"
+  | "dam"
+  | "tamp"
+  | "groove"
+  | "flatten"
+  | "concrete"
+  | "soft";
 
 export type WorkerIn =
   | {
@@ -12,6 +21,7 @@ export type WorkerIn =
       wetness?: Float32Array;
       sediment?: Float32Array;
       cohesion?: Float32Array;
+      hardmask?: Float32Array;
       sources: WaterSource[];
     }
   | { type: "step"; steps: number }
@@ -37,6 +47,7 @@ export type WorkerIn =
       water?: Float32Array;
       wetness?: Float32Array;
       cohesion?: Float32Array;
+      hardmask?: Float32Array;
       sources: WaterSource[];
     }
   | { type: "requestSnapshot" };
@@ -49,6 +60,8 @@ export type WorkerOut =
       particles: Float32Array;
       waterVolume: number;
       erodedSand: number;
+      /** Companion hardmask; sent only when dirty so RGBA frames stay cheap. */
+      hard?: Float32Array;
     }
   | {
       type: "snapshot";
@@ -58,6 +71,7 @@ export type WorkerOut =
       wetness: Float32Array;
       sediment: Float32Array;
       cohesion: Float32Array;
+      hardmask: Float32Array;
       sources: WaterSource[];
       erodedSand: number;
     };

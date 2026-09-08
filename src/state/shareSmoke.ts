@@ -8,6 +8,7 @@ import {
   bytesToB64Url,
   compactShareForHash,
   decodeHeightField,
+  decodeMaskField,
   dequantizeHeight,
   encodeShareHash,
   parseAnyScene,
@@ -67,6 +68,11 @@ const payload = buildSharePayload(
     props: [{ u: 0.4, v: 0.6, s: 0.07, r: 1.2, k: 2 }],
     terrain,
     water: new Float32Array(srcSize * srcSize),
+    hardmask: (() => {
+      const m = new Float32Array(srcSize * srcSize);
+      for (let i = 0; i < m.length; i++) m[i] = i % 2 === 0 ? 1 : 0;
+      return m;
+    })(),
     size: srcSize,
   },
   SHARE_HASH_GRID,
@@ -75,6 +81,7 @@ const payload = buildSharePayload(
 
 if (payload.v !== 2) fail("version");
 if (!payload.h || payload.hn !== SHARE_HASH_GRID) fail("height missing");
+if (!payload.m || payload.mn !== SHARE_HASH_GRID) fail("hardmask missing");
 if (payload.w) fail("hash payload should omit water when asked");
 if (payload.props?.[0].k !== 2) fail("prop kind");
 
@@ -96,6 +103,9 @@ if (srcs.length !== 1 || Math.abs(srcs[0].x - 0.5) > 1e-6) fail("sources");
 const decoded = decodeHeightField(parsed.h, parsed.hn, srcSize);
 if (!decoded || decoded.length !== terrain.length) fail("decode height");
 almost(decoded[mid], terrain[mid], 0.1, "hash height mid");
+const decodedM = decodeMaskField(parsed.m, parsed.mn, srcSize);
+if (!decodedM || decodedM.length !== terrain.length) fail("decode mask");
+if (decodedM[0] < 0.5 || decodedM[1] >= 0.5) fail("mask checkerboard");
 
 const compact = compactShareForHash({
   presetId: "flat",

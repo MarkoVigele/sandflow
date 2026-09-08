@@ -221,3 +221,42 @@ for (let x = 2; x < size - 2; x++) {
 }
 console.log(JSON.stringify({ deltaClusters, deltaVol: +deltaSim.waterVolume().toFixed(3) }));
 if (deltaClusters < 2) fail(`Delta verzweigt nicht: clusters=${deltaClusters}`);
+
+const hardBuilt = getPreset("slope").build(size);
+const hardSim = new ErosionSim(size, DEFAULT_PARAMS, hardBuilt.terrain);
+hardSim.sources = hardBuilt.sources;
+for (let y = 0; y < size; y++) {
+  const v = y / (size - 1);
+  for (let x = 0; x < size; x++) {
+    if (v >= 0.38 && v <= 0.52) hardSim.hardmask[y * size + x] = 1;
+  }
+}
+const hard0 = hardSim.terrain.slice();
+hardSim.step(100);
+let hardCut = 0;
+let sandCut = 0;
+let waterOnHard = 0;
+for (let i = 0; i < hard0.length; i++) {
+  const cut = hard0[i] - hardSim.terrain[i];
+  if (hardSim.hardmask[i] >= 0.5) {
+    hardCut = Math.max(hardCut, cut);
+    if (hardSim.water[i] > 0.001) waterOnHard++;
+  } else {
+    sandCut = Math.max(sandCut, cut);
+  }
+}
+console.log(JSON.stringify({ hardCut: +hardCut.toFixed(5), sandCut: +sandCut.toFixed(4), waterOnHard }));
+if (hardCut > 1e-5) fail(`Hartzellen erodieren: ${hardCut}`);
+if (sandCut < 0.012) fail(`Sand neben Beton erodiert nicht: ${sandCut}`);
+if (waterOnHard < 6) fail(`Wasser fließt nicht über Beton: ${waterOnHard}`);
+
+const depFlat = new Float32Array(size * size);
+depFlat.fill(0.52);
+const dep = new ErosionSim(size, DEFAULT_PARAMS, depFlat);
+for (let i = 0; i < dep.hardmask.length; i++) dep.hardmask[i] = 1;
+dep.sediment.fill(0.08);
+const dep0 = dep.terrain.slice();
+dep.step(20);
+let depRaise = 0;
+for (let i = 0; i < dep0.length; i++) depRaise = Math.max(depRaise, dep.terrain[i] - dep0[i]);
+if (depRaise > 1e-5) fail(`Ablagerung auf Beton: ${depRaise}`);

@@ -572,6 +572,11 @@ export function generateLabRimCanvas(size = 512, seed = 0x51a7d): HTMLCanvasElem
   return canvasFromRgba(rgba, size, size);
 }
 
+/** Same albedo as the tray rim — Beton cells share `concrete-albedo.jpg`. */
+export function generateConcreteCanvas(size = 512, seed = 0xc0c0e): HTMLCanvasElement {
+  return generateLabRimCanvas(size, seed);
+}
+
 /** Pale ash fallback — no floorboard seams. */
 export function generateWoodCanvas(size = 512, seed = 0x51a7d): HTMLCanvasElement {
   const c = makeCanvas(size);

@@ -1,6 +1,6 @@
 import { hash2 } from "../assets/noise";
 import type { SimParams, WaterSource } from "../state/types";
-import { packMapsRgba } from "./mapsContract";
+import { HARD_THRESHOLD, packMapsRgba } from "./mapsContract";
 import type { BrushKind } from "./types";
 
 const NEIGH = [
@@ -42,6 +42,8 @@ export class ErosionSim {
   flow: Float32Array;
   /** Local cohesion boost 0–0.85. Not packed into visual maps. */
   cohesion: Float32Array;
+  /** Companion hardmask. 1 = concrete/stone: no erosion, no deposition. */
+  hardmask: Float32Array;
   sources: WaterSource[] = [];
   erodedSand = 0;
   private waterDelta: Float32Array;
@@ -64,6 +66,7 @@ export class ErosionSim {
     this.wetness = new Float32Array(n);
     this.flow = new Float32Array(n);
     this.cohesion = new Float32Array(n);
+    this.hardmask = new Float32Array(n);
     this.waterDelta = new Float32Array(n);
     this.sedDelta = new Float32Array(n);
     this.terrDelta = new Float32Array(n);
@@ -123,6 +126,7 @@ export class ErosionSim {
     const transfer = 0.76 * params.flowRate;
     const capK = params.sedimentCapacity;
     const cohesion = this.cohesion;
+    const hard = this.hardmask;
 
     for (let y = 1; y < size - 1; y++) {
       for (let x = 1; x < size - 1; x++) {
@@ -211,7 +215,12 @@ export class ErosionSim {
         const steepBed = this.nBed[steep];
         const steepFrac = steepBed / Math.max(this.nDrop[steep], 1e-6);
         const shear = movable * steepBed;
-        const carving = !ponded && steepFrac >= MIN_BED_FRAC && shear > MIN_SHEAR && bedFall > 0;
+        const carving =
+          !ponded &&
+          steepFrac >= MIN_BED_FRAC &&
+          shear > MIN_SHEAR &&
+          bedFall > 0 &&
+          hard[i] < HARD_THRESHOLD;
         const localC = Math.min(0.95, params.cohesion + cohesion[i]);
         const localErodeK = params.erosionRate * (1.05 - localC);
 
@@ -268,7 +277,7 @@ export class ErosionSim {
           for (let k = 0; k < 4; k++) {
             const j = this.i(x + NEIGH[k][0], y + NEIGH[k][1]);
             const bank = terrain[j] - terrain[i];
-            if (bank > 0.012) {
+            if (bank > 0.012 && hard[j] < HARD_THRESHOLD) {
               const nibble = Math.min(bank * 0.017 * localErodeK * Math.min(flux, 0.09), bank * 0.05);
               tD[j] -= nibble;
               sD[i] += nibble * 0.62;
@@ -281,6 +290,7 @@ export class ErosionSim {
     for (let i = 0; i < n; i++) {
       water[i] = Math.max(0, water[i] + wD[i]);
       sediment[i] = Math.max(0, sediment[i] + sD[i]);
+      if (hard[i] >= HARD_THRESHOLD) continue;
       const before = terrain[i];
       terrain[i] = Math.max(MIN_SAND, terrain[i] + tD[i]);
       if (tD[i] < 0) this.erodedSand += before - terrain[i];
@@ -299,6 +309,7 @@ export class ErosionSim {
     for (let y = 1; y < size - 1; y++) {
       for (let x = 1; x < size - 1; x++) {
         const i = this.i(x, y);
+        if (this.hardmask[i] >= HARD_THRESHOLD) continue;
         if (sediment[i] < 1e-6) continue;
         const w = water[i];
         const h = terrain[i] + w;
@@ -355,11 +366,13 @@ export class ErosionSim {
       for (let x = 1; x < size - 1; x++) {
         const i = this.i(x, y);
         if (water[i] > 0.01) continue;
+        if (this.hardmask[i] >= HARD_THRESHOLD) continue;
         const localC = Math.min(0.95, params.cohesion + cohesion[i]);
         const talus = 0.1 + params.grain * 0.045 + localC * 0.06;
         const k = 0.028 * (1.05 - localC);
         for (let kN = 0; kN < 4; kN++) {
           const j = this.i(x + NEIGH[kN][0], y + NEIGH[kN][1]);
+          if (this.hardmask[j] >= HARD_THRESHOLD) continue;
           const dh = terrain[i] - terrain[j];
           if (dh > talus) {
             const m = (dh - talus) * k;
@@ -370,7 +383,10 @@ export class ErosionSim {
       }
     }
     const n = size * size;
-    for (let i = 0; i < n; i++) terrain[i] = Math.max(MIN_SAND, terrain[i] + tD[i]);
+    for (let i = 0; i < n; i++) {
+      if (this.hardmask[i] >= HARD_THRESHOLD) continue;
+      terrain[i] = Math.max(MIN_SAND, terrain[i] + tD[i]);
+    }
   }
 
   brush(kind: BrushKind, u: number, v: number, radius: number, strength: number): void {
@@ -395,8 +411,10 @@ export class ErosionSim {
             const dy = y - cy;
             const d2 = dx * dx + dy * dy;
             if (d2 > r2) continue;
+            const i = this.i(x, y);
+            if (this.hardmask[i] >= HARD_THRESHOLD) continue;
             const w = Math.exp(-d2 / (r2 * 0.45));
-            mean += copy[this.i(x, y)] * w;
+            mean += copy[i] * w;
             meanW += w;
           }
         }
@@ -408,8 +426,9 @@ export class ErosionSim {
           const dy = y - cy;
           const d2 = dx * dx + dy * dy;
           if (d2 > r2) continue;
-          const w = Math.exp(-d2 / (r2 * 0.45)) * strength * (kind === "flatten" ? 0.55 : 0.35);
           const i = this.i(x, y);
+          if (this.hardmask[i] >= HARD_THRESHOLD) continue;
+          const w = Math.exp(-d2 / (r2 * 0.45)) * strength * (kind === "flatten" ? 0.55 : 0.35);
           if (kind === "flatten") {
             this.terrain[i] += (mean - this.terrain[i]) * Math.min(1, w);
             continue;
@@ -418,11 +437,13 @@ export class ErosionSim {
           let c = 0;
           for (let oy = -1; oy <= 1; oy++) {
             for (let ox = -1; ox <= 1; ox++) {
-              acc += copy[this.i(x + ox, y + oy)];
+              const j = this.i(x + ox, y + oy);
+              if (this.hardmask[j] >= HARD_THRESHOLD) continue;
+              acc += copy[j];
               c++;
             }
           }
-          this.terrain[i] += (acc / c - this.terrain[i]) * w;
+          if (c > 0) this.terrain[i] += (acc / c - this.terrain[i]) * w;
         }
       }
       return;
@@ -436,6 +457,18 @@ export class ErosionSim {
         if (d2 > r2) continue;
         const fall = Math.exp(-d2 / (r2 * 0.38));
         const i = this.i(x, y);
+        if (kind === "concrete") {
+          this.hardmask[i] = Math.min(1, this.hardmask[i] + fall * 1.85);
+          const slab = fall * strength * 0.018;
+          const wall = fall * Math.max(0, strength - 0.85) * 0.055;
+          this.terrain[i] += slab + wall;
+          continue;
+        }
+        if (kind === "soft") {
+          this.hardmask[i] = Math.max(0, this.hardmask[i] - fall * Math.max(0.65, strength));
+          continue;
+        }
+        if (this.hardmask[i] >= HARD_THRESHOLD) continue;
         if (kind === "pile") {
           this.terrain[i] += fall * strength * 0.055;
         } else if (kind === "dig") {
@@ -467,14 +500,18 @@ export class ErosionSim {
     let count = 0;
     for (let y = edge; y < size - edge; y++) {
       for (let x = edge; x < size - edge; x++) {
-        sum += this.terrain[this.i(x, y)];
+        const i = this.i(x, y);
+        if (this.hardmask[i] >= HARD_THRESHOLD) continue;
+        sum += this.terrain[i];
         count++;
       }
     }
     const mean = count > 0 ? sum / count : 0.42;
     for (let y = edge; y < size - edge; y++) {
       for (let x = edge; x < size - edge; x++) {
-        this.terrain[this.i(x, y)] = mean;
+        const i = this.i(x, y);
+        if (this.hardmask[i] >= HARD_THRESHOLD) continue;
+        this.terrain[i] = mean;
       }
     }
   }

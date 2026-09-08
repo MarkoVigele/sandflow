@@ -1,3 +1,4 @@
+import { countHardCells, HARD_THRESHOLD, resampleMask } from "../sim/mapsContract";
 import { resampleHeight } from "../sim/presets";
 import type { CameraPose } from "../sim/presets";
 import type { SceneFile } from "./persist";
@@ -43,6 +44,8 @@ export interface SharePayload {
   h?: string;
   wn?: number;
   w?: string;
+  mn?: number;
+  m?: string;
 }
 
 export interface ShareBuildInput {
@@ -56,6 +59,7 @@ export interface ShareBuildInput {
   props?: ShareProp[];
   terrain?: Float32Array;
   water?: Float32Array;
+  hardmask?: Float32Array;
   size?: number;
 }
 
@@ -100,6 +104,22 @@ export function quantizeHeight(src: Float32Array, srcSize: number, dstSize: numb
     out[i] = Math.round(clamp01(resampled[i]) * 255);
   }
   return out;
+}
+
+export function quantizeMask(src: Float32Array, srcSize: number, dstSize: number): Uint8Array {
+  const resampled = resampleMask(src, srcSize, dstSize);
+  const out = new Uint8Array(dstSize * dstSize);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = resampled[i] >= HARD_THRESHOLD ? 255 : 0;
+  }
+  return out;
+}
+
+export function dequantizeMask(q: Uint8Array, srcSize: number, dstSize: number): Float32Array {
+  const f = new Float32Array(srcSize * srcSize);
+  const n = Math.min(f.length, q.length);
+  for (let i = 0; i < n; i++) f[i] = q[i] >= 128 ? 1 : 0;
+  return resampleMask(f, srcSize, dstSize);
 }
 
 export function dequantizeHeight(q: Uint8Array, srcSize: number, dstSize: number): Float32Array {
@@ -158,6 +178,10 @@ export function buildSharePayload(input: ShareBuildInput, grid: number, includeW
     payload.wn = grid;
     payload.w = bytesToB64Url(quantizeHeight(input.water, input.size, grid));
   }
+  if (input.hardmask && input.size && countHardCells(input.hardmask) > 0) {
+    payload.mn = grid;
+    payload.m = bytesToB64Url(quantizeMask(input.hardmask, input.size, grid));
+  }
   return payload;
 }
 
@@ -191,6 +215,8 @@ export function parseSharePayload(data: unknown): SharePayload {
     h: raw.h,
     wn: raw.wn,
     w: raw.w,
+    mn: raw.mn,
+    m: raw.m,
   };
 }
 
@@ -218,6 +244,15 @@ export function decodeHeightField(b64: string | undefined, srcSize: number | und
   }
 }
 
+export function decodeMaskField(b64: string | undefined, srcSize: number | undefined, dstSize: number): Float32Array | null {
+  if (!b64 || !srcSize) return null;
+  try {
+    return dequantizeMask(b64UrlToBytes(b64), srcSize, dstSize);
+  } catch {
+    return null;
+  }
+}
+
 export function shareSources(share: SharePayload): WaterSource[] {
   return share.sources.map((s, i) => ({
     id: `s-share-${i}`,
@@ -237,6 +272,10 @@ export function compactShareForHash(input: ShareBuildInput): { hash: string; omi
   let hash = encodeShareHash(full);
   if (hash.length <= SHARE_HASH_SOFT_LIMIT) return { hash, omittedHeight: false };
   const slim = { ...full };
+  delete slim.m;
+  delete slim.mn;
+  hash = encodeShareHash(slim);
+  if (hash.length <= SHARE_HASH_SOFT_LIMIT) return { hash, omittedHeight: false };
   delete slim.h;
   delete slim.hn;
   delete slim.w;

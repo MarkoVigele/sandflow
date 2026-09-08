@@ -11,6 +11,7 @@ export interface SceneFile {
   waterB64: string;
   wetnessB64: string;
   cohesionB64?: string;
+  hardmaskB64?: string;
   sources: WaterSource[];
   texturePrompt: string;
 }
@@ -51,12 +52,14 @@ export function packMaps(
   water: Float32Array,
   wetness: Float32Array,
   cohesion?: Float32Array,
+  hardmask?: Float32Array,
 ) {
   return {
     terrainB64: f32ToB64(terrain),
     waterB64: f32ToB64(water),
     wetnessB64: f32ToB64(wetness),
     cohesionB64: cohesion ? f32ToB64(cohesion) : undefined,
+    hardmaskB64: hardmask ? f32ToB64(hardmask) : undefined,
   };
 }
 
@@ -66,6 +69,7 @@ export function unpackMaps(file: SceneFile) {
     water: b64ToF32(file.waterB64),
     wetness: b64ToF32(file.wetnessB64),
     cohesion: file.cohesionB64 ? b64ToF32(file.cohesionB64) : undefined,
+    hardmask: file.hardmaskB64 ? b64ToF32(file.hardmaskB64) : undefined,
   };
 }
 

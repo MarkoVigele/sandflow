@@ -1,10 +1,12 @@
 import { ErosionSim } from "./erosionCore";
+import { resampleMask } from "./mapsContract";
 import { resampleHeight } from "./presets";
 import type { WorkerIn, WorkerOut } from "./types";
 import { DEFAULT_PARAMS } from "../state/types";
 
 let sim: ErosionSim | null = null;
 let lastPourEmit = 0;
+let hardDirty = true;
 
 function post(msg: WorkerOut, transfer: Transferable[] = []): void {
   (self as unknown as Worker).postMessage(msg, transfer);
@@ -17,6 +19,7 @@ function snapshot(): void {
   const wetness = sim.wetness.slice();
   const sediment = sim.sediment.slice();
   const cohesion = sim.cohesion.slice();
+  const hardmask = sim.hardmask.slice();
   post(
     {
       type: "snapshot",
@@ -26,10 +29,11 @@ function snapshot(): void {
       wetness,
       sediment,
       cohesion,
+      hardmask,
       sources: sim.sources.map((s) => ({ ...s })),
       erodedSand: sim.erodedSand,
     },
-    [terrain.buffer, water.buffer, wetness.buffer, sediment.buffer, cohesion.buffer],
+    [terrain.buffer, water.buffer, wetness.buffer, sediment.buffer, cohesion.buffer, hardmask.buffer],
   );
 }
 
@@ -37,6 +41,10 @@ function emitFrame(): void {
   if (!sim) return;
   const packed = sim.pack();
   const particles = sim.collectParticles();
+  const hard = hardDirty ? sim.hardmask.slice() : undefined;
+  hardDirty = false;
+  const transfer: Transferable[] = [packed.buffer, particles.buffer];
+  if (hard) transfer.push(hard.buffer);
   post(
     {
       type: "frame",
@@ -45,8 +53,9 @@ function emitFrame(): void {
       particles,
       waterVolume: sim.waterVolume(),
       erodedSand: sim.erodedSand,
+      hard,
     },
-    [packed.buffer, particles.buffer],
+    transfer,
   );
 }
 
@@ -59,8 +68,10 @@ self.onmessage = (ev: MessageEvent<WorkerIn>) => {
       if (msg.wetness) sim.wetness.set(msg.wetness);
       if (msg.sediment) sim.sediment.set(msg.sediment);
       if (msg.cohesion) sim.cohesion.set(msg.cohesion);
+      if (msg.hardmask) sim.hardmask.set(msg.hardmask);
       sim.sources = msg.sources.map((s) => ({ ...s }));
       sim.erodedSand = 0;
+      hardDirty = true;
       emitFrame();
       break;
     }
@@ -78,6 +89,7 @@ self.onmessage = (ev: MessageEvent<WorkerIn>) => {
     case "brush": {
       if (!sim) return;
       sim.brush(msg.kind, msg.x, msg.y, msg.radius, msg.strength);
+      if (msg.kind === "concrete" || msg.kind === "soft") hardDirty = true;
       emitFrame();
       break;
     }
@@ -131,6 +143,7 @@ self.onmessage = (ev: MessageEvent<WorkerIn>) => {
     case "replaceTerrain": {
       const params = sim?.params ?? DEFAULT_PARAMS;
       const oldCoh = sim?.cohesion;
+      const oldHard = sim?.hardmask;
       const oldSize = sim?.size;
       const nextSize = Math.round(Math.sqrt(msg.terrain.length));
       sim = new ErosionSim(nextSize, params, msg.terrain.slice());
@@ -138,7 +151,10 @@ self.onmessage = (ev: MessageEvent<WorkerIn>) => {
       if (msg.wetness) sim.wetness.set(msg.wetness);
       if (msg.cohesion) sim.cohesion.set(msg.cohesion);
       else if (oldCoh && oldSize) sim.cohesion.set(resampleHeight(oldCoh, oldSize, nextSize));
+      if (msg.hardmask) sim.hardmask.set(msg.hardmask);
+      else if (oldHard && oldSize) sim.hardmask.set(resampleMask(oldHard, oldSize, nextSize));
       sim.sources = msg.sources.map((s) => ({ ...s }));
+      hardDirty = true;
       emitFrame();
       break;
     }

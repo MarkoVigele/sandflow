@@ -2,11 +2,16 @@ import type { QualityId } from "../state/types";
 
 export const DEFAULT_TEXTURE_PROMPT = "feiner Quarzsand, warm, trocken";
 
+/**
+ * Filenames under `public/textures/`.
+ * The same `concrete-albedo.jpg` is the tray rim *and* in-sim Beton.
+ */
 export const BAKED_TEXTURE_FILES = {
   sandDry: "sand-dry-albedo.jpg",
   sandWet: "sand-wet-albedo.jpg",
   woodRim: "wood-rim.jpg",
   labRim: "concrete-albedo.jpg",
+  concrete: "concrete-albedo.jpg",
 } as const;
 
 /** GPU albedo/normal/rough size. Medium stays at 512 so mobile does not thrash 1k maps. */

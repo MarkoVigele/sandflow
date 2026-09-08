@@ -9,9 +9,10 @@ const TOOL_COPY: Record<ToolId, { title: string; body: string }> = {
   dam: { title: "Damm / Wand", body: "Kreis = Pinselradius. Steiler als Aufschütten." },
   tamp: { title: "Feststampfen", body: "Drückt Sand fest: lokale Kohäsion steigt, Erosion hält schlechter." },
   groove: { title: "Rinne vorzeichnen", body: "Ziehen zeichnet eine V-Rinne mit leichten Ufern — Wasser folgt später." },
-  flatten: { title: "Einebnen", body: "Pinsel ebnet die Fläche unter dem Finger. Unten: ganze Wanne." },
+  flatten: { title: "Einebnen", body: "Pinsel ebnet die Fläche unter dem Finger. Unten: ganze Wanne. Beton bleibt stehen." },
+  concrete: { title: "Beton", body: "Hartstoff setzen. Niedrige Stärke = Platte, hohe Stärke = Wand. Wasser fließt darüber, Erosion und Ablagerung nicht. Radierer nimmt den Beton weg." },
   stone: { title: "Kiesel", body: "Kleine Steine auf den Sand setzen. Radius steuert die Größe. Der Radierer nimmt sie wieder weg." },
-  erase: { title: "Radierer", body: "Kiesel in Reichweite entfernen. Sand und Wasser bleiben unberührt." },
+  erase: { title: "Radierer", body: "Kiesel und Beton in Reichweite entfernen. Sandhöhe und Wasser bleiben unberührt." },
   pour: { title: "Gießen", body: "Der Kreis auf dem Sand zeigt die Tropfstelle. Halten zum Gießen." },
   source: { title: "Quelle", body: "Kreis unter dem Finger: Tippen setzt, Ziehen verschiebt." },
 };

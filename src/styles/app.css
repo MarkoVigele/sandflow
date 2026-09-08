@@ -204,6 +204,10 @@ body {
 .swatch-delta { background: linear-gradient(180deg, #6a8a92 0%, #b08950 38%, #8a6a3e 100%); }
 .swatch-referenz { background: linear-gradient(90deg, #c4a06a, #4a5a60 48%, #c4a06a); }
 .swatch-veins { background: repeating-linear-gradient(90deg, #b08950 0 10px, #4a5a58 10px 14px, #b08950 14px 24px); }
+.swatch-betonkanal { background: linear-gradient(90deg, #8a8a86 0%, #8a8a86 28%, #c4a06a 38%, #c4a06a 62%, #8a8a86 72%, #8a8a86 100%); }
+.swatch-auffangbecken { background: linear-gradient(180deg, #c4a06a 0%, #8a8a86 55%, #6a6e6c 100%); }
+.swatch-treppenueberlauf { background: repeating-linear-gradient(180deg, #9a9a96 0 10px, #7a7a76 10px 14px, #c4a06a 14px 22px); }
+.swatch-betonwehr { background: linear-gradient(180deg, #c4a06a 0%, #8d8d88 42%, #8d8d88 56%, #b08950 100%); }
 .about p { color: var(--muted); line-height: 1.5; }
 
 .seg {
