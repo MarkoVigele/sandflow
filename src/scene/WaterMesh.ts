@@ -33,8 +33,9 @@ export class WaterMesh {
         uMaps: { value: maps },
         uHeightScale: { value: heightScale },
         uTexel: { value: 1 / Math.max(1, maps.image.width) },
-        uSunDir: { value: new THREE.Vector3(0.45, 0.82, 0.28).normalize() },
-        uSunColor: { value: new THREE.Color(1.0, 0.9, 0.76) },
+        uTraySize: { value: traySize },
+        uSunDir: { value: new THREE.Vector3(0.62, 0.58, 0.38).normalize() },
+        uSunColor: { value: new THREE.Color(1.0, 0.9, 0.72) },
         uTime: { value: 0 },
       },
       vertexShader: waterVert,
@@ -56,6 +57,15 @@ export class WaterMesh {
     const geo = new THREE.PlaneGeometry(traySize, traySize, segs, segs);
     geo.rotateX(-Math.PI / 2);
     this.mesh.geometry = geo;
+  }
+
+  setHeightScale(scale: number): void {
+    this.material.uniforms.uHeightScale.value = scale;
+  }
+
+  setSun(dir: THREE.Vector3, color: THREE.Color): void {
+    this.material.uniforms.uSunDir.value.copy(dir);
+    this.material.uniforms.uSunColor.value.copy(color);
   }
 
   tick(t: number): void {

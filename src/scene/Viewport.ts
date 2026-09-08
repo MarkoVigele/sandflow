@@ -8,6 +8,7 @@ import { getPreset, resampleHeight, type CameraPose } from "../sim/presets";
 import { History } from "../state/history";
 import type { Store } from "../state/store";
 import {
+  DEFAULT_HEIGHT_SCALE,
   QUALITY_GRID,
   QUALITY_LABEL,
   isMobile,
@@ -31,7 +32,7 @@ import { applyTrayWood, createSourceMarker, createTray, type TrayHandle } from "
 import { WaterMesh } from "./WaterMesh";
 
 export const TRAY_SIZE = 8;
-export const HEIGHT_SCALE = 2.5;
+export const HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE;
 
 export class Viewport {
   readonly renderer: THREE.WebGLRenderer;
@@ -130,11 +131,12 @@ export class Viewport {
     this.scene.fog = new THREE.Fog(0x14110e, 14, 28);
     this.scene.background = new THREE.Color(0x14110e);
 
-    this.hemi = new THREE.HemisphereLight(0xc5d4e0, 0x5a4a36, 0.55);
+    this.hemi = new THREE.HemisphereLight(0xd2e0ec, 0x4a3c2c, 0.36);
     this.scene.add(this.hemi);
 
-    this.sun = new THREE.DirectionalLight(0xffe6c4, 1.45);
-    this.sun.position.set(6.2, 10.5, 3.8);
+    this.sun = new THREE.DirectionalLight(0xffe0b0, 1.95);
+    this.sun.position.set(7.8, 6.4, 4.8);
+    this.sun.target.position.set(0, 0.55, 0);
     this.sun.castShadow = false;
     this.sun.shadow.mapSize.set(1024, 1024);
     this.sun.shadow.camera.near = 1;
@@ -154,8 +156,8 @@ export class Viewport {
     const q = store.state.quality;
     const grid = QUALITY_GRID[q];
     this.maps = createMapsTexture(grid);
-    this.sand = new SandMesh(TRAY_SIZE, this.maps, q, HEIGHT_SCALE);
-    this.water = new WaterMesh(TRAY_SIZE, this.maps, q, HEIGHT_SCALE);
+    this.sand = new SandMesh(TRAY_SIZE, this.maps, q, this.heightScale);
+    this.water = new WaterMesh(TRAY_SIZE, this.maps, q, this.heightScale);
     this.particles = new FlowParticles();
     this.scene.add(this.sand.mesh, this.water.mesh, this.particles.points, this.propsLite.group);
     this.sand.setHeatMode(store.state.heatmap);
@@ -174,6 +176,8 @@ export class Viewport {
         else this.aim.hide();
       }
     });
+
+    this.syncSunUniforms();
 
     this.sim = new SimClient();
     this.sim.onFrame((frame) => this.applyFrame(frame));
@@ -207,6 +211,24 @@ export class Viewport {
   applyParams(): void {
     this.sim.setParams(this.store.state.params);
     this.sand.setGrain(this.store.state.params.grain);
+    this.applyHeightScale();
+  }
+
+  get heightScale(): number {
+    return this.store.state.heightScale;
+  }
+
+  applyHeightScale(scale = this.store.state.heightScale): void {
+    this.sand.setHeightScale(scale);
+    this.water.setHeightScale(scale);
+  }
+
+  private syncSunUniforms(): void {
+    const dir = this.sun.position.clone().sub(this.sun.target.position).normalize();
+    const sunColor = this.sun.color.clone().multiplyScalar(0.92);
+    const ambient = new THREE.Color(0.17, 0.155, 0.13);
+    this.sand.setSun(dir, sunColor, ambient);
+    this.water.setSun(dir, sunColor);
   }
 
   applyQuality(quality: QualityId, resample = true): void {
@@ -342,7 +364,7 @@ export class Viewport {
   }
 
   setProps(props: PropLite[]): void {
-    this.propsLite.setAll(props, (u, v) => this.sampleHeight(u, v), TRAY_SIZE, HEIGHT_SCALE);
+    this.propsLite.setAll(props, (u, v) => this.sampleHeight(u, v), TRAY_SIZE, this.heightScale);
   }
 
   cameraPose(): CameraPose {
@@ -438,7 +460,7 @@ export class Viewport {
     this.particles.update(
       frame.particles,
       TRAY_SIZE,
-      HEIGHT_SCALE,
+      this.heightScale,
       q === "high" || q === "ultra",
     );
   }
@@ -457,7 +479,7 @@ export class Viewport {
 
   private placeMarker(m: THREE.Group, s: WaterSource): void {
     const h = this.sampleHeight(s.x, s.y);
-    m.position.set((s.x - 0.5) * TRAY_SIZE, h * HEIGHT_SCALE, (s.y - 0.5) * TRAY_SIZE);
+    m.position.set((s.x - 0.5) * TRAY_SIZE, h * this.heightScale, (s.y - 0.5) * TRAY_SIZE);
   }
 
   private sampleHeight(u: number, v: number): number {
@@ -479,7 +501,7 @@ export class Viewport {
       this.raycaster.ray.origin,
       this.raycaster.ray.direction,
       TRAY_SIZE,
-      HEIGHT_SCALE,
+      this.heightScale,
       (u, v) => this.sampleHeight(u, v),
     );
   }
@@ -572,7 +594,7 @@ export class Viewport {
       },
       (uu, vv) => this.sampleHeight(uu, vv),
       TRAY_SIZE,
-      HEIGHT_SCALE,
+      this.heightScale,
     );
   }
 
@@ -715,7 +737,7 @@ export class Viewport {
       else this.aim.hide();
     }
     this.aim.tick(t, this.strokeActive || !!this.draggingSource);
-    this.propsLite.settle((u, v) => this.sampleHeight(u, v), TRAY_SIZE, HEIGHT_SCALE);
+    this.propsLite.settle((u, v) => this.sampleHeight(u, v), TRAY_SIZE, this.heightScale);
     this.renderer.render(this.scene, this.camera);
 
     this.fpsFrames++;
@@ -737,7 +759,7 @@ export class Viewport {
     const lim = TRAY_SIZE * 0.42;
     tgt.x = Math.max(-lim, Math.min(lim, tgt.x));
     tgt.z = Math.max(-lim, Math.min(lim, tgt.z));
-    tgt.y = Math.max(0.4, Math.min(1.7, tgt.y));
+    tgt.y = Math.max(0.4, Math.min(2.2, tgt.y));
 
     const minY = Math.max(0.62, tgt.y + 0.38);
     if (this.camera.position.y < minY) this.camera.position.y = minY;

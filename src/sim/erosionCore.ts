@@ -16,21 +16,21 @@ const NEIGH = [
 
 const DIAG = 1.41421356;
 const MAX_PARTICLES = 280;
-const CONCENTRATE = 2.65;
+const CONCENTRATE = 2.92;
 const MIN_SAND = 0.04;
-/** Water-surface drop below this is a still pool, not a stream. */
+/** Water-surface drop below this is a still pool, not a stream. Keep — standing water must not burn holes. */
 const MIN_SURFACE_SLOPE = 0.0016;
 /** Bed must explain this share of a neighbor drop before we pick sand. */
 const MIN_BED_FRAC = 0.28;
 /** Shear = outgoing flux × bed slope. Standing mounds sit near 0. */
 const MIN_SHEAR = 2.5e-6;
-const INERTIA = 0.64;
-const MAX_ERODE_FRAC = 0.013;
+const INERTIA = 0.74;
+const MAX_ERODE_FRAC = 0.014;
 /** Scales tiny per-cell bed slopes (~0.005 on the slope preset) into capacity. */
-const BED_SLOPE_GAIN = 40;
+const BED_SLOPE_GAIN = 44;
 /** Established streams may split when a second downhill path is close. */
-const BRANCH_FLUX = 0.03;
-const BRANCH_RATIO = 0.46;
+const BRANCH_FLUX = 0.02;
+const BRANCH_RATIO = 0.4;
 
 export class ErosionSim {
   size: number;
@@ -95,11 +95,11 @@ export class ErosionSim {
     for (const src of this.sources) {
       const x = Math.max(1, Math.min(size - 2, Math.round(src.x * (size - 1))));
       const y = Math.max(1, Math.min(size - 2, Math.round(src.y * (size - 1))));
-      const add = src.rate * 0.032;
+      const add = src.rate * 0.034;
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
-          const fall = Math.exp(-(dx * dx + dy * dy) * 0.7);
-          water[this.i(x + dx, y + dy)] += add * fall * 0.55;
+          const fall = Math.exp(-(dx * dx + dy * dy) * 0.95);
+          water[this.i(x + dx, y + dy)] += add * fall * 0.62;
         }
       }
     }
@@ -120,7 +120,7 @@ export class ErosionSim {
     sD.fill(0);
     tD.fill(0);
 
-    const transfer = 0.72 * params.flowRate;
+    const transfer = 0.76 * params.flowRate;
     const capK = params.sedimentCapacity;
     const cohesion = this.cohesion;
 
@@ -153,8 +153,8 @@ export class ErosionSim {
           const len = k < 4 ? 1 : DIAG;
           const drop = dh / len;
           const bed = Math.max(0, terrain[i] - terrain[j]);
-          const wander = 0.93 + 0.14 * hash2(x + k * 13, y, 91);
-          const channel = 1 + 15 * bed + 2.6 * Math.min(flow[j], 0.22);
+          const wander = 0.94 + 0.12 * hash2(x + k * 13, y, 91);
+          const channel = 1 + 20 * bed + 4.2 * Math.min(flow[j], 0.3);
           let weight = Math.pow(drop * wander, CONCENTRATE) * channel;
           if (lastDir[i] === k) weight *= 1 + INERTIA;
           else if (lastDir[i] < 8) {
@@ -180,9 +180,15 @@ export class ErosionSim {
         }
 
         const head = Math.max(0, h - minHn);
-        const movable = Math.min(w * transfer, w * 0.9, Math.max(head * 0.95, w * 0.22));
         const ponded = maxDrop < MIN_SURFACE_SLOPE;
         const bedFall = Math.max(0, terrain[i] - minBed);
+        const inThread = bedFall > 0.006 && maxDrop >= MIN_SURFACE_SLOPE;
+        const reserve = inThread ? Math.min(w * 0.16, 0.01) : 0;
+        const movable = Math.min(
+          Math.max(0, w - reserve) * transfer,
+          Math.max(0, w - reserve) * 0.9,
+          Math.max(head * 0.95, w * (inThread ? 0.18 : 0.22)),
+        );
 
         let steep = 0;
         let second = -1;
@@ -210,8 +216,8 @@ export class ErosionSim {
         const localErodeK = params.erosionRate * (1.05 - localC);
 
         const moving = !ponded && movable > 0.0015;
-        const stream = moving ? movable * (0.32 + maxDrop * 2.2) : movable * 0.05;
-        flow[i] = flow[i] * 0.4 + stream * 0.6;
+        const stream = moving ? movable * (0.38 + maxDrop * 2.6) : movable * 0.05;
+        flow[i] = flow[i] * 0.46 + stream * 0.54;
         const flux = flow[i];
 
         const ratio = second >= 0 ? this.nDrop[second] / Math.max(this.nDrop[steep], 1e-6) : 0;
@@ -222,9 +228,9 @@ export class ErosionSim {
           ratio >= BRANCH_RATIO &&
           this.nBed[second] > 1e-5;
         const overflow = carving && w > 0.055;
-        const leakK = canBranch ? 0.16 : overflow ? 0.12 : 0.07;
-        const branchShare = canBranch ? 0.18 + 0.2 * Math.min(1, (ratio - BRANCH_RATIO) / 0.4) : 0;
-        const steepShare = Math.max(0.55, 1 - leakK - branchShare);
+        const leakK = canBranch ? 0.12 : overflow ? 0.1 : flux > 0.018 ? 0.038 : 0.062;
+        const branchShare = canBranch ? 0.24 + 0.28 * Math.min(1, (ratio - BRANCH_RATIO) / 0.36) : 0;
+        const steepShare = Math.max(0.52, 1 - leakK - branchShare);
 
         for (let k = 0; k < drops; k++) {
           const leak = leakK * (this.nW[k] / totalW);
@@ -244,7 +250,7 @@ export class ErosionSim {
           const neighFrac = bedSlope / Math.max(this.nDrop[k], 1e-6);
           if (bedSlope < 1e-5 || neighFrac < MIN_BED_FRAC) continue;
           const capacity =
-            share * capK * (0.12 + bedSlope * BED_SLOPE_GAIN) * (0.9 + flux * 2.2);
+            share * capK * (0.14 + bedSlope * BED_SLOPE_GAIN) * (0.9 + flux * 2.6);
           const pick = Math.min(
             capacity * localErodeK,
             Math.max(0, terrain[i] - MIN_SAND) * MAX_ERODE_FRAC,
@@ -322,13 +328,13 @@ export class ErosionSim {
       const y = (i / size) | 0;
       const moving = this.flow[i];
       const w = this.water[i];
-      const soakScale = w < 0.03 ? 0.18 : 1;
-      const soak = Math.min(w, (inf * 0.38 * soakScale * w) / (1 + moving * 16));
+      const soakScale = w < 0.03 ? 0.16 : 1;
+      const soak = Math.min(w, (inf * 0.36 * soakScale * w) / (1 + moving * 24));
       this.water[i] -= soak;
       this.wetness[i] = Math.min(1, this.wetness[i] + soak * 8 + (w > 0.0015 ? 0.08 : 0));
       this.wetness[i] *= 0.993;
       const still = moving < 0.008;
-      this.water[i] *= 1 - eva * (still ? 0.88 : 0.42);
+      this.water[i] *= 1 - eva * (still ? 0.88 : 0.3);
       if (y >= last && this.water[i] > 0) this.water[i] *= 0.88;
       if (this.water[i] < 1e-5) {
         this.water[i] = 0;

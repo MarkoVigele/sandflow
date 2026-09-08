@@ -19,7 +19,9 @@ void main() {
   vFlow = (flow == flow && flow > 0.0) ? flow : 0.0;
   float sheet = 0.0;
   if (water > 0.0008) {
-    sheet = 0.005 + min(water, 0.08) * 0.12;
+    // Lab film with readable depth: beds sit higher than thin veins.
+    float body = min(water, 0.16);
+    sheet = 0.0045 + body * 0.36 + min(vFlow, 0.22) * 0.012;
   }
   float h = (terrain + sheet) * uHeightScale;
   if (!(h == h)) h = 0.0;

@@ -48,9 +48,10 @@ export class SandMesh {
         uRough: { value: fallbackRough },
         uHeightScale: { value: heightScale },
         uTexel: { value: 1 / maps.image.width },
-        uSunDir: { value: new THREE.Vector3(0.45, 0.82, 0.28).normalize() },
-        uSunColor: { value: new THREE.Color(1.0, 0.91, 0.76) },
-        uAmbient: { value: new THREE.Color(0.24, 0.21, 0.17) },
+        uTraySize: { value: traySize },
+        uSunDir: { value: new THREE.Vector3(0.62, 0.58, 0.38).normalize() },
+        uSunColor: { value: new THREE.Color(1.0, 0.90, 0.72) },
+        uAmbient: { value: new THREE.Color(0.16, 0.15, 0.13) },
         uReceiveShadow: { value: 0 },
         uGrain: { value: 0.55 },
         uUvScale: { value: sandUvScale(0.55) },
@@ -105,6 +106,16 @@ export class SandMesh {
     this.material.uniforms.uNormal.value = this.normal;
     this.material.uniforms.uRough.value = this.rough;
     this.material.uniforms.uUvScale.value = sandUvScale(this.material.uniforms.uGrain.value);
+  }
+
+  setHeightScale(scale: number): void {
+    this.material.uniforms.uHeightScale.value = scale;
+  }
+
+  setSun(dir: THREE.Vector3, color: THREE.Color, ambient: THREE.Color): void {
+    this.material.uniforms.uSunDir.value.copy(dir);
+    this.material.uniforms.uSunColor.value.copy(color);
+    this.material.uniforms.uAmbient.value.copy(ambient);
   }
 
   setGrain(grain: number): void {

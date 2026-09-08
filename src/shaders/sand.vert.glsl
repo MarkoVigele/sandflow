@@ -1,6 +1,7 @@
 uniform sampler2D uMaps;
 uniform float uHeightScale;
 uniform float uTexel;
+uniform float uTraySize;
 
 varying vec2 vUv;
 varying vec3 vWorldPos;
@@ -20,16 +21,19 @@ float safeHeight(vec2 coord) {
   return (h == h) ? h : 0.0;
 }
 
+// World: u+ → +X, v+ → −Z (PlaneGeometry after rotateX). Must match AimCursor.heightfieldNormal.
 void main() {
   vUv = uv;
   float h = safeHeight(uv);
   float texel = max(uTexel, 1.0e-4);
+  float tray = uTraySize > 0.5 ? uTraySize : 8.0;
 
   float hL = safeHeight(uv + vec2(-texel, 0.0));
   float hR = safeHeight(uv + vec2(texel, 0.0));
-  float hD = safeHeight(uv + vec2(0.0, -texel));
-  float hU = safeHeight(uv + vec2(0.0, texel));
-  vNormalW = safeNormalize(vec3(hL - hR, 2.0 * texel * 16.0, hD - hU), vec3(0.0, 1.0, 0.0));
+  float hVp = safeHeight(uv + vec2(0.0, texel));
+  float hVm = safeHeight(uv + vec2(0.0, -texel));
+  float dx = texel * tray;
+  vNormalW = safeNormalize(vec3(hL - hR, 2.0 * dx, hVp - hVm), vec3(0.0, 1.0, 0.0));
 
   vec3 pos = position;
   pos.y = h;

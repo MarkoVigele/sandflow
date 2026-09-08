@@ -1,6 +1,6 @@
 import type { Store } from "../state/store";
 import type { Viewport } from "../scene/Viewport";
-import type { HeatmapMode, SimParams, ToolId } from "../state/types";
+import { HEIGHT_SCALE_MAX, HEIGHT_SCALE_MIN, type HeatmapMode, type SimParams, type ToolId } from "../state/types";
 
 const TOOL_COPY: Record<ToolId, { title: string; body: string }> = {
   pile: { title: "Aufschütten", body: "Kreis = Pinselradius. Ziehen, um Sand anzuhäufen." },
@@ -94,6 +94,7 @@ export class Inspector {
             ${slider("Erosionsrate", 0.05, 1, 0.01, s.params.erosionRate, "erosionRate")}
             ${slider("Sedimentkapazität", 0.08, 1, 0.01, s.params.sedimentCapacity, "sedimentCapacity")}
             ${slider("Ablagerung", 0.05, 0.8, 0.01, s.params.deposition, "deposition")}
+            ${slider("Relief", HEIGHT_SCALE_MIN, HEIGHT_SCALE_MAX, 0.05, s.heightScale, "heightScale")}
             <label class="field">
               <span>Heatmap</span>
               <select data-heat>
@@ -163,6 +164,10 @@ export class Inspector {
     else if (key === "brushRadius") this.store.patch({ brushRadius: value });
     else if (key === "brushStrength") this.store.patch({ brushStrength: value });
     else if (key === "sourceRate") this.viewport.setSelectedRate(value);
+    else if (key === "heightScale") {
+      this.store.patch({ heightScale: value });
+      this.viewport.applyHeightScale(value);
+    }
     else {
       this.store.setParams({ [key]: value } as Partial<SimParams>);
       this.viewport.applyParams();

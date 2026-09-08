@@ -62,6 +62,11 @@ export const QUALITY_GRID: Record<QualityId, number> = {
   ultra: 512,
 };
 
+/** World Y multiplier for heightmap 0–1. Lab camera reads ridges better above 3. */
+export const DEFAULT_HEIGHT_SCALE = 3.2;
+export const HEIGHT_SCALE_MIN = 2.0;
+export const HEIGHT_SCALE_MAX = 4.6;
+
 export const DEFAULT_PARAMS: SimParams = {
   grain: 0.55,
   cohesion: 0.28,

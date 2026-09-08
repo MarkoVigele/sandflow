@@ -10,6 +10,9 @@ uniform float uReceiveShadow;
 uniform float uGrain;
 uniform float uUvScale;
 uniform float uHeatMode;
+uniform float uHeightScale;
+uniform float uTexel;
+uniform float uTraySize;
 
 varying vec2 vUv;
 varying vec3 vWorldPos;
@@ -22,6 +25,40 @@ vec3 safeNormalize(vec3 v, vec3 fallback) {
   vec3 n = v * inversesqrt(len2);
   if (!(n.x == n.x && n.y == n.y && n.z == n.z)) return fallback;
   return n;
+}
+
+float heightAt(vec2 uv) {
+  float h = texture2D(uMaps, uv).r * uHeightScale;
+  return (h == h) ? h : 0.0;
+}
+
+float heightfieldAO(vec2 uv, float h0, float texel) {
+  float acc = 0.0;
+  acc += max(heightAt(uv + vec2(-texel, 0.0)) - h0, 0.0);
+  acc += max(heightAt(uv + vec2(texel, 0.0)) - h0, 0.0);
+  acc += max(heightAt(uv + vec2(0.0, -texel)) - h0, 0.0);
+  acc += max(heightAt(uv + vec2(0.0, texel)) - h0, 0.0);
+  acc += max(heightAt(uv + vec2(-texel, -texel)) - h0, 0.0) * 0.65;
+  acc += max(heightAt(uv + vec2(texel, texel)) - h0, 0.0) * 0.65;
+  return clamp(1.0 - acc * 1.45, 0.52, 1.0);
+}
+
+float heightfieldContact(vec2 uv, float h0, vec3 L, float texel, float tray) {
+  vec2 dirUv = vec2(L.x, -L.z);
+  float len = length(dirUv);
+  if (len < 1.0e-4) return 1.0;
+  dirUv *= 1.0 / len;
+  float stepUv = texel * 1.65;
+  float stepWorld = stepUv * tray;
+  float shadow = 1.0;
+  float y = h0;
+  for (int i = 1; i <= 6; i++) {
+    y += L.y * stepWorld;
+    float hs = heightAt(uv + dirUv * stepUv * float(i));
+    float occ = (hs - y) / max(stepWorld * 2.4, 1.0e-3);
+    shadow *= 1.0 - clamp(occ, 0.0, 1.0) * 0.32;
+  }
+  return clamp(shadow, 0.38, 1.0);
 }
 
 void main() {
@@ -54,7 +91,7 @@ void main() {
   vec3 wetCol = mix(moistened, wetAlb, 0.52);
   vec3 albedo = mix(dryAlb, wetCol, wetMask);
 
-  vec3 N = safeNormalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.09, vec3(0.0, 1.0, 0.0));
+  vec3 N = safeNormalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.07, vec3(0.0, 1.0, 0.0));
 
   albedo = mix(albedo, albedo * vec3(0.92, 0.90, 0.84), smoothstep(0.003, 0.04, water) * 0.1);
 
@@ -66,14 +103,23 @@ void main() {
   vec3 V = safeNormalize(vViewDir, vec3(0.0, 1.0, 0.0));
   vec3 L = safeNormalize(uSunDir, vec3(0.4, 0.8, 0.3));
   vec3 H = safeNormalize(V + L, vec3(0.0, 1.0, 0.0));
-  float wrap = clamp((dot(N, L) + 0.22) / 1.22, 0.0, 1.0);
+  float ndl = max(dot(N, L), 0.0);
+  float wrap = mix(ndl, clamp((dot(N, L) + 0.12) / 1.12, 0.0, 1.0), 0.4);
 
-  float shadow = mix(1.0, 0.78 + wrap * 0.22, step(0.5, uReceiveShadow));
+  float texel = max(uTexel, 1.0e-4);
+  float tray = uTraySize > 0.5 ? uTraySize : 8.0;
+  float h0 = heightAt(vUv);
+  float ao = heightfieldAO(vUv, h0, texel);
+  float contact = heightfieldContact(vUv, h0, L, texel, tray);
+  float slopeShade = mix(0.72, 1.0, clamp(N.y, 0.0, 1.0));
+  float gpuShadow = mix(1.0, 0.82 + wrap * 0.18, step(0.5, uReceiveShadow));
+  float shade = ao * contact * slopeShade * gpuShadow;
+
   float specPow = mix(6.0, 22.0, 1.0 - roughness);
   float spec = pow(max(dot(N, H), 0.0), specPow) * mix(0.012, 0.09, wet);
   spec = min(spec, 0.09);
 
-  vec3 color = albedo * (uAmbient + uSunColor * wrap * shadow) + uSunColor * spec * shadow;
+  vec3 color = albedo * (uAmbient * ao + uSunColor * wrap * shade) + uSunColor * spec * shade;
   float underWater = smoothstep(0.003, 0.04, water);
   color = mix(color, color * vec3(0.88, 0.86, 0.80), underWater * 0.2);
 
