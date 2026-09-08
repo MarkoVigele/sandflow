@@ -149,7 +149,6 @@ export class Viewport {
       stencil: false,
       depth: true,
       failIfMajorPerformanceCaveat: false,
-      preserveDrawingBuffer: true,
     });
     this.renderer.setPixelRatio(
       pixelRatioFor(store.state.quality, window.devicePixelRatio || 1, isMobile(), this.iosWebKit),
