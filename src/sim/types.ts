@@ -64,6 +64,8 @@ export type WorkerOut =
       erodedSand: number;
       /** Companion hardmask; sent only when dirty so RGBA frames stay cheap. */
       hard?: Float32Array;
+      /** Unsolicited pour preview — must not settle the in-flight step counter. */
+      preview?: boolean;
     }
   | {
       type: "snapshot";

@@ -1,5 +1,5 @@
 import { MAX_PARTICLES } from "../sim/flowFx";
-import { MAX_STEP_BACKLOG, MAX_STEP_BATCH, planFlushBacklog, planSimStep } from "../sim/SimClient";
+import { MAX_STEP_BACKLOG, MAX_STEP_BATCH, frameSettlesPending, planFlushBacklog, planSimStep } from "../sim/SimClient";
 import {
   AUTO_FPS_FLOOR,
   AUTO_FPS_HOLD_MS,
@@ -140,6 +140,8 @@ const playFlush = planFlushBacklog(true, 0, 1);
 assert(playFlush.send === 1 && playFlush.backlog === 0, "play flushes one backlog tick");
 const playBusy = planFlushBacklog(true, 1, 1);
 assert(playBusy.send === 0 && playBusy.backlog === 1, "play keeps backlog while busy");
+assert(frameSettlesPending(undefined) && frameSettlesPending(false), "step frames settle pending");
+assert(!frameSettlesPending(true), "pour preview must not settle pending");
 
 console.log("qualitySmoke ok", {
   grids: { low: low.grid, med: med.grid, high: high.grid, ultra: ultra.grid },

@@ -43,7 +43,7 @@ function snapshot(): void {
   );
 }
 
-function emitFrame(): void {
+function emitFrame(preview = false): void {
   if (!sim) return;
   const packed = sim.pack();
   const particles = sim.collectParticles();
@@ -60,6 +60,7 @@ function emitFrame(): void {
       waterVolume: sim.waterVolume(),
       erodedSand: sim.erodedSand,
       hard,
+      preview: preview || undefined,
     },
     transfer,
   );
@@ -112,7 +113,7 @@ self.onmessage = (ev: MessageEvent<WorkerIn>) => {
       const now = Date.now();
       if (now - lastPourEmit > 50) {
         lastPourEmit = now;
-        emitFrame();
+        emitFrame(true);
       }
       break;
     }

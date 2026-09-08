@@ -47,6 +47,11 @@ export function planSimStep(
   return { send, backlog: 0, skipped: n - send };
 }
 
+/** Pour previews must not settle `pendingFrames` or flush a paused backlog. */
+export function frameSettlesPending(preview?: boolean): boolean {
+  return !preview;
+}
+
 /**
  * Pause must drop the coalesced tick. Flushing it after Play/Zeitraffer
  * would keep the worker stepping while the UI thinks it is stopped.
@@ -78,8 +83,10 @@ export class SimClient {
     this.worker.onmessage = (ev: MessageEvent<WorkerOut>) => {
       const msg = ev.data;
       if (msg.type === "frame") {
-        this.pendingFrames = Math.max(0, this.pendingFrames - 1);
-        this.busy = this.pendingFrames > 0;
+        if (frameSettlesPending(msg.preview)) {
+          this.pendingFrames = Math.max(0, this.pendingFrames - 1);
+          this.busy = this.pendingFrames > 0;
+        }
         const frame: SimFrame = {
           size: msg.size,
           packed: msg.packed,
@@ -89,7 +96,7 @@ export class SimClient {
           hard: msg.hard,
         };
         for (const h of this.frameHandlers) h(frame);
-        this.flushBacklog();
+        if (frameSettlesPending(msg.preview)) this.flushBacklog();
       } else if (msg.type === "snapshot") {
         const snap: SimSnapshot = {
           size: msg.size,
