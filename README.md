@@ -53,7 +53,7 @@ Zusätzliche Werkzeuge: **Feststampfen** (Kohäsion lokal), **Rinne** vorzeichne
 
 ## Speichern und teilen
 
-JSON (Speichern) nimmt Höhe, Wasser, Quellen und Materialparameter in voller Genauigkeit mit. **Teilen** schreibt einen kompakten Zustand in den URL-Hash (`#sf2.…`) oder als Share-JSON — ohne Cloud. Der Link trägt Vorlage, Quellen, Tempo, Kamera, Kiesel und ein grobes Höhenfeld (64²). Fehlt Platz, bleibt die Vorlage ohne Gelände. PNG ist ein Blick aus der aktuellen Kamera. Die Sandtextur kommt aus einer kurzen Beschreibung (lokal erzeugt).
+JSON (Speichern) nimmt Höhe, Wasser, Quellen und Materialparameter in voller Genauigkeit mit. **Teilen** schreibt einen kompakten Zustand in den URL-Hash (`#sf2.…`) oder als Share-JSON — ohne Cloud. Der Link trägt Vorlage, Quellen, Tempo, Kamera, Kiesel und ein grobes Höhenfeld (64²). Fehlt Platz, bleibt die Vorlage ohne Gelände. PNG ist ein Blick aus der aktuellen Kamera. Trocken- und Nass-Sand unter `public/textures/` mischen sich nach Feuchte; der Wannenrand trägt Holz. Fehlt eine Datei, bleibt die lokale Prozedur.
 
 ## Was V1 nicht ist
 

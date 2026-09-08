@@ -16,6 +16,7 @@ export class SandMesh {
   mesh: THREE.Mesh;
   material: THREE.ShaderMaterial;
   private albedo?: THREE.CanvasTexture;
+  private albedoWet?: THREE.CanvasTexture;
   private normal?: THREE.CanvasTexture;
   private rough?: THREE.CanvasTexture;
 
@@ -40,6 +41,7 @@ export class SandMesh {
       uniforms: {
         uMaps: { value: maps },
         uAlbedo: { value: fallbackAlbedo },
+        uAlbedoWet: { value: fallbackAlbedo },
         uNormal: { value: fallbackNormal },
         uRough: { value: fallbackRough },
         uHeightScale: { value: heightScale },
@@ -79,14 +81,17 @@ export class SandMesh {
 
   applyMaps(maps: GeneratedMaps): void {
     this.albedo?.dispose();
+    this.albedoWet?.dispose();
     this.normal?.dispose();
     this.rough?.dispose();
     this.albedo = canvasTexture(maps.albedo);
+    this.albedoWet = canvasTexture(maps.albedoWet ?? maps.albedo);
     this.normal = canvasTexture(maps.normal);
     this.normal.colorSpace = THREE.LinearSRGBColorSpace;
     this.rough = canvasTexture(maps.roughness);
     this.rough.colorSpace = THREE.LinearSRGBColorSpace;
     this.material.uniforms.uAlbedo.value = this.albedo;
+    this.material.uniforms.uAlbedoWet.value = this.albedoWet;
     this.material.uniforms.uNormal.value = this.normal;
     this.material.uniforms.uRough.value = this.rough;
   }
@@ -103,6 +108,7 @@ export class SandMesh {
     this.mesh.geometry.dispose();
     this.material.dispose();
     this.albedo?.dispose();
+    this.albedoWet?.dispose();
     this.normal?.dispose();
     this.rough?.dispose();
   }
