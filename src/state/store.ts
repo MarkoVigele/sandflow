@@ -10,7 +10,7 @@ import {
   type ToolId,
 } from "./types";
 
-export const ONBOARD_KEY = "sandflow.onboarded.v1";
+export const ONBOARD_KEY = "sandflow.onboarded.v2";
 
 export function readOnboardStep(): OnboardStep {
   if (typeof localStorage === "undefined") return 0;
@@ -61,7 +61,7 @@ export interface UiState {
 export const initialUiState = (): UiState => {
   const onboardStep = readOnboardStep();
   return {
-    tool: onboardStep === 1 ? "pile" : "pour",
+    tool: "pour",
     playing: onboardStep === 0,
     speed: 1,
     trailFade: true,

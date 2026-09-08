@@ -29,8 +29,7 @@ import {
 import { persistOnboardDone, Store } from "../state/store";
 import { QUALITY_GRID, SPEEDS } from "../state/types";
 import { qualityProfile } from "../state/quality";
-import { SOURCE_TOOL_TIP } from "./sourceGesture";
-import { LETTER_HOTKEYS, TOOL_HOTKEYS } from "./tools";
+import { interpretHotkey, nudgeBrushRadius } from "./hotkeys";
 import { Inspector } from "./Inspector";
 import { Onboarding } from "./Onboarding";
 import { PresetGallery } from "./PresetGallery";
@@ -370,7 +369,7 @@ export class App {
               <button class="icon-btn" data-x>${ICONS.close}</button>
             </header>
             <p>Wasser sucht sich Wege durch Sand: erst dünne Adern, dann ein Bett, später ein verzweigtes Netz. V1.x ist der spielbare Kern — Zielring, Werkzeuge, Teilen, Kiesel, Beton, gebackene Texturen. WebGPU und eine volle Requisitenbibliothek bleiben später.</p>
-            <p>Kurzanleitung: <strong>Sand formen</strong> → <strong>Quelle setzen</strong> (<em>${SOURCE_TOOL_TIP}</em>) → <strong>Abspielen</strong>. Pins sitzen auf dem Sand; Ziehen verschiebt sie auch im Kameramodus.</p>
+            <p>Kurzanleitung: <strong>Kamera drehen</strong> → <strong>Gießen / Quelle ziehen</strong> → <strong>Graben und Beton</strong>. Pins sitzen auf dem Sand; Ziehen verschiebt sie auch im Kameramodus.</p>
             <p>Rechtsklick oder zwei Finger drehen die Kamera. Ein Finger (oder die linke Taste) bedient das Werkzeug. Unter <em>Kamera</em> geht das Drehen auch mit einem Finger.</p>
             <p>Oben neben Play: <em>Bild</em> (PNG der aktuellen Kamera), <em>Tempo</em>, <em>Zeitraffer</em> (8× Ticks) und optionale <em>Spur</em> (sanfte Höhenspur). Qualität inkl. Auto, Szene oder nur Wasser zurücksetzen, Teilen per Link oder JSON. <em>Beton</em> setzt Hartstoff (Platte oder Wand). Kiesel sind kleine Steine mit einer Hartinsel darunter — der Radierer nimmt Kiesel und Beton weg. Der Wannenrahmen ist Holz.</p>
             <p>Unter <em>Erweitert</em> liegen Farbkarte (Strömung oder Nässe) und <em>Relief</em>, das die Höhen in der Wanne überhöht. Texturen entstehen lokal aus einer kurzen Beschreibung.</p>
@@ -390,31 +389,30 @@ export class App {
 
   private bindKeys(): void {
     window.addEventListener("keydown", (e) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      const k = e.key.toLowerCase();
-      if (k === " ") {
+      const action = interpretHotkey(e);
+      if (!action) return;
+      if (action.type === "play" || action.type === "undo" || action.type === "redo" || action.type === "brush") {
         e.preventDefault();
+      }
+      if (action.type === "play") {
         const next = applyPlay(!this.store.state.playing, this.store.state.onboardStep);
         if (next.persistOnboard) persistOnboardDone();
         this.store.patch({ playing: next.playing, onboardStep: next.onboardStep });
+        return;
       }
-      if ((e.metaKey || e.ctrlKey) && k === "z") {
-        e.preventDefault();
-        if (e.shiftKey) void this.redo();
-        else void this.undo();
+      if (action.type === "undo") {
+        void this.undo();
+        return;
       }
-      if ((e.metaKey || e.ctrlKey) && k === "y") {
-        e.preventDefault();
+      if (action.type === "redo") {
         void this.redo();
+        return;
       }
-      const n = Number(e.key);
-      if (n >= 1 && n <= TOOL_HOTKEYS.length) {
-        this.store.patch({ tool: TOOL_HOTKEYS[n - 1], cameraMode: false, menuOpen: null });
+      if (action.type === "brush") {
+        this.store.patch({ brushRadius: nudgeBrushRadius(this.store.state.brushRadius, action.delta) });
+        return;
       }
-      const letter = LETTER_HOTKEYS[k];
-      if (letter) {
-        this.store.patch({ tool: letter, cameraMode: false, menuOpen: null });
-      }
+      this.store.patch({ tool: action.tool, cameraMode: false, menuOpen: null });
     });
   }
 

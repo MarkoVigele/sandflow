@@ -52,66 +52,66 @@ export class TopBar {
         </div>
       </div>
       <div class="top-actions">
-        <button class="chip" data-presets>Vorlagen</button>
+        <button type="button" class="chip" data-presets aria-label="Vorlagen">Vorlagen</button>
         <div class="q-slot"></div>
         <div class="transport">
-          <button class="icon-btn ${s.onboardStep === 3 ? "is-hint" : ""}" data-play title="${s.playing ? "Pause" : "Abspielen"}">${s.playing ? ICONS.pause : ICONS.play}</button>
-          <button class="icon-btn" data-shot title="Bild als PNG speichern">${ICONS.shot}</button>
+          <button type="button" class="icon-btn" data-play title="${s.playing ? "Pause" : "Abspielen"}" aria-label="${s.playing ? "Pause" : "Abspielen"}" aria-keyshortcuts="Space">${s.playing ? ICONS.pause : ICONS.play}</button>
+          <button type="button" class="icon-btn" data-shot title="Bild als PNG speichern" aria-label="Bild als PNG speichern">${ICONS.shot}</button>
           <label class="speed">
             <span>Tempo ${speedLabel(s.speed)}</span>
             <input type="range" min="0" max="${SPEEDS.length - 1}" step="1" value="${idx}" data-speed aria-label="Simulationstempo" />
           </label>
-          <button class="chip ${lapse ? "is-on" : ""}" data-lapse title="Zeitraffer 8×">${lapseOn ? "Zeitraffer an" : "Zeitraffer"}</button>
-          <button class="chip ${s.trailFade ? "is-on" : ""}" data-trail title="Sanfte Höhenspur im Zeitraffer">Spur</button>
+          <button type="button" class="chip ${lapse ? "is-on" : ""}" data-lapse title="Zeitraffer 8×" aria-label="Zeitraffer" aria-pressed="${lapse}">${lapseOn ? "Zeitraffer an" : "Zeitraffer"}</button>
+          <button type="button" class="chip ${s.trailFade ? "is-on" : ""}" data-trail title="Sanfte Höhenspur im Zeitraffer" aria-label="Höhenspur" aria-pressed="${s.trailFade}">Spur</button>
         </div>
         <div class="top-desktop">
-          <button class="icon-btn" data-step title="Einzelschritt">${ICONS.step}</button>
-          <button class="icon-btn" data-undo title="Rückgängig (Strg+Z)" ${s.canUndo ? "" : "disabled"} aria-disabled="${!s.canUndo}">${ICONS.undo}</button>
-          <button class="icon-btn" data-redo title="Wiederholen (Strg+Y)" ${s.canRedo ? "" : "disabled"} aria-disabled="${!s.canRedo}">${ICONS.redo}</button>
+          <button type="button" class="icon-btn" data-step title="Einzelschritt" aria-label="Einzelschritt">${ICONS.step}</button>
+          <button type="button" class="icon-btn" data-undo title="Rückgängig (Strg+Z)" aria-label="Rückgängig" aria-keyshortcuts="Control+Z" ${s.canUndo ? "" : "disabled"} aria-disabled="${!s.canUndo}">${ICONS.undo}</button>
+          <button type="button" class="icon-btn" data-redo title="Wiederholen (Strg+Y)" aria-label="Wiederholen" aria-keyshortcuts="Control+Y" ${s.canRedo ? "" : "disabled"} aria-disabled="${!s.canRedo}">${ICONS.redo}</button>
           <div class="menu-wrap">
-            <button class="icon-btn ${s.menuOpen === "reset" ? "is-open" : ""}" data-reset-menu title="Zurücksetzen">${ICONS.reset}</button>
+            <button type="button" class="icon-btn ${s.menuOpen === "reset" ? "is-open" : ""}" data-reset-menu title="Zurücksetzen" aria-label="Zurücksetzen" aria-haspopup="menu" aria-expanded="${s.menuOpen === "reset"}">${ICONS.reset}</button>
             ${
               s.menuOpen === "reset"
                 ? `<div class="menu" role="menu">
-                    <button data-reset-all>Szene zurücksetzen</button>
-                    <button data-reset-water>Nur Wasser</button>
+                    <button type="button" data-reset-all>Szene zurücksetzen</button>
+                    <button type="button" data-reset-water>Nur Wasser</button>
                   </div>`
                 : ""
             }
           </div>
           <div class="menu-wrap">
-            <button class="icon-btn ${s.menuOpen === "share" ? "is-open" : ""}" data-share-menu title="Teilen">${ICONS.share}</button>
+            <button type="button" class="icon-btn ${s.menuOpen === "share" ? "is-open" : ""}" data-share-menu title="Teilen" aria-label="Teilen" aria-haspopup="menu" aria-expanded="${s.menuOpen === "share"}">${ICONS.share}</button>
             ${
               s.menuOpen === "share"
                 ? `<div class="menu" role="menu">
-                    <button data-share-link>Link kopieren</button>
-                    <button data-share-json>Share-JSON herunterladen</button>
+                    <button type="button" data-share-link>Link kopieren</button>
+                    <button type="button" data-share-json>Share-JSON herunterladen</button>
                   </div>`
                 : ""
             }
           </div>
-          <button class="icon-btn" data-save title="Szene speichern">${ICONS.save}</button>
-          <button class="icon-btn" data-load title="Szene laden">${ICONS.load}</button>
-          <button class="chip ghost" data-about>Über</button>
+          <button type="button" class="icon-btn" data-save title="Szene speichern" aria-label="Szene speichern">${ICONS.save}</button>
+          <button type="button" class="icon-btn" data-load title="Szene laden" aria-label="Szene laden">${ICONS.load}</button>
+          <button type="button" class="chip ghost" data-about aria-label="Über Sandflow">Über</button>
         </div>
         <div class="menu-wrap top-more">
-          <button class="icon-btn ${s.menuOpen === "more" ? "is-open" : ""}" data-more-menu title="Mehr">${ICONS.more}</button>
+          <button type="button" class="icon-btn ${s.menuOpen === "more" ? "is-open" : ""}" data-more-menu title="Mehr" aria-label="Mehr" aria-haspopup="menu" aria-expanded="${s.menuOpen === "more"}">${ICONS.more}</button>
           ${
             s.menuOpen === "more"
               ? `<div class="menu menu-more" role="menu">
-                  <button data-step>Einzelschritt</button>
-                  <button data-lapse>${lapseOn ? "Zeitraffer aus" : "Zeitraffer 8×"}</button>
-                  <button data-trail>${s.trailFade ? "Höhenspur aus" : "Höhenspur an"}</button>
-                  <button data-undo ${s.canUndo ? "" : "disabled"}>Rückgängig (Strg+Z)</button>
-                  <button data-redo ${s.canRedo ? "" : "disabled"}>Wiederholen (Strg+Y)</button>
-                  <button data-reset-all>Szene zurücksetzen</button>
-                  <button data-reset-water>Nur Wasser</button>
-                  <button data-share-link>Link kopieren</button>
-                  <button data-share-json>Share-JSON</button>
-                  <button data-save>Szene speichern</button>
-                  <button data-load>Szene laden</button>
-                  <button data-shot>Bild speichern</button>
-                  <button data-about>Über</button>
+                  <button type="button" data-step>Einzelschritt</button>
+                  <button type="button" data-lapse>${lapseOn ? "Zeitraffer aus" : "Zeitraffer 8×"}</button>
+                  <button type="button" data-trail>${s.trailFade ? "Höhenspur aus" : "Höhenspur an"}</button>
+                  <button type="button" data-undo ${s.canUndo ? "" : "disabled"}>Rückgängig (Strg+Z)</button>
+                  <button type="button" data-redo ${s.canRedo ? "" : "disabled"}>Wiederholen (Strg+Y)</button>
+                  <button type="button" data-reset-all>Szene zurücksetzen</button>
+                  <button type="button" data-reset-water>Nur Wasser</button>
+                  <button type="button" data-share-link>Link kopieren</button>
+                  <button type="button" data-share-json>Share-JSON</button>
+                  <button type="button" data-save>Szene speichern</button>
+                  <button type="button" data-load>Szene laden</button>
+                  <button type="button" data-shot>Bild speichern</button>
+                  <button type="button" data-about>Über</button>
                 </div>`
               : ""
           }

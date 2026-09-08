@@ -26,10 +26,11 @@ Der Build landet in `docs/` (relativer Basispfad, bereit für GitHub Pages). Ein
 | Kamera drehen / zoomen | Rechte Taste, Rad, Mitteltaste | Zwei Finger. Oder Werkzeug **Kamera** für einen Finger |
 | Abspielen / Pause | Leertaste oder Transportleiste | Transportleiste |
 | Werkzeuge 1–9 | Tasten `1`–`9` | Symbolleiste |
+| Pinselgröße | `[` kleiner, `]` größer | Inspector |
 | Kiesel / Radierer / Beton | `K` / `R` / `B` | Symbolleiste |
 | Rückgängig / Wiederholen | `Strg+Z` / `Strg+Y` | Symbole oben |
 
-Oben neben Play/Pause: **Bild** (PNG der aktuellen Kamera), Tempo (0,25×–8×), **Zeitraffer** (8 Ticks pro Bild) und optionale **Spur** (sanfte Höhenspur der Bettänderung). Vorlagen, Qualität (inkl. **Auto**), Zurücksetzen, Teilen, Speichern, Laden. Am Telefon bleiben Transport und Bild sichtbar; der Rest wandert in **Mehr**. Rechts (am Telefon unten): Kontext zum aktiven Werkzeug, inklusive Heatmap und einem optionalen **Querschnitt**. Beim ersten Start führt eine Kurzanleitung in drei Schritten: Sand formen → Quelle → Abspielen. Quelle: **tippen = wählen, ziehen = verschieben**.
+Oben neben Play/Pause: **Bild** (PNG der aktuellen Kamera), Tempo (0,25×–8×), **Zeitraffer** (8 Ticks pro Bild) und optionale **Spur** (sanfte Höhenspur der Bettänderung). Vorlagen, Qualität (inkl. **Auto**), Zurücksetzen, Teilen, Speichern, Laden. Am Telefon bleiben Transport und Bild sichtbar; der Rest wandert in **Mehr**. Rechts (am Telefon unten): Kontext zum aktiven Werkzeug, inklusive Heatmap und einem optionalen **Querschnitt**. Beim ersten Start führt eine Kurzanleitung in drei Schritten: Kamera drehen → Gießen / Quelle ziehen → Graben und Beton. Quelle: **tippen = wählen, ziehen = verschieben**.
 
 ## Vorlagen
 

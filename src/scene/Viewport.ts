@@ -6,7 +6,8 @@ import type { BrushKind } from "../sim/types";
 import { packMapsRgba, resampleMask, stoneIslandUvRadius, unpackRgba } from "../sim/mapsContract";
 import { getPreset, resampleHeight, type CameraPose } from "../sim/presets";
 import { History } from "../state/history";
-import type { Store } from "../state/store";
+import { persistOnboardDone, type Store } from "../state/store";
+import { onboardAfterAction, type OnboardAction } from "../ui/onboard";
 import { effectiveHeight01 } from "./heightDisplace";
 import {
   autoQualityToast,
@@ -29,7 +30,7 @@ import {
 } from "../state/types";
 import { CrossSectionView } from "../ui/crossSection";
 import { allowOneFingerOrbit, claimSourceGesture, pinGrabBeatsOrbit } from "../ui/sourceGesture";
-import { isShapeTool, strokeWaypoints, toolBrushKind } from "../ui/tools";
+import { strokeWaypoints, toolBrushKind } from "../ui/tools";
 import { isLapse, stepsThisFrame } from "../ui/transport";
 import {
   AimCursor,
@@ -132,6 +133,7 @@ export class Viewport {
   private workHeight = new Float32Array(0);
   private trailSize = 0;
   private iosWebKit = isIosWebKit();
+  private orbitFrom = new THREE.Vector3();
 
   constructor(host: HTMLElement, store: Store, onUi: () => void) {
     this.host = host;
@@ -264,6 +266,12 @@ export class Viewport {
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
     canvas.addEventListener("webglcontextlost", this.onContextLost, false);
     canvas.addEventListener("webglcontextrestored", this.onContextRestored, false);
+    this.controls.addEventListener("start", () => {
+      this.orbitFrom.copy(this.camera.position);
+    });
+    this.controls.addEventListener("end", () => {
+      if (this.camera.position.distanceTo(this.orbitFrom) > 0.12) this.noteOnboard("orbit");
+    });
     window.addEventListener("resize", this.resize);
     document.addEventListener("visibilitychange", this.onVisibility);
     window.addEventListener("pagehide", this.onPageHide);
@@ -567,8 +575,8 @@ export class Viewport {
     };
     this.sources.push(src);
     this.sim.addSource(src);
-    const onboard = this.store.state.onboardStep === 2 ? { onboardStep: 3 as const } : {};
-    this.store.patch({ selectedSourceId: src.id, ...onboard });
+    this.store.patch({ selectedSourceId: src.id });
+    this.noteOnboard("source");
     this.rebuildMarkers();
     this.onUi();
   }
@@ -790,6 +798,7 @@ export class Viewport {
     const { brushRadius, brushStrength, pourRate } = this.store.state;
     if (tool === "pour") {
       this.sim.pour(u, v, 0.045 * pourRate);
+      this.noteOnboard("pour");
       return;
     }
     if (tool === "source") return;
@@ -804,9 +813,15 @@ export class Viewport {
     if (kind) {
       this.strokeBrush(kind, u, v, brushRadius, brushStrength);
     }
-    if (this.store.state.onboardStep === 1 && isShapeTool(tool)) {
-      this.store.patch({ onboardStep: 2, tool: "source" });
-    }
+    if (tool === "dig") this.noteOnboard("dig");
+    if (tool === "concrete") this.noteOnboard("concrete");
+  }
+
+  private noteOnboard(action: OnboardAction): void {
+    const next = onboardAfterAction(this.store.state.onboardStep, action);
+    if (!next) return;
+    if (next.onboardStep === 0) persistOnboardDone();
+    this.store.patch(next);
   }
 
   private strokeBrush(kind: BrushKind, u: number, v: number, radius: number, strength: number): void {
@@ -927,6 +942,7 @@ export class Viewport {
         const m = this.markers.get(s.id);
         if (m) this.placeMarker(m, s);
         this.syncMarkerStyles();
+        this.noteOnboard("source");
       }
       return;
     }
