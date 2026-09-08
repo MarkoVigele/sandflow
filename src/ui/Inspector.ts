@@ -1,6 +1,14 @@
 import type { Store } from "../state/store";
 import type { Viewport } from "../scene/Viewport";
-import { RELIEF_MAX, RELIEF_MIN, type HeatmapMode, type SimParams, type ToolId } from "../state/types";
+import {
+  RELIEF_MAX,
+  RELIEF_MIN,
+  WAVES_MAX,
+  WAVES_MIN,
+  type HeatmapMode,
+  type SimParams,
+  type ToolId,
+} from "../state/types";
 
 const TOOL_COPY: Record<ToolId, { title: string; body: string }> = {
   pile: { title: "Aufschütten", body: "Kreis = Pinselradius. Ziehen, um Sand anzuhäufen." },
@@ -96,6 +104,7 @@ export class Inspector {
             ${slider("Sedimentkapazität", 0.08, 1, 0.01, s.params.sedimentCapacity, "sedimentCapacity")}
             ${slider("Ablagerung", 0.05, 0.8, 0.01, s.params.deposition, "deposition")}
             ${slider("Relief", RELIEF_MIN, RELIEF_MAX, 0.05, s.relief, "relief")}
+            ${slider("Wellen", WAVES_MIN, WAVES_MAX, 0.05, s.waves, "waves")}
             <label class="field">
               <span>Heatmap</span>
               <select data-heat>
@@ -168,6 +177,9 @@ export class Inspector {
     else if (key === "relief") {
       this.store.patch({ relief: value });
       this.viewport.applyRelief(value);
+    } else if (key === "waves") {
+      this.store.patch({ waves: value });
+      this.viewport.applyWaves(value);
     }
     else {
       this.store.setParams({ [key]: value } as Partial<SimParams>);

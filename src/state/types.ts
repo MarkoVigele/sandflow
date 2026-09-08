@@ -70,6 +70,9 @@ export const HEIGHT_WORLD = 2.5;
 export const DEFAULT_RELIEF = 1.5;
 export const RELIEF_MIN = 0.8;
 export const RELIEF_MAX = 2.4;
+export const DEFAULT_WAVES = 1;
+export const WAVES_MIN = 0;
+export const WAVES_MAX = 1.4;
 
 export const DEFAULT_PARAMS: SimParams = {
   grain: 0.55,

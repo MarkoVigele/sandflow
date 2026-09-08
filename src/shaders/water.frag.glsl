@@ -59,8 +59,8 @@ void main() {
   float depth = clamp(vDepth * 11.0, 0.0, 1.0);
   float flow = clamp(vFlow, 0.0, 1.0);
   if (!(flow == flow)) flow = 0.0;
-  float turbid = clamp(flow * 2.6 + depth * 0.2, 0.0, 0.88);
-  float foam = smoothstep(0.028, 0.14, flow) * mix(0.92, 0.38, depth);
+  float turbid = clamp(flow * 1.1, 0.0, 0.45);
+  float foam = 0.0;
 
   vec3 V = safeNormalize(vViewDir, vec3(0.0, 1.0, 0.0));
   float texel = max(uTexel, 0.0015);
@@ -127,17 +127,18 @@ void main() {
   // Beer's law: longer optical path in deep / glancing water, red absorbed first.
   float optical = vDepth / max(ndv, 0.12);
   if (uQuality > 0.5) optical = mix(optical, vDepth / max(ssFacing, 0.12), 0.35);
-  vec3 sigma = vec3(3.4, 0.95, 0.62) * beer;
+  // Weak beer: bed stays readable. Tint is sand, not teal soup.
+  vec3 sigma = vec3(1.8, 1.15, 1.05) * beer;
   vec3 trans = exp(-sigma * optical);
-  if (!(trans.x == trans.x)) trans = vec3(0.45, 0.62, 0.66);
+  if (!(trans.x == trans.x)) trans = vec3(0.72, 0.78, 0.80);
 
-  vec3 shallow = vec3(0.58, 0.67, 0.63);
-  vec3 scatter = vec3(0.20, 0.38, 0.40);
-  vec3 silt = vec3(0.56, 0.50, 0.38);
-  vec3 foamC = vec3(0.90, 0.92, 0.88);
-  vec3 wetSand = vec3(0.40, 0.32, 0.22);
+  vec3 shallow = vec3(0.64, 0.58, 0.46);
+  vec3 scatter = vec3(0.46, 0.42, 0.34);
+  vec3 silt = vec3(0.52, 0.46, 0.34);
+  vec3 foamC = vec3(0.93, 0.94, 0.92);
+  vec3 wetSand = vec3(0.34, 0.26, 0.18);
   vec3 body = mix(scatter, shallow, trans);
-  vec3 base = mix(body, silt, turbid * mix(0.28, 0.18, depth));
+  vec3 base = mix(body, silt, turbid * 0.12);
 
   float edge =
     abs(sL.g - vDepth) + abs(sR.g - vDepth) + abs(sVm.g - vDepth) + abs(sVp.g - vDepth);
@@ -159,40 +160,41 @@ void main() {
   float thin = 1.0 - smoothstep(0.01, 0.058, vDepth);
   float flat = smoothstep(0.62, 0.88, geoUp);
   float contact = smoothstep(0.55, 2.6, dryN) * thin * flat;
-  float contactFoam = contact * (0.42 + flow * 0.58) * (0.35 + foamDet * 0.65);
+  // Foam only at turbulence: steps, obstacles, fast overflow — not a calm shoreline glow.
+  float bedJump = abs(sL.r - sR.r) + abs(sVm.r - sVp.r);
+  float drop = smoothstep(0.014, 0.055, edge) * smoothstep(0.028, 0.11, flow);
+  float obstacle = smoothstep(0.016, 0.055, bedJump) * smoothstep(0.03, 0.12, flow);
+  float turb = max(drop, obstacle);
+  foam = turb * mix(0.5, 1.0, foamDet);
+  foam += smoothstep(0.09, 0.2, flow) * 0.22;
   if (foamDet > 0.35) {
     float lace = sin(dot(vUv, vec2(46.0, 39.0)) + uTime * 3.05 + flow * 8.0);
     if (uQuality > 2.5) {
       lace = mix(lace, sin(dot(vUv, vec2(78.0, -51.0)) - uTime * 4.2), 0.45);
     }
-    contactFoam *= mix(0.72, 1.18, lace * 0.5 + 0.5);
+    foam *= mix(0.45, 1.2, lace * 0.5 + 0.5);
   }
+  foam = clamp(foam, 0.0, 1.0);
 
-  foam = clamp(foam + smoothstep(0.012, 0.05, edge) * (0.22 + flow * 0.45), 0.0, 1.0);
-  foam = clamp(foam + contactFoam, 0.0, 1.0);
+  base = mix(base, wetSand, contact * (1.0 - foam) * 0.22);
+  base = mix(base, foamC, foam * mix(0.62, 0.88, foamDet));
 
-  // Wet-sand lip: thin contact water picks up stained sand, then foam sits on top.
-  base = mix(base, wetSand, contact * (1.0 - foam) * mix(0.10, 0.20, foamDet));
-  base = mix(base, foamC, foam * mix(0.55, 0.80, foamDet));
-
-  vec3 L = safeNormalize(uSunDir, vec3(0.4, 0.8, 0.3));
+  vec3 L = safeNormalize(uSunDir, vec3(0.35, 0.88, 0.28));
   vec3 H = safeNormalize(V + L, vec3(0.0, 1.0, 0.0));
   float specPow = uSpecPower > 4.0 ? uSpecPower : 22.0;
-  float spec = pow(max(dot(N, H), 0.0), mix(specPow * 0.55, specPow, 1.0 - foam));
-  spec *= mix(0.06, 0.15, depth) * (1.0 - foam * 0.7);
-  spec = min(spec, uQuality > 2.5 ? 0.16 : 0.13);
+  float spec = pow(max(dot(N, H), 0.0), mix(specPow * 0.4, specPow * 0.75, 1.0 - foam));
+  spec *= mix(0.1, 0.22, depth) * (1.0 - foam * 0.65);
+  spec = min(spec, 0.2);
   float ndl = max(dot(N, L), 0.0);
 
-  vec3 color = base * (0.70 + ndl * 0.32) + uSunColor * (spec + fresnel * 0.68);
-  color = mix(color, vec3(0.42, 0.50, 0.48), 0.05);
-  color = clamp(color, vec3(0.08), vec3(0.84));
+  vec3 sky = vec3(0.76, 0.81, 0.86);
+  vec3 color = base * (0.78 + ndl * 0.18) + sky * fresnel * 0.72 + uSunColor * spec * 0.55;
+  color = clamp(color, vec3(0.12), vec3(0.92));
 
   float absorbAlpha = 1.0 - clamp((trans.x + trans.y + trans.z) * 0.333, 0.0, 1.0);
-  float alpha = mix(0.26, 0.50, depth) + absorbAlpha * mix(0.10, 0.22, beer * 0.5);
-  alpha += turbid * 0.05 + foam * 0.15 + fresnel * 0.22;
+  float alpha = mix(0.14, 0.34, depth) + absorbAlpha * 0.08 + foam * 0.14 + fresnel * 0.32;
   if (geoArea > 4.0e-4) alpha *= mix(0.45, 1.0, smoothstep(0.14, 0.40, geoUp));
-  float aMax = uQuality > 2.5 ? 0.68 : 0.62;
-  alpha = clamp(alpha, 0.17, aMax);
+  alpha = clamp(alpha, 0.12, 0.46);
 
   gl_FragColor = vec4(color, alpha);
 }

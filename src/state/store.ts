@@ -1,6 +1,7 @@
 import {
   DEFAULT_PARAMS,
   DEFAULT_RELIEF,
+  DEFAULT_WAVES,
   defaultQuality,
   type HeatmapMode,
   type OnboardStep,
@@ -48,6 +49,7 @@ export interface UiState {
   presetId: string;
   heatmap: HeatmapMode;
   relief: number;
+  waves: number;
   onboardStep: OnboardStep;
   menuOpen: null | "reset" | "share";
 }
@@ -74,6 +76,7 @@ export const initialUiState = (): UiState => {
     presetId: "flat",
     heatmap: "off",
     relief: DEFAULT_RELIEF,
+    waves: DEFAULT_WAVES,
     onboardStep,
     menuOpen: null,
   };

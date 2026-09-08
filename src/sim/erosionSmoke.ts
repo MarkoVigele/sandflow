@@ -110,6 +110,8 @@ console.log(JSON.stringify({ depths90 }));
 if (depths90.p90 < depths90.p50 * 1.25) {
   fail(`zu wenig Tiefenvariation: p50=${depths90.p50} p90=${depths90.p90}`);
 }
+if (depths90.max < 0.04) fail(`keine tiefe Stelle: max=${depths90.max}`);
+if (depths90.p90 < 0.01) fail(`Tiefe zu gleichmäßig flach: p90=${depths90.p90}`);
 
 sim.step(90);
 const later = measureVein(sim, initial);
@@ -260,3 +262,85 @@ dep.step(20);
 let depRaise = 0;
 for (let i = 0; i < dep0.length; i++) depRaise = Math.max(depRaise, dep.terrain[i] - dep0[i]);
 if (depRaise > 1e-5) fail(`Ablagerung auf Beton: ${depRaise}`);
+
+const bowl = new Float32Array(size * size);
+for (let y = 0; y < size; y++) {
+  for (let x = 0; x < size; x++) {
+    const u = x / (size - 1) - 0.5;
+    const v = y / (size - 1) - 0.5;
+    const r = Math.hypot(u, v);
+    bowl[y * size + x] = 0.52 - Math.max(0, 0.22 - r) * 0.55;
+  }
+}
+const pool = new ErosionSim(size, DEFAULT_PARAMS, bowl);
+pool.sources = [];
+const bowl0 = pool.terrain.slice();
+for (let s = 0; s < 36; s++) {
+  pool.pour(0.5, 0.5, 0.55);
+  pool.step(1);
+}
+const midI = ((size * 0.5) | 0) * size + ((size * 0.5) | 0);
+const poolDepth = pool.water[midI];
+const poolCut = maxCutNear(bowl0, pool.terrain, (size * 0.5) | 0, (size * 0.5) | 0, 8);
+let rimWet = 0;
+for (let x = 2; x < size - 2; x++) {
+  if (pool.water[2 * size + x] > 0.004) rimWet++;
+}
+console.log(JSON.stringify({ poolDepth: +poolDepth.toFixed(4), poolCut: +poolCut.toFixed(4), rimWet }));
+if (poolDepth < 0.045) fail(`Becken bleibt zu flach: ${poolDepth}`);
+if (poolCut > 0.02) fail(`stehendes Becken brennt ein: ${poolCut}`);
+if (rimWet > size * 0.35) fail(`Becken läuft über den Rand: rimWet=${rimWet}`);
+
+const glideFlat = new Float32Array(size * size);
+for (let y = 0; y < size; y++) {
+  for (let x = 0; x < size; x++) {
+    glideFlat[y * size + x] = 0.58 - (y / (size - 1)) * 0.16;
+  }
+}
+const glide = new ErosionSim(size, { ...DEFAULT_PARAMS, infiltration: 0, evaporation: 0 }, glideFlat);
+glide.sources = [];
+glide.pour(0.5, 0.22, 1.4);
+glide.step(40);
+let mass = 0;
+let massY = 0;
+let past = 0;
+for (let i = 0; i < glide.water.length; i++) {
+  const w = glide.water[i];
+  if (w < 1e-5) continue;
+  mass += w;
+  const y = (i / size) | 0;
+  massY += y * w;
+  if (y > size * 0.48) past += w;
+}
+const glideCy = mass > 0 ? massY / mass : 0;
+console.log(JSON.stringify({ glideCy: +glideCy.toFixed(1), glidePast: +past.toFixed(3), glideVol: +mass.toFixed(3) }));
+if (glideCy < size * 0.3) fail(`keine Trägheit / Welle: centroidY=${glideCy}`);
+if (past < 0.08) fail(`Wasser propagiert nicht wellenartig: past=${past}`);
+
+const damBuilt = getPreset("slope").build(size);
+const damSim = new ErosionSim(size, DEFAULT_PARAMS, damBuilt.terrain);
+damSim.sources = damBuilt.sources;
+damSim.step(50);
+const damY = (size * 0.42) | 0;
+const upMass = (sim: ErosionSim) => {
+  let s = 0;
+  for (let y = 2; y < damY; y++) {
+    for (let x = 2; x < size - 2; x++) s += sim.water[y * size + x];
+  }
+  return s;
+};
+const up0 = upMass(damSim);
+for (let u = 0.32; u <= 0.68; u += 0.03) {
+  damSim.brush("dam", u, 0.42, 0.07, 1.9);
+}
+const damRow = damSim.terrain.slice(damY * size, damY * size + size);
+damSim.step(18);
+const up1 = upMass(damSim);
+damSim.step(70);
+let damCut = 0;
+for (let x = 2; x < size - 2; x++) {
+  damCut = Math.max(damCut, damRow[x] - damSim.terrain[damY * size + x]);
+}
+console.log(JSON.stringify({ damUp0: +up0.toFixed(3), damUp1: +up1.toFixed(3), damCut: +damCut.toFixed(4) }));
+if (up1 < up0 * 0.95) fail(`Damm staut nicht: ${up0} → ${up1}`);
+if (damCut < 0.008) fail(`kein Unterspülen nach Überlauf: ${damCut}`);

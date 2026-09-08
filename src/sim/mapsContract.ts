@@ -17,7 +17,10 @@
  *
  * Required sim uniforms (names stay):
  *   uMaps, uHeightScale, uTexel
- * Optional look uniforms: uTraySize (world width), uRelief, uPivot.
+ * Optional look uniforms: uTraySize (world width), uRelief, uPivot,
+ *   uWaveAmp, uWaveDetail, uTime (water surface only).
+ * Water displacement adds a depth sheet + quality-scaled Gerstner on top of R.
+ * AimCursor still samples R + relief only.
  * Displacement: Y = (uPivot + (R − uPivot) * uRelief) * uHeightScale
  * sand.vert normals: N = (hL-hR, 2·texel·tray, h(v+)-h(v−)) — same as AimCursor.heightfieldNormal.
  * Optional visual uniforms:

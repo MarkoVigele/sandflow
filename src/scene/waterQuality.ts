@@ -31,40 +31,40 @@ export const WATER_QUALITY: Record<QualityId, WaterQualityTier> = {
     meshSegs: 80,
     waveOctaves: 1,
     waveDisplace: 0,
-    foamDetail: 0.32,
-    beerStrength: 0.72,
-    fresnelScale: 0.68,
-    specPower: 16,
+    foamDetail: 0.28,
+    beerStrength: 0.48,
+    fresnelScale: 0.82,
+    specPower: 14,
   },
   medium: {
     id: "medium",
     meshSegs: 128,
     waveOctaves: 2,
     waveDisplace: 0.00115,
-    foamDetail: 0.62,
-    beerStrength: 1,
-    fresnelScale: 1,
-    specPower: 22,
+    foamDetail: 0.52,
+    beerStrength: 0.68,
+    fresnelScale: 1.08,
+    specPower: 20,
   },
   high: {
     id: "high",
     meshSegs: 224,
     waveOctaves: 3,
     waveDisplace: 0.00225,
-    foamDetail: 0.86,
-    beerStrength: 1.16,
-    fresnelScale: 1.14,
-    specPower: 28,
+    foamDetail: 0.72,
+    beerStrength: 0.82,
+    fresnelScale: 1.2,
+    specPower: 24,
   },
   ultra: {
     id: "ultra",
     meshSegs: 352,
     waveOctaves: 4,
     waveDisplace: 0.00355,
-    foamDetail: 1,
-    beerStrength: 1.28,
-    fresnelScale: 1.28,
-    specPower: 36,
+    foamDetail: 0.88,
+    beerStrength: 0.95,
+    fresnelScale: 1.32,
+    specPower: 28,
   },
 };
 
@@ -123,8 +123,15 @@ export function contactLineFoam(
   }
   const thin = 1 - smoothstep(0.01, 0.058, depth);
   const edge = smoothstep(0.55, 2.6, shore);
-  const flowBoost = 0.42 + fl * 0.58;
-  return clamp01(edge * thin * flowBoost * (0.35 + detail * 0.65));
+  let jump = 0;
+  for (const w of neighborDepths) {
+    const ww = Number.isFinite(w) ? w : 0;
+    jump = Math.max(jump, Math.abs(ww - depth));
+  }
+  const turb = fl > 0.035 || jump > 0.018;
+  if (!turb) return 0;
+  const flowBoost = 0.2 + fl * 0.9;
+  return clamp01(edge * thin * flowBoost * (0.3 + detail * 0.55));
 }
 
 export function flowWaveAmp(depth: number, flow: number, displace: number): number {
