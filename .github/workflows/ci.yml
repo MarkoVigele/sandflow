@@ -16,7 +16,6 @@ jobs:
       - run: npm run sim:smoke
       - run: npm run tools:smoke
       - run: npm run ui:smoke
-      - run: npm run pins:smoke
       - run: npm run share:smoke
       - run: npm run assets:smoke
       - run: npm run water:smoke

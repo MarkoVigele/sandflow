@@ -10,7 +10,7 @@
     "preview": "vite preview --outDir docs",
     "sim:smoke": "npx --yes vite-node src/sim/erosionSmoke.ts",
     "tools:smoke": "npx --yes vite-node src/sim/toolsSmoke.ts",
-    "ui:smoke": "npx --yes vite-node src/ui/aimCursorSmoke.ts",
+    "ui:smoke": "npx --yes vite-node src/ui/aimCursorSmoke.ts && npx --yes vite-node src/ui/sourcePinsSmoke.ts",
     "pins:smoke": "npx --yes vite-node src/ui/sourcePinsSmoke.ts",
     "share:smoke": "npx --yes vite-node src/state/shareSmoke.ts",
     "assets:smoke": "npx --yes vite-node src/assets/textureMapsSmoke.ts",
