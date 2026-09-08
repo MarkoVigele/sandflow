@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import waterVert from "../shaders/water.vert.glsl?raw";
 import waterFrag from "../shaders/water.frag.glsl?raw";
-import type { QualityId } from "../state/types";
+import { DEFAULT_RELIEF, HEIGHT_PIVOT, type QualityId } from "../state/types";
 
 const MESH_SEGS: Record<QualityId, number> = {
   low: 80,
@@ -32,6 +32,8 @@ export class WaterMesh {
       uniforms: {
         uMaps: { value: maps },
         uHeightScale: { value: heightScale },
+        uRelief: { value: DEFAULT_RELIEF },
+        uPivot: { value: HEIGHT_PIVOT },
         uTexel: { value: 1 / Math.max(1, maps.image.width) },
         uTraySize: { value: traySize },
         uSunDir: { value: new THREE.Vector3(0.62, 0.58, 0.38).normalize() },
@@ -61,6 +63,10 @@ export class WaterMesh {
 
   setHeightScale(scale: number): void {
     this.material.uniforms.uHeightScale.value = scale;
+  }
+
+  setRelief(relief: number): void {
+    this.material.uniforms.uRelief.value = relief;
   }
 
   setSun(dir: THREE.Vector3, color: THREE.Color): void {

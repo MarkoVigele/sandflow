@@ -29,7 +29,7 @@ Der Build landet in `docs/` (relativer Basispfad, bereit für GitHub Pages). Ein
 | Kiesel / Radierer | `K` / `R` | Symbolleiste |
 | Rückgängig / Wiederholen | `Strg+Z` / `Strg+Y` | Symbole oben |
 
-Oben: Vorlagen, Qualität (inkl. **Auto**), Tempo (0,25×–8×) und **Zeitraffer**, Zurücksetzen (Szene oder nur Wasser), Teilen, Speichern, Laden, Bild. Rechts (am Telefon unten): Kontext zum aktiven Werkzeug. Unter **Erweitert** liegen Körnung, Kohäsion, Infiltration, Erosionsrate, Sedimentkapazität, **Relief** (Höhenskalierung der Wanne) und eine optionale Heatmap (Fluss oder Tiefe). Beim ersten Start führt eine Kurzanleitung in drei Schritten: Sand formen → Quelle → Abspielen.
+Oben: Vorlagen, Qualität (inkl. **Auto**), Tempo (0,25×–8×) und **Zeitraffer**, Zurücksetzen (Szene oder nur Wasser), Teilen, Speichern, Laden, Bild. Rechts (am Telefon unten): Kontext zum aktiven Werkzeug. Unter **Erweitert** liegen Körnung, Kohäsion, Infiltration, Erosionsrate, Sedimentkapazität, **Relief** (Überhöhung von Rücken und Rinnen, ohne die Wanne anzuheben) und eine optionale Heatmap (Fluss oder Tiefe). Beim ersten Start führt eine Kurzanleitung in drei Schritten: Sand formen → Quelle → Abspielen.
 
 ## Vorlagen
 

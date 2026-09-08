@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import particleVert from "../shaders/particles.vert.glsl?raw";
 import particleFrag from "../shaders/particles.frag.glsl?raw";
+import { effectiveHeight01 } from "./heightDisplace";
 
 function isFiniteUvHeight(u: number, v: number, h: number): boolean {
   return (
@@ -52,6 +53,7 @@ export class FlowParticles {
     traySize: number,
     heightScale: number,
     enabled: boolean,
+    relief = 1,
   ): void {
     if (!enabled || !particles || particles.length < 3) {
       this.geo.setDrawRange(0, 0);
@@ -66,7 +68,7 @@ export class FlowParticles {
       const h = particles[i * 3 + 2];
       if (!isFiniteUvHeight(u, v, h)) continue;
       this.positions[count * 3] = (u - 0.5) * traySize;
-      const visualH = Math.min(Math.max(h, 0), 0.62);
+      const visualH = Math.min(Math.max(effectiveHeight01(h, relief), 0), 1.15);
       this.positions[count * 3 + 1] = visualH * heightScale + 0.01;
       this.positions[count * 3 + 2] = (v - 0.5) * traySize;
       count++;

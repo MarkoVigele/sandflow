@@ -1,5 +1,7 @@
 uniform sampler2D uMaps;
 uniform float uHeightScale;
+uniform float uRelief;
+uniform float uPivot;
 uniform float uTexel;
 uniform float uTraySize;
 
@@ -17,7 +19,10 @@ vec3 safeNormalize(vec3 v, vec3 fallback) {
 }
 
 float safeHeight(vec2 coord) {
-  float h = texture2D(uMaps, coord).r * uHeightScale;
+  float h01 = texture2D(uMaps, coord).r;
+  if (!(h01 == h01)) h01 = 0.0;
+  float relief = uRelief > 0.05 ? uRelief : 1.0;
+  float h = (uPivot + (h01 - uPivot) * relief) * uHeightScale;
   return (h == h) ? h : 0.0;
 }
 

@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import sandVert from "../shaders/sand.vert.glsl?raw";
 import sandFrag from "../shaders/sand.frag.glsl?raw";
-import type { HeatmapMode, QualityId } from "../state/types";
+import { DEFAULT_RELIEF, HEIGHT_PIVOT, type HeatmapMode, type QualityId } from "../state/types";
 import { canvasTexture } from "./mapsTexture";
 import { fitCanvas } from "../assets/deriveMaps";
 import { gpuAnisotropy, gpuTexelBudget, sandUvScale } from "../assets/texturePaths";
@@ -47,11 +47,13 @@ export class SandMesh {
         uNormal: { value: fallbackNormal },
         uRough: { value: fallbackRough },
         uHeightScale: { value: heightScale },
+        uRelief: { value: DEFAULT_RELIEF },
+        uPivot: { value: HEIGHT_PIVOT },
         uTexel: { value: 1 / maps.image.width },
         uTraySize: { value: traySize },
-        uSunDir: { value: new THREE.Vector3(0.62, 0.58, 0.38).normalize() },
-        uSunColor: { value: new THREE.Color(1.0, 0.90, 0.72) },
-        uAmbient: { value: new THREE.Color(0.16, 0.15, 0.13) },
+        uSunDir: { value: new THREE.Vector3(0.72, 0.48, 0.50).normalize() },
+        uSunColor: { value: new THREE.Color(1.0, 0.88, 0.68) },
+        uAmbient: { value: new THREE.Color(0.13, 0.12, 0.11) },
         uReceiveShadow: { value: 0 },
         uGrain: { value: 0.55 },
         uUvScale: { value: sandUvScale(0.55) },
@@ -110,6 +112,10 @@ export class SandMesh {
 
   setHeightScale(scale: number): void {
     this.material.uniforms.uHeightScale.value = scale;
+  }
+
+  setRelief(relief: number): void {
+    this.material.uniforms.uRelief.value = relief;
   }
 
   setSun(dir: THREE.Vector3, color: THREE.Color, ambient: THREE.Color): void {

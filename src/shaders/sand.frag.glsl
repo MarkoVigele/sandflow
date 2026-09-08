@@ -11,6 +11,8 @@ uniform float uGrain;
 uniform float uUvScale;
 uniform float uHeatMode;
 uniform float uHeightScale;
+uniform float uRelief;
+uniform float uPivot;
 uniform float uTexel;
 uniform float uTraySize;
 
@@ -28,7 +30,10 @@ vec3 safeNormalize(vec3 v, vec3 fallback) {
 }
 
 float heightAt(vec2 uv) {
-  float h = texture2D(uMaps, uv).r * uHeightScale;
+  float h01 = texture2D(uMaps, uv).r;
+  if (!(h01 == h01)) h01 = 0.0;
+  float relief = uRelief > 0.05 ? uRelief : 1.0;
+  float h = (uPivot + (h01 - uPivot) * relief) * uHeightScale;
   return (h == h) ? h : 0.0;
 }
 
@@ -40,7 +45,7 @@ float heightfieldAO(vec2 uv, float h0, float texel) {
   acc += max(heightAt(uv + vec2(0.0, texel)) - h0, 0.0);
   acc += max(heightAt(uv + vec2(-texel, -texel)) - h0, 0.0) * 0.65;
   acc += max(heightAt(uv + vec2(texel, texel)) - h0, 0.0) * 0.65;
-  return clamp(1.0 - acc * 1.45, 0.52, 1.0);
+  return clamp(1.0 - acc * 1.85, 0.48, 1.0);
 }
 
 float heightfieldContact(vec2 uv, float h0, vec3 L, float texel, float tray) {
@@ -56,9 +61,9 @@ float heightfieldContact(vec2 uv, float h0, vec3 L, float texel, float tray) {
     y += L.y * stepWorld;
     float hs = heightAt(uv + dirUv * stepUv * float(i));
     float occ = (hs - y) / max(stepWorld * 2.4, 1.0e-3);
-    shadow *= 1.0 - clamp(occ, 0.0, 1.0) * 0.32;
+    shadow *= 1.0 - clamp(occ, 0.0, 1.0) * 0.42;
   }
-  return clamp(shadow, 0.38, 1.0);
+  return clamp(shadow, 0.32, 1.0);
 }
 
 void main() {
@@ -104,14 +109,14 @@ void main() {
   vec3 L = safeNormalize(uSunDir, vec3(0.4, 0.8, 0.3));
   vec3 H = safeNormalize(V + L, vec3(0.0, 1.0, 0.0));
   float ndl = max(dot(N, L), 0.0);
-  float wrap = mix(ndl, clamp((dot(N, L) + 0.12) / 1.12, 0.0, 1.0), 0.4);
+  float wrap = mix(ndl, clamp((dot(N, L) + 0.06) / 1.06, 0.0, 1.0), 0.28);
 
   float texel = max(uTexel, 1.0e-4);
   float tray = uTraySize > 0.5 ? uTraySize : 8.0;
   float h0 = heightAt(vUv);
   float ao = heightfieldAO(vUv, h0, texel);
   float contact = heightfieldContact(vUv, h0, L, texel, tray);
-  float slopeShade = mix(0.72, 1.0, clamp(N.y, 0.0, 1.0));
+  float slopeShade = mix(0.62, 1.0, clamp(N.y, 0.0, 1.0));
   float gpuShadow = mix(1.0, 0.82 + wrap * 0.18, step(0.5, uReceiveShadow));
   float shade = ao * contact * slopeShade * gpuShadow;
 

@@ -3,6 +3,8 @@ uniform vec3 uSunColor;
 uniform float uTime;
 uniform float uTexel;
 uniform float uHeightScale;
+uniform float uRelief;
+uniform float uPivot;
 uniform float uTraySize;
 uniform sampler2D uMaps;
 
@@ -24,6 +26,10 @@ float waterAwareHeight(vec4 s, float centerWater) {
   float w = s.g;
   float wet = step(0.0008, w);
   return s.r + mix(centerWater, w, wet);
+}
+
+float displaceY(float h01, float relief) {
+  return (uPivot + (h01 - uPivot) * relief) * uHeightScale;
 }
 
 void main() {
@@ -53,10 +59,11 @@ void main() {
   vec4 sVm = texture2D(uMaps, vUv + vec2(0.0, -texel));
   vec4 sVp = texture2D(uMaps, vUv + vec2(0.0, texel));
 
-  float hL = waterAwareHeight(sL, vDepth) * uHeightScale;
-  float hR = waterAwareHeight(sR, vDepth) * uHeightScale;
-  float hVp = waterAwareHeight(sVp, vDepth) * uHeightScale;
-  float hVm = waterAwareHeight(sVm, vDepth) * uHeightScale;
+  float relief = uRelief > 0.05 ? uRelief : 1.0;
+  float hL = displaceY(waterAwareHeight(sL, vDepth), relief);
+  float hR = displaceY(waterAwareHeight(sR, vDepth), relief);
+  float hVp = displaceY(waterAwareHeight(sVp, vDepth), relief);
+  float hVm = displaceY(waterAwareHeight(sVm, vDepth), relief);
 
   float edge =
     abs(sL.g - vDepth) + abs(sR.g - vDepth) + abs(sVm.g - vDepth) + abs(sVp.g - vDepth);

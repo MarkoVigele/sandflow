@@ -62,10 +62,13 @@ export const QUALITY_GRID: Record<QualityId, number> = {
   ultra: 512,
 };
 
-/** World Y multiplier for heightmap 0–1. Lab camera reads ridges better above 3. */
-export const DEFAULT_HEIGHT_SCALE = 3.2;
-export const HEIGHT_SCALE_MIN = 2.0;
-export const HEIGHT_SCALE_MAX = 4.6;
+/** Preset bed height. Relief exaggerates deviation so the slab does not lift into the camera. */
+export const HEIGHT_PIVOT = 0.42;
+/** World Y per heightmap unit at Relief = 1. */
+export const HEIGHT_WORLD = 2.5;
+export const DEFAULT_RELIEF = 1.5;
+export const RELIEF_MIN = 0.8;
+export const RELIEF_MAX = 2.4;
 
 export const DEFAULT_PARAMS: SimParams = {
   grain: 0.55,

@@ -1,5 +1,7 @@
 uniform sampler2D uMaps;
 uniform float uHeightScale;
+uniform float uRelief;
+uniform float uPivot;
 
 varying vec2 vUv;
 varying vec3 vWorldPos;
@@ -20,10 +22,12 @@ void main() {
   float sheet = 0.0;
   if (water > 0.0008) {
     // Lab film with readable depth: beds sit higher than thin veins.
-    float body = min(water, 0.16);
-    sheet = 0.0045 + body * 0.36 + min(vFlow, 0.22) * 0.012;
+    float body = min(water, 0.14);
+    sheet = 0.0035 + body * 0.22 + min(vFlow, 0.22) * 0.008;
   }
-  float h = (terrain + sheet) * uHeightScale;
+  float h01 = terrain + sheet;
+  float relief = uRelief > 0.05 ? uRelief : 1.0;
+  float h = (uPivot + (h01 - uPivot) * relief) * uHeightScale;
   if (!(h == h)) h = 0.0;
   vec3 pos = position;
   pos.y = h;

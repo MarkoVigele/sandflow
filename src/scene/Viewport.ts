@@ -7,8 +7,9 @@ import { packMapsRgba, unpackRgba } from "../sim/mapsContract";
 import { getPreset, resampleHeight, type CameraPose } from "../sim/presets";
 import { History } from "../state/history";
 import type { Store } from "../state/store";
+import { effectiveHeight01 } from "./heightDisplace";
 import {
-  DEFAULT_HEIGHT_SCALE,
+  HEIGHT_WORLD,
   QUALITY_GRID,
   QUALITY_LABEL,
   isMobile,
@@ -32,7 +33,7 @@ import { applyTrayWood, createSourceMarker, createTray, type TrayHandle } from "
 import { WaterMesh } from "./WaterMesh";
 
 export const TRAY_SIZE = 8;
-export const HEIGHT_SCALE = DEFAULT_HEIGHT_SCALE;
+export const HEIGHT_SCALE = HEIGHT_WORLD;
 
 export class Viewport {
   readonly renderer: THREE.WebGLRenderer;
@@ -131,12 +132,12 @@ export class Viewport {
     this.scene.fog = new THREE.Fog(0x14110e, 14, 28);
     this.scene.background = new THREE.Color(0x14110e);
 
-    this.hemi = new THREE.HemisphereLight(0xd2e0ec, 0x4a3c2c, 0.36);
+    this.hemi = new THREE.HemisphereLight(0xd2e0ec, 0x3f3226, 0.28);
     this.scene.add(this.hemi);
 
-    this.sun = new THREE.DirectionalLight(0xffe0b0, 1.95);
-    this.sun.position.set(7.8, 6.4, 4.8);
-    this.sun.target.position.set(0, 0.55, 0);
+    this.sun = new THREE.DirectionalLight(0xffd9a3, 2.15);
+    this.sun.position.set(8.6, 4.8, 5.4);
+    this.sun.target.position.set(0, 0.7, 0);
     this.sun.castShadow = false;
     this.sun.shadow.mapSize.set(1024, 1024);
     this.sun.shadow.camera.near = 1;
@@ -177,6 +178,7 @@ export class Viewport {
       }
     });
 
+    this.applyRelief();
     this.syncSunUniforms();
 
     this.sim = new SimClient();
@@ -211,22 +213,32 @@ export class Viewport {
   applyParams(): void {
     this.sim.setParams(this.store.state.params);
     this.sand.setGrain(this.store.state.params.grain);
-    this.applyHeightScale();
+    this.applyRelief();
   }
 
   get heightScale(): number {
-    return this.store.state.heightScale;
+    return HEIGHT_WORLD;
   }
 
-  applyHeightScale(scale = this.store.state.heightScale): void {
-    this.sand.setHeightScale(scale);
-    this.water.setHeightScale(scale);
+  get relief(): number {
+    return this.store.state.relief;
+  }
+
+  applyHeightScale(): void {
+    this.applyRelief();
+  }
+
+  applyRelief(relief = this.store.state.relief): void {
+    this.sand.setHeightScale(HEIGHT_WORLD);
+    this.water.setHeightScale(HEIGHT_WORLD);
+    this.sand.setRelief(relief);
+    this.water.setRelief(relief);
   }
 
   private syncSunUniforms(): void {
     const dir = this.sun.position.clone().sub(this.sun.target.position).normalize();
-    const sunColor = this.sun.color.clone().multiplyScalar(0.92);
-    const ambient = new THREE.Color(0.17, 0.155, 0.13);
+    const sunColor = this.sun.color.clone().multiplyScalar(0.95);
+    const ambient = new THREE.Color(0.12, 0.11, 0.10);
     this.sand.setSun(dir, sunColor, ambient);
     this.water.setSun(dir, sunColor);
   }
@@ -462,6 +474,7 @@ export class Viewport {
       TRAY_SIZE,
       this.heightScale,
       q === "high" || q === "ultra",
+      this.relief,
     );
   }
 
@@ -483,7 +496,7 @@ export class Viewport {
   }
 
   private sampleHeight(u: number, v: number): number {
-    return samplePackedHeight(this.lastPacked, this.lastSize, u, v);
+    return effectiveHeight01(samplePackedHeight(this.lastPacked, this.lastSize, u, v), this.relief);
   }
 
   private hitUv(ev: PointerEvent): AimHit | null {

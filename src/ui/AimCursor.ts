@@ -184,7 +184,7 @@ export function pickDeformedSand(
     origin,
     dir,
     new THREE.Vector3(-half, -0.08, -half),
-    new THREE.Vector3(half, heightScale * 1.6 + 0.5, half),
+    new THREE.Vector3(half, heightScale * 2.5 + 0.6, half),
   );
   if (!bounds) return fallbackPlanePick(origin, dir, traySize, heightScale, heightAt);
 

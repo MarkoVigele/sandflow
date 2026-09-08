@@ -40,7 +40,7 @@ export function createTray(traySize: number): TrayHandle {
     metalness: 0.02,
   });
 
-  // Flat bed sits near BASE * default heightScale ≈ 1.34; the rim is a frame, not a lid.
+  // Flat bed stays near BASE * HEIGHT_WORLD ≈ 1.05; Relief exaggerates ridges, not the slab.
   const wallH = 1.18;
   const wallT = 0.3;
   const inner = traySize + TRAY_SAND_CLEARANCE * 2;
