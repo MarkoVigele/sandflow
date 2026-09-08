@@ -100,6 +100,22 @@ if (sanitizeQuality("nope") !== "high") fail("sanitize quality");
 if (sanitizeQuality("medium") !== "medium") fail("keep quality");
 const srcs = shareSources(parsed);
 if (srcs.length !== 1 || Math.abs(srcs[0].x - 0.5) > 1e-6) fail("sources");
+
+const rainPay = buildSharePayload(
+  {
+    presetId: "regen-hang",
+    quality: "low",
+    speed: 1,
+    params: DEFAULT_PARAMS,
+    sources: [{ id: "r", x: 0.5, y: 0.1, rate: 1.8, kind: "rain", spread: 0.4 }],
+    texturePrompt: "",
+  },
+  SHARE_HASH_GRID,
+  false,
+);
+if (rainPay.sources[0].kind !== "rain" || rainPay.sources[0].spread !== 0.4) fail("share rain kind");
+const rainBack = shareSources(parseSharePayload(rainPay));
+if (rainBack[0].kind !== "rain") fail("share rain roundtrip");
 const decoded = decodeHeightField(parsed.h, parsed.hn, srcSize);
 if (!decoded || decoded.length !== terrain.length) fail("decode height");
 almost(decoded[mid], terrain[mid], 0.1, "hash height mid");

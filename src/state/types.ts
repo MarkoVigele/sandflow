@@ -42,11 +42,21 @@ export interface SimParams {
   flowRate: number;
 }
 
+export type SourceKind = "point" | "rain";
+
 export interface WaterSource {
   id: string;
   x: number;
   y: number;
   rate: number;
+  /** Default point. Rain sprinkles over `spread` instead of a 3×3 pin kernel. */
+  kind?: SourceKind;
+  /** UV half-width for rain. Ignored for point sources. */
+  spread?: number;
+}
+
+export function sourceKindOf(src: WaterSource): SourceKind {
+  return src.kind === "rain" ? "rain" : "point";
 }
 
 export interface SimStats {

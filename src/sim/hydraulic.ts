@@ -213,8 +213,10 @@ export function updatePipeFlux(
       const dT = eta - (terrain[i + size] + water[i + size]);
 
       // Conductivity rises in an established thread and on a falling bed.
+      // Thin films stay less laterally conductive so a gentle pour becomes a vein.
       const bedFall = Math.max(0, -Math.min(dL, dR, dB, dT) + (w - Math.max(water[i - 1], water[i + 1], water[i - size], water[i + size])));
-      const cond = 1 + 14 * Math.min(flow[i], 0.32) + 6 * Math.min(bedFall, 0.08);
+      const thin = w < 0.02 ? 0.78 + 11 * w : 1;
+      const cond = (1 + 14 * Math.min(flow[i], 0.32) + 6 * Math.min(bedFall, 0.08)) * thin;
       const acc = gAl * cond;
 
       let fL = Math.max(0, fluxL[i] * PIPE_FRICTION + acc * dL);
@@ -238,8 +240,8 @@ export function updatePipeFlux(
         which = 3;
       }
       if (steep > 1e-8) {
-        const boost = 1.55;
-        const keep = 0.72;
+        const boost = w < 0.018 ? 1.7 : 1.55;
+        const keep = w < 0.018 ? 0.6 : 0.72;
         fL *= which === 0 ? boost : keep;
         fR *= which === 1 ? boost : keep;
         fB *= which === 2 ? boost : keep;

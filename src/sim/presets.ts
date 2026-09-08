@@ -1,5 +1,5 @@
 import { fbm } from "../assets/noise";
-import type { WaterSource } from "../state/types";
+import type { SourceKind, WaterSource } from "../state/types";
 
 export interface CameraPose {
   position: [number, number, number];
@@ -31,8 +31,18 @@ function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
 }
 
-function source(id: string, x: number, y: number, rate = 1.6): WaterSource {
-  return { id, x: clamp01(x), y: clamp01(y), rate };
+function source(
+  id: string,
+  x: number,
+  y: number,
+  rate = 1.6,
+  kind?: SourceKind,
+  spread?: number,
+): WaterSource {
+  const src: WaterSource = { id, x: clamp01(x), y: clamp01(y), rate };
+  if (kind) src.kind = kind;
+  if (spread != null) src.spread = spread;
+  return src;
 }
 
 function rim(terrain: Float32Array, size: number, openDown = false): void {
@@ -512,9 +522,115 @@ export const PRESETS: PresetDef[] = [
       return { terrain, hardmask: hard, sources: [source("s-wehr", 0.5, 0.08, 2.1)] };
     },
   },
+  {
+    id: "regen-hang",
+    title: "Regenhang",
+    blurb: "Schräge unter Regen. Betonrinnen fangen das Wasser — erst Adern, unten eine Pfütze. Die Rinnen bleiben stehen.",
+    camera: { position: [5.4, 6.4, 6.0], target: [0, 0.4, 0.2] },
+    build(size) {
+      const terrain = new Float32Array(size * size);
+      const hard = blankHard(size);
+      for (let y = 0; y < size; y++) {
+        const v = y / (size - 1);
+        for (let x = 0; x < size; x++) {
+          terrain[idx(x, y, size)] = BASE + (1 - v) * 0.48;
+        }
+      }
+      const gutters = [0.28, 0.5, 0.72];
+      for (const mid of gutters) {
+        carveChannel(terrain, size, () => mid, 0.038, 0.07, 0.06, 0.78);
+        paintWallBand(terrain, hard, size, mid - 0.062, mid - 0.034, 0.06, 0.78, (_u, v) => {
+          return BASE + 0.16 + (1 - v) * 0.48;
+        });
+        paintWallBand(terrain, hard, size, mid + 0.034, mid + 0.062, 0.06, 0.78, (_u, v) => {
+          return BASE + 0.16 + (1 - v) * 0.48;
+        });
+      }
+      const floor = (_u: number, v: number) => BASE + 0.05 + (1 - v) * 0.04;
+      const wallH = (_u: number, v: number) => BASE + 0.3 + (1 - v) * 0.04;
+      paintWallBand(terrain, hard, size, 0.1, 0.16, 0.76, 0.96, wallH);
+      paintWallBand(terrain, hard, size, 0.84, 0.9, 0.76, 0.96, wallH);
+      paintWallBand(terrain, hard, size, 0.1, 0.9, 0.9, 0.97, wallH);
+      for (let y = 0; y < size; y++) {
+        const v = y / (size - 1);
+        if (v < 0.79 || v > 0.9) continue;
+        for (let x = 0; x < size; x++) {
+          const u = x / (size - 1);
+          if (u < 0.16 || u > 0.84) continue;
+          const i = idx(x, y, size);
+          if (hard[i] >= 0.5) continue;
+          terrain[i] = floor(u, v);
+        }
+      }
+      grain(terrain, size, 0.012, 91);
+      for (let i = 0; i < hard.length; i++) {
+        if (hard[i] < 0.5) continue;
+        const y = (i / size) | 0;
+        const v = y / (size - 1);
+        if (v >= 0.74) {
+          terrain[i] = BASE + 0.3 + (1 - v) * 0.04;
+          continue;
+        }
+        terrain[i] = BASE + 0.16 + (1 - v) * 0.48;
+      }
+      rim(terrain, size, true);
+      return {
+        terrain,
+        hardmask: hard,
+        sources: [source("s-regen", 0.5, 0.08, 2.05, "rain", 0.46)],
+      };
+    },
+  },
+  {
+    id: "staudamm",
+    title: "Staudamm",
+    blurb: "Betonstaumauer quer durchs Tal. Oben staut sich ein See, der Überlauf nagt unten am Sand.",
+    camera: { position: [5.6, 5.9, 5.8], target: [0, 0.42, 0.2] },
+    build(size) {
+      const terrain = new Float32Array(size * size);
+      const hard = blankHard(size);
+      for (let y = 0; y < size; y++) {
+        const v = y / (size - 1);
+        for (let x = 0; x < size; x++) {
+          const u = x / (size - 1);
+          const valley = ((u - 0.5) ** 2) * 0.72;
+          terrain[idx(x, y, size)] = BASE + (1 - v) * 0.38 + valley;
+        }
+      }
+      carveChannel(
+        terrain,
+        size,
+        (v) => 0.5 + Math.sin(v * Math.PI * 0.7) * 0.025,
+        0.11,
+        0.1,
+        0.04,
+        0.96,
+      );
+      fillBox(terrain, hard, size, 0.08, 0.44, 0.92, 0.56, (u) => {
+        const notch = Math.abs(u - 0.5) < 0.065;
+        return notch ? BASE + 0.4 : BASE + 0.78;
+      }, true);
+      fillBox(terrain, hard, size, 0.08, 0.42, 0.16, 0.58, BASE + 0.86, true);
+      fillBox(terrain, hard, size, 0.84, 0.42, 0.92, 0.58, BASE + 0.86, true);
+      grain(terrain, size, 0.014, 67);
+      for (let i = 0; i < hard.length; i++) {
+        if (hard[i] < 0.5) continue;
+        const y = (i / size) | 0;
+        const v = y / (size - 1);
+        const x = i % size;
+        const u = x / (size - 1);
+        const notch = Math.abs(u - 0.5) < 0.065 && v > 0.44 && v < 0.56;
+        terrain[i] = notch ? BASE + 0.4 : BASE + 0.78;
+        if (u < 0.16 || u > 0.84) terrain[i] = BASE + 0.86;
+      }
+      rim(terrain, size, true);
+      return { terrain, hardmask: hard, sources: [source("s-stau", 0.5, 0.08, 2.15)] };
+    },
+  },
 ];
 
 export function getPreset(id: string): PresetDef {
+  if (id === "beton-kanal") return PRESETS.find((p) => p.id === "betonkanal") ?? PRESETS[0];
   return PRESETS.find((p) => p.id === id) ?? PRESETS[0];
 }
 

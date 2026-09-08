@@ -7,6 +7,7 @@ import {
   DEFAULT_PARAMS,
   type QualityId,
   type SimParams,
+  type SourceKind,
   type WaterSource,
 } from "./types";
 
@@ -36,7 +37,7 @@ export interface SharePayload {
   quality: QualityId;
   speed: number;
   params: SimParams;
-  sources: Array<{ x: number; y: number; rate: number }>;
+  sources: Array<{ x: number; y: number; rate: number; kind?: SourceKind; spread?: number }>;
   prompt: string;
   camera?: { p: [number, number, number]; t: [number, number, number] };
   props?: ShareProp[];
@@ -160,7 +161,18 @@ export function buildSharePayload(input: ShareBuildInput, grid: number, includeW
     quality: input.quality,
     speed: input.speed,
     params: compactParams(input.params),
-    sources: input.sources.map((s) => ({ x: round3(s.x), y: round3(s.y), rate: round3(s.rate) })),
+    sources: input.sources.map((s) => {
+      const out: SharePayload["sources"][number] = {
+        x: round3(s.x),
+        y: round3(s.y),
+        rate: round3(s.rate),
+      };
+      if (s.kind === "rain") {
+        out.kind = "rain";
+        if (s.spread != null) out.spread = round3(s.spread);
+      }
+      return out;
+    }),
     prompt: input.texturePrompt.slice(0, 80),
     props: compactProps(input.props),
   };
@@ -207,6 +219,8 @@ export function parseSharePayload(data: unknown): SharePayload {
       x: clamp01(Number(s.x)),
       y: clamp01(Number(s.y)),
       rate: Number(s.rate) || 1.5,
+      kind: s.kind === "rain" ? "rain" : undefined,
+      spread: typeof s.spread === "number" ? clamp01(s.spread) : undefined,
     })),
     prompt: String(raw.prompt ?? ""),
     camera: raw.camera,
@@ -259,6 +273,8 @@ export function shareSources(share: SharePayload): WaterSource[] {
     x: s.x,
     y: s.y,
     rate: s.rate,
+    kind: s.kind === "rain" ? "rain" : undefined,
+    spread: s.spread,
   }));
 }
 

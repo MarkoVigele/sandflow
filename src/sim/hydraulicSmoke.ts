@@ -9,7 +9,7 @@ import {
   updatePipeFlux,
 } from "./hydraulic";
 import { HARD_THRESHOLD } from "./mapsContract";
-import { talusLimit, thermalSlip } from "./thermalErosion";
+import { hardSupportCount, talusLimit, thermalSlip } from "./thermalErosion";
 
 function fail(msg: string): never {
   console.error(msg);
@@ -108,6 +108,32 @@ const n = size * size;
   console.log(JSON.stringify({ talus: +talusLimit(0.55, 0.28, 0).toFixed(3), left, right, hardCell: terrain[10 * size + 10] }));
   if (left - right > 0.305) fail("thermal should slump a cliff toward talus");
   if (Math.abs(terrain[10 * size + 10] - cliff0) > 1e-6) fail("thermal moved a hard cell");
+}
+
+{
+  const ch = new Float32Array(n);
+  const hardCh = new Float32Array(n);
+  const water = new Float32Array(n);
+  const wet = new Float32Array(n);
+  const coh = new Float32Array(n);
+  const delta = new Float32Array(n);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = y * size + x;
+      if (x < 10 || x > 21) {
+        ch[i] = 0.84;
+        hardCh[i] = 1;
+      } else {
+        ch[i] = 0.4;
+      }
+    }
+  }
+  if (hardSupportCount(hardCh, ch, size, 10, 8) < 1) fail("channel floor needs wall support");
+  const bed0 = ch[8 * size + 16];
+  const wall0 = ch[8 * size + 4];
+  thermalSlip(ch, water, wet, coh, hardCh, delta, size, 0.55, 0.28);
+  if (Math.abs(ch[8 * size + 4] - wall0) > 1e-6) fail("thermal moved channel wall");
+  if (ch[8 * size + 16] - bed0 > 0.03) fail("thermal filled hardmask channel");
 }
 
 {
