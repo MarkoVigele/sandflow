@@ -30,6 +30,10 @@ export type QualityProfile = {
   lookHeightMicro: number;
   /** Tray wood normal scale. 0 = albedo only (Low). */
   lookWoodNormal: number;
+  /** Screen-edge vignette 0..1. Low stays off (CSS overlay is free). */
+  lookVignette: number;
+  /** Cheap tray contact blob 0..1. Low skips the extra plane. */
+  lookTrayShadow: number;
 };
 
 export const QUALITY_ORDER: QualityId[] = ["low", "medium", "high", "ultra"];
@@ -63,6 +67,8 @@ export const QUALITY_PROFILE: Record<QualityId, QualityProfile> = {
     lookShoreFoam: 0.28,
     lookHeightMicro: 0,
     lookWoodNormal: 0,
+    lookVignette: 0,
+    lookTrayShadow: 0,
   },
   medium: {
     id: "medium",
@@ -80,6 +86,8 @@ export const QUALITY_PROFILE: Record<QualityId, QualityProfile> = {
     lookShoreFoam: 0.42,
     lookHeightMicro: 0.14,
     lookWoodNormal: 0.28,
+    lookVignette: 0.18,
+    lookTrayShadow: 0.22,
   },
   high: {
     id: "high",
@@ -97,6 +105,8 @@ export const QUALITY_PROFILE: Record<QualityId, QualityProfile> = {
     lookShoreFoam: 0.62,
     lookHeightMicro: 0.26,
     lookWoodNormal: 0.52,
+    lookVignette: 0.28,
+    lookTrayShadow: 0.34,
   },
   ultra: {
     id: "ultra",
@@ -114,6 +124,8 @@ export const QUALITY_PROFILE: Record<QualityId, QualityProfile> = {
     lookShoreFoam: 0.78,
     lookHeightMicro: 0.36,
     lookWoodNormal: 0.68,
+    lookVignette: 0.34,
+    lookTrayShadow: 0.42,
   },
 };
 

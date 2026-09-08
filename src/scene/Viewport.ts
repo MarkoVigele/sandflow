@@ -72,7 +72,8 @@ import { createHardTexture, createMapsTexture, uploadHard, uploadPacked } from "
 import { FlowParticles } from "./Particles";
 import { PropsLite, type PropLite } from "./PropsLite";
 import { SandMesh } from "./SandMesh";
-import { applyTrayWood, createTray, type TrayHandle } from "./Tray";
+import { lookVignette } from "./look";
+import { applyTrayShadow, applyTrayWood, createTray, type TrayHandle } from "./Tray";
 import { WaterMesh } from "./WaterMesh";
 
 export const TRAY_SIZE = 8;
@@ -361,6 +362,9 @@ export class Viewport {
     this.water.setQuality(quality, TRAY_SIZE);
     this.propsLite.setQuality(quality);
     this.fill.intensity = 0.18 + profile.lookFill * 0.35;
+    applyTrayShadow(this.tray, quality);
+    this.host.style.setProperty("--vignette", String(lookVignette(quality)));
+    this.host.dataset.look = quality;
     this.syncSunUniforms();
     const gpuSize = gpuTexelBudget(quality);
     if (this.labMaps && gpuSize !== this.labGpuSize) {

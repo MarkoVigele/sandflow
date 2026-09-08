@@ -62,6 +62,9 @@ assert(low.lookWoodNormal === 0, "low skips wood normals");
 assert(med.lookHeightMicro > 0 && ultra.lookHeightMicro > med.lookHeightMicro, "height micro scales");
 assert(med.lookWoodNormal > 0 && ultra.lookWoodNormal > med.lookWoodNormal, "wood normal scales");
 
+assert(low.lookVignette === 0 && low.lookTrayShadow === 0, "low skips vignette/blob");
+assert(med.lookVignette > 0 && high.lookVignette > med.lookVignette, "vignette rises");
+assert(ultra.lookTrayShadow > high.lookTrayShadow, "tray blob rises");
 assert(!low.shadows && !med.shadows, "shadows off until High");
 assert(high.shadows && high.shadowMap === 1024, "high shadow map 1024");
 assert(ultra.shadows && ultra.shadowMap === 2048, "ultra shadow map 2048");

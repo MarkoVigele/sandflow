@@ -142,3 +142,13 @@ export function waterSpecCap(quality: QualityId, mobile = isMobile()): number {
 export function lookAoSteps(quality: QualityId): number {
   return qualityProfile(quality).lookAoSteps;
 }
+
+/** Screen vignette strength. Low is 0 so the overlay is a no-op. */
+export function lookVignette(quality: QualityId): number {
+  return qualityProfile(quality).lookVignette;
+}
+
+/** Tray contact-blob opacity. Low hides the plane. */
+export function trayShadowOpacity(quality: QualityId): number {
+  return qualityProfile(quality).lookTrayShadow;
+}

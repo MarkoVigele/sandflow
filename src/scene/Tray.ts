@@ -3,6 +3,7 @@ import { fitCanvas } from "../assets/deriveMaps";
 import { gpuAnisotropy, gpuTexelBudget } from "../assets/texturePaths";
 import { qualityProfile } from "../state/quality";
 import type { QualityId } from "../state/types";
+import { trayShadowOpacity } from "./look";
 import { canvasTexture } from "./mapsTexture";
 
 /** Inner wall sits outside the sand plane so the rim does not z-fight the bed. */
@@ -17,6 +18,7 @@ export type TrayHandle = {
   wood: THREE.MeshStandardMaterial;
   lip: THREE.MeshStandardMaterial;
   maps: THREE.Texture[];
+  shadow: THREE.Mesh;
 };
 
 /**
@@ -130,8 +132,49 @@ export function createTray(traySize: number): TrayHandle {
   under.position.y = -0.02;
   under.receiveShadow = true;
 
-  g.add(north, south, west, east, lipN, lipS, lipW, lipE, table, under);
-  return { group: g, wood, lip: rimDark, maps: [] };
+  const shadow = createTrayShadow(outer);
+  g.add(north, south, west, east, lipN, lipS, lipW, lipE, table, under, shadow);
+  return { group: g, wood, lip: rimDark, maps: [], shadow };
+}
+
+/** Soft radial blob on the bench — cheaper than a second shadow map. */
+function createTrayShadow(outer: number): THREE.Mesh {
+  const size = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const g = ctx.createRadialGradient(size / 2, size / 2, size * 0.08, size / 2, size / 2, size * 0.48);
+  g.addColorStop(0, "rgba(0,0,0,0.62)");
+  g.addColorStop(0.42, "rgba(0,0,0,0.22)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.LinearSRGBColorSpace;
+  const mat = new THREE.MeshBasicMaterial({
+    map: tex,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(outer + 2.4, outer + 2.4), mat);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.y = 0.002;
+  mesh.name = "tray-shadow";
+  mesh.renderOrder = 0;
+  mesh.visible = false;
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
+  return mesh;
+}
+
+export function applyTrayShadow(tray: TrayHandle, quality: QualityId): void {
+  const opacity = trayShadowOpacity(quality);
+  const mat = tray.shadow.material as THREE.MeshBasicMaterial;
+  mat.opacity = opacity;
+  tray.shadow.visible = opacity > 0.01;
 }
 
 export function applyTrayWood(
