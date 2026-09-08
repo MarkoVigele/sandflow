@@ -26,6 +26,8 @@ export type QualityProfile = {
   lookSpecCap: number;
   /** Soft shore foam from flow velocity. */
   lookShoreFoam: number;
+  /** Animated bed caustics under water. 0 = skip (Low). */
+  lookCaustic: number;
   /** Height-normal micro-relief (dFdx of bed height). 0 = skip. */
   lookHeightMicro: number;
   /** Tray wood normal scale. 0 = albedo only (Low). */
@@ -65,6 +67,7 @@ export const QUALITY_PROFILE: Record<QualityId, QualityProfile> = {
     lookGrain: 0.22,
     lookSpecCap: 0.055,
     lookShoreFoam: 0.28,
+    lookCaustic: 0,
     lookHeightMicro: 0,
     lookWoodNormal: 0,
     lookVignette: 0,
@@ -84,6 +87,7 @@ export const QUALITY_PROFILE: Record<QualityId, QualityProfile> = {
     lookGrain: 0.38,
     lookSpecCap: 0.075,
     lookShoreFoam: 0.42,
+    lookCaustic: 0.32,
     lookHeightMicro: 0.14,
     lookWoodNormal: 0.28,
     lookVignette: 0.18,
@@ -103,6 +107,7 @@ export const QUALITY_PROFILE: Record<QualityId, QualityProfile> = {
     lookGrain: 0.55,
     lookSpecCap: 0.1,
     lookShoreFoam: 0.62,
+    lookCaustic: 0.58,
     lookHeightMicro: 0.26,
     lookWoodNormal: 0.52,
     lookVignette: 0.28,
@@ -122,6 +127,7 @@ export const QUALITY_PROFILE: Record<QualityId, QualityProfile> = {
     lookGrain: 0.72,
     lookSpecCap: 0.12,
     lookShoreFoam: 0.78,
+    lookCaustic: 0.82,
     lookHeightMicro: 0.36,
     lookWoodNormal: 0.68,
     lookVignette: 0.34,

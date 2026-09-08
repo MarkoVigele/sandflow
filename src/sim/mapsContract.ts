@@ -19,7 +19,7 @@
  * Required sim uniforms (names stay):
  *   uMaps, uHeightScale, uTexel
  * Optional look uniforms: uTraySize (world width), uRelief, uPivot,
- *   uWaveAmp, uWaveDetail, uTime (water surface only).
+ *   uWaveAmp, uWaveDetail, uTime (water surface + bed caustics).
  * Water displacement: sim owns G/A (despike, channel-preserving blur,
  * Lipschitz clamp, flow damping). Shaders add a thin capped sheet (≤ 0.012)
  * on top of R — never a raw SWE column. Do not re-sharpen G.

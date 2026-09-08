@@ -30,6 +30,10 @@ const KERNEL = [1, 3, 6, 3, 1] as const;
 export const LIPSCHITZ_RATIO = 1.1;
 export const LIPSCHITZ_PAD = 0.0024;
 export const LIPSCHITZ_ITERS = 8;
+/** Isolated pour/rain cells flatten to a mound, not a cone. */
+export const INLET_ISOLATED_RATIO = 1.28;
+export const INLET_ISOLATED_PAD = 0.004;
+export const INLET_NEIGHBOR_PAD = 0.006;
 /** Physics pour/source: kill columns, leave threads. */
 export const PHYSICS_LIPSCHITZ_RATIO = 1.35;
 export const PHYSICS_LIPSCHITZ_PAD = 0.006;
@@ -285,6 +289,42 @@ export function relaxPhysicsSpikes(
   );
 }
 
+/**
+ * Pour / rain / source inlets: if a cell towers over its 4-neighbors,
+ * flatten it to a soft mound. Volume fans into the 3×3 so the GPU never
+ * sees a cone. Channel veins (center ≈ neighbors) are left alone.
+ */
+export function flattenInletCones(
+  field: Float32Array,
+  scratch: Float32Array,
+  size: number,
+): void {
+  if (size < 3) return;
+  scratch.set(field);
+  for (let y = 1; y < size - 1; y++) {
+    const row = y * size;
+    for (let x = 1; x < size - 1; x++) {
+      const i = row + x;
+      const w = scratch[i];
+      if (w < WET_EPS) continue;
+      const nMax = neighborMax4(scratch, size, x, y);
+      const ceil = nMax * INLET_ISOLATED_RATIO + INLET_ISOLATED_PAD;
+      if (w <= ceil) continue;
+      const keep = Math.min(w, nMax + INLET_NEIGHBOR_PAD);
+      const excess = w - keep;
+      field[i] = keep;
+      if (!(excess > 1e-9)) continue;
+      const share = excess / 8;
+      for (let oy = -1; oy <= 1; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          if (ox === 0 && oy === 0) continue;
+          field[idx(x + ox, y + oy, size)] += share;
+        }
+      }
+    }
+  }
+}
+
 export function blurWaterField(
   src: Float32Array,
   dst: Float32Array,
@@ -373,7 +413,9 @@ export function prepareDisplayMaps(
     throw new Error("prepareDisplayMaps: buffer size mismatch");
   }
   despikeWater(water, outWater, size);
+  flattenInletCones(outWater, scratch, size);
   blurWaterField(outWater, outWater, scratch, size);
+  flattenInletCones(outWater, scratch, size);
   clampWaterLipschitz(outWater, scratch, size);
   for (let i = 0; i < n; i++) {
     let w = outWater[i];

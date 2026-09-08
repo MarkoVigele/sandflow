@@ -1075,6 +1075,7 @@ export class Viewport {
     }
 
     this.water.tick(t);
+    this.sand.tick(t);
     if (this.lastPointer && !this.store.state.cameraMode) {
       const hit = this.hitFromClient(this.lastPointer.clientX, this.lastPointer.clientY);
       if (hit) this.refreshAim(hit);

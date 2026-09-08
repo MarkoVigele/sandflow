@@ -167,13 +167,52 @@ export function contactShadow(
 }
 
 /**
- * Extra body darken for deeper columns. Shallow films stay close to 1
- * so the bed remains readable; deep water picks up a sand-brown tint.
+ * Extra body darken for deeper columns. Films stay close to 1 so the
+ * bed remains readable; pools pick up a sand-brown-teal tint you can
+ * actually read as depth (stronger than the #45 film).
  */
 export function depthTint(depth: number): [number, number, number] {
   const d = Number.isFinite(depth) && depth > 0 ? depth : 0;
-  const t = smoothstep(0.02, 0.16, d) * 0.72;
-  return [mix(1, 0.56, t), mix(1, 0.48, t), mix(1, 0.4, t)];
+  const t = smoothstep(0.012, 0.14, d);
+  const amt = t * 0.74;
+  return [mix(1, 0.52, amt), mix(1, 0.5, amt), mix(1, 0.46, amt)];
+}
+
+/**
+ * Water body albedo before beer / foam. Films are cool-clear so rivulets
+ * read as water, not wet sand. Pools go teal-brown. Flow adds a little silt.
+ */
+export function waterBodyColor(depth: number, flow = 0): [number, number, number] {
+  const d = Number.isFinite(depth) && depth > 0 ? depth : 0;
+  const fl = Number.isFinite(flow) && flow > 0 ? Math.min(1, flow) : 0;
+  const film: [number, number, number] = [0.28, 0.72, 0.82];
+  const shallow: [number, number, number] = [0.16, 0.52, 0.62];
+  const deep: [number, number, number] = [0.1, 0.32, 0.4];
+  const t = smoothstep(0.005, 0.055, d);
+  const t2 = smoothstep(0.04, 0.14, d);
+  const body = mix3(mix3(film, shallow, t), deep, t2);
+  const silt: [number, number, number] = [0.5, 0.44, 0.34];
+  return mix3(body, silt, clamp01(fl * 1.05) * 0.16);
+}
+
+/** Anisotropic surface streak only where velocity is high. Still water = 0. */
+export function flowStreakAmp(flow: number): number {
+  const fl = Number.isFinite(flow) ? Math.max(0, flow) : 0;
+  return smoothstep(0.038, 0.15, fl) * (0.2 + Math.min(0.35, fl) * 1.6);
+}
+
+/**
+ * Bed caustic gain under a water column. 1 = identity. Strength 0 skips.
+ * Deep ponds fade the lace so the bed stays readable.
+ */
+export function bedCausticGain(depth: number, strength: number, phase: number): number {
+  const d = Number.isFinite(depth) && depth > 0 ? depth : 0;
+  const s = Number.isFinite(strength) ? clamp01(strength) : 0;
+  if (d < 0.003 || s <= 1e-5) return 1;
+  const cover = smoothstep(0.0035, 0.055, d);
+  const fade = 1 - smoothstep(0.14, 0.24, d) * 0.4;
+  const wave = 0.5 + 0.5 * Math.sin(Number.isFinite(phase) ? phase : 0);
+  return 1 + (wave - 0.5) * cover * fade * s * 0.32;
 }
 
 /**

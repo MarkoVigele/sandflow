@@ -27,56 +27,62 @@ export type WaterQualityTier = {
   /** Hard ceiling so glancing water cannot glitter into needles. */
   fresnelCap: number;
   specPower: number;
+  /** Bed caustic mix on the sand shader. 0 = skip. */
+  caustic: number;
 };
 
 export const WATER_QUALITY: Record<QualityId, WaterQualityTier> = {
   low: {
     id: "low",
-    meshSegs: 80,
+    meshSegs: 96,
     waveOctaves: 1,
     waveDisplace: 0,
     sheetCap: 0.012,
     foamDetail: 0.22,
-    beerStrength: 0.52,
-    fresnelScale: 0.48,
+    beerStrength: 0.62,
+    fresnelScale: 0.52,
     fresnelCap: 0.22,
     specPower: 10,
+    caustic: 0,
   },
   medium: {
     id: "medium",
     meshSegs: 128,
     waveOctaves: 2,
-    waveDisplace: 0.0007,
+    waveDisplace: 0.00095,
     sheetCap: 0.012,
-    foamDetail: 0.42,
-    beerStrength: 0.74,
-    fresnelScale: 0.62,
+    foamDetail: 0.48,
+    beerStrength: 0.88,
+    fresnelScale: 0.68,
     fresnelCap: 0.28,
     specPower: 16,
+    caustic: 0.32,
   },
   high: {
     id: "high",
     meshSegs: 224,
     waveOctaves: 3,
-    waveDisplace: 0.0012,
+    waveDisplace: 0.0016,
     sheetCap: 0.012,
-    foamDetail: 0.58,
-    beerStrength: 0.9,
-    fresnelScale: 0.74,
+    foamDetail: 0.66,
+    beerStrength: 1.05,
+    fresnelScale: 0.8,
     fresnelCap: 0.34,
     specPower: 22,
+    caustic: 0.58,
   },
   ultra: {
     id: "ultra",
     meshSegs: 352,
     waveOctaves: 4,
-    waveDisplace: 0.0018,
+    waveDisplace: 0.0024,
     sheetCap: 0.012,
-    foamDetail: 0.70,
-    beerStrength: 1.08,
-    fresnelScale: 0.82,
+    foamDetail: 0.78,
+    beerStrength: 1.22,
+    fresnelScale: 0.88,
     fresnelCap: 0.38,
-    specPower: 24,
+    specPower: 26,
+    caustic: 0.82,
   },
 };
 
@@ -171,7 +177,34 @@ export function suppressWaterPeak(
   const nMax = Math.max(n[0]!, n[1]!, n[2]!, n[3]!);
   const nAvg = (n[0]! + n[1]! + n[2]! + n[3]!) * 0.25;
   const avg = (c * 4 + nAvg * 8) / 12;
-  return Math.min(avg, nMax + 0.014);
+  const isolated = c > nMax * 1.35 + 0.01;
+  const pad = isolated ? 0.006 : 0.014;
+  return Math.min(avg, nMax + pad);
+}
+
+/**
+ * Flow-aligned Gerstner-style height. Still / thin water stays 0.
+ * Amplitude is hard-capped by the visual sheet so waves cannot needle.
+ */
+export function gerstnerHeight(
+  phase: number,
+  flow: number,
+  water: number,
+  displace: number,
+  octaves = 1,
+): number {
+  const amp0 = flowWaveAmp(water, flow, displace);
+  if (amp0 < 1e-8) return 0;
+  const cap = WATER_SHEET_CAP * 0.45;
+  const amp = Math.min(amp0, cap);
+  const p = Number.isFinite(phase) ? phase : 0;
+  const n = Number.isFinite(octaves) ? Math.max(1, octaves) : 1;
+  let h = Math.sin(p) * amp;
+  if (n > 1.5) h += Math.sin(p * 1.7 + 0.8) * amp * 0.38;
+  if (n > 2.5) h += Math.sin(p * 2.4 + 1.6) * amp * 0.18;
+  if (n > 3.5) h += Math.sin(p * 3.1 + 2.4) * amp * 0.08;
+  if (!Number.isFinite(h)) return 0;
+  return Math.max(-amp, Math.min(amp, h));
 }
 
 export const WATER_SHEET_CAP = 0.012;

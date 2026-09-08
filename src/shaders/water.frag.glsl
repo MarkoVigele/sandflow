@@ -76,11 +76,11 @@ void main() {
   float col = vDepth > 0.0 ? vDepth : rawW;
   if (rawW < 0.0007 && col < 0.0007) discard;
 
-  float depth = clamp(col * 12.5, 0.0, 1.0);
+  float depth = clamp(col * 11.0, 0.0, 1.0);
   float flow = clamp(vFlow, 0.0, 1.0);
   if (!(flow == flow)) flow = 0.0;
   float stream = smoothstep(0.038, 0.15, flow);
-  float turbid = clamp(flow * 1.1, 0.0, 0.45);
+  float turbid = clamp(flow * 1.05, 0.0, 0.38);
   float foam = 0.0;
 
   vec3 V = safeNormalize(vViewDir, vec3(0.0, 1.0, 0.0));
@@ -112,32 +112,32 @@ void main() {
   vec2 grad = vec2(hL - hR, hVp - hVm);
   if (!(grad.x == grad.x && grad.y == grad.y)) grad = vec2(0.0);
   float gLen = length(grad);
-  grad *= min(1.0, 0.028 / max(gLen, 1.0e-6));
+  grad *= min(1.0, 0.026 / max(gLen, 1.0e-6));
   grad *= smoothstep(0.0009, 0.018, col);
-  grad *= mix(0.10, 1.0, stream);
+  grad *= mix(0.06, 1.0, stream);
 
   vec2 fdir = safeDir(vec2((tL + wL) - (tR + wR), (tVp + wVp) - (tVm + wVm)), vec2(0.72, 0.42));
   vec2 fdir2 = vec2(-fdir.y, fdir.x);
   float spd = clamp(flow * 2.2, 0.0, 1.0);
-  float flAmp = (0.28 + depth * 0.42) * stream * (0.2 + flow * 1.35);
-  float dAlong = cos(dot(vUv, fdir) * 12.0 + uTime * (0.95 + spd * 1.4) + flow * 1.6) * 0.010 * flAmp;
+  float flAmp = (0.32 + depth * 0.48) * stream * (0.18 + flow * 1.45);
+  float dAlong = cos(dot(vUv, fdir) * 10.5 + uTime * (0.85 + spd * 1.55) + flow * 1.5) * 0.012 * flAmp;
   float dCross = 0.0;
   if (uWaveOctaves > 1.5) {
-    dCross = cos(dot(vUv, fdir2) * 19.0 - uTime * 1.45) * 0.0045 * flAmp;
+    dCross = cos(dot(vUv, fdir2) * 17.5 - uTime * 1.55) * 0.0055 * flAmp;
   }
   if (uWaveOctaves > 2.5) {
-    dAlong += cos(dot(vUv, fdir * 0.8 + fdir2 * 0.35) * 27.0 + uTime * 1.9) * 0.0024 * flAmp;
+    dAlong += cos(dot(vUv, fdir * 0.78 + fdir2 * 0.4) * 25.0 + uTime * 1.95) * 0.0028 * flAmp;
   }
   if (uWaveOctaves > 3.5) {
-    dAlong += cos(dot(vUv, fdir * 0.3 - fdir2 * 0.85) * 36.0 + uTime * 2.3) * 0.0012 * flAmp;
+    dAlong += cos(dot(vUv, fdir * 0.32 - fdir2 * 0.92) * 33.0 + uTime * 2.35) * 0.0014 * flAmp;
   }
-  dAlong += vWave * 1.05 * stream;
+  dAlong += vWave * 1.15 * stream;
 
   vec3 N = safeNormalize(
     vec3(grad.x + dAlong * fdir.x + dCross * fdir2.x, 2.0 * dx, grad.y + dAlong * fdir.y + dCross * fdir2.y),
     vec3(0.0, 1.0, 0.0)
   );
-  N = safeNormalize(mix(vec3(0.0, 1.0, 0.0), N, mix(0.14, 1.0, stream)), vec3(0.0, 1.0, 0.0));
+  N = safeNormalize(mix(vec3(0.0, 1.0, 0.0), N, mix(0.10, 1.0, stream)), vec3(0.0, 1.0, 0.0));
 
   vec3 dpdx = dFdx(vWorldPos);
   vec3 dpdy = dFdy(vWorldPos);
@@ -155,25 +155,41 @@ void main() {
   float waveF = schlick(ndv, fresScale);
   float ssF = schlick(ssFacing, fresScale);
   float fresnel = mix(waveF, ssF, uQuality > 0.5 ? 0.18 : 0.08);
-  fresnel *= mix(0.38, 0.72, depth);
+  fresnel *= mix(0.55, 0.92, depth);
   fresnel = min(fresnel, fresCap);
 
   // Optical depth from the SWE column (color), not the vertex spike.
   float optical = min(col, 0.22) / max(ndv, 0.16);
   if (uQuality > 0.5) optical = mix(optical, min(col, 0.22) / max(ssFacing, 0.16), 0.22);
-  float beerDeep = beer * mix(0.68, 1.42, smoothstep(0.012, 0.14, col));
-  vec3 sigma = vec3(2.15, 1.26, 1.06) * beerDeep;
+  float beerDeep = beer * mix(0.62, 1.28, smoothstep(0.012, 0.14, col));
+  vec3 sigma = vec3(2.05, 1.18, 0.98) * beerDeep;
   vec3 trans = exp(-sigma * optical);
-  if (!(trans.x == trans.x)) trans = vec3(0.72, 0.78, 0.80);
+  if (!(trans.x == trans.x)) trans = vec3(0.74, 0.82, 0.84);
 
-  vec3 shallow = vec3(0.64, 0.58, 0.46);
-  vec3 scatter = vec3(0.42, 0.36, 0.28);
-  vec3 silt = vec3(0.52, 0.46, 0.34);
-  vec3 foamC = vec3(0.93, 0.94, 0.92);
-  vec3 wetSand = vec3(0.34, 0.26, 0.18);
-  vec3 body = mix(scatter, shallow, trans);
-  vec3 tint = mix(vec3(1.0), vec3(0.56, 0.48, 0.40), smoothstep(0.02, 0.16, col) * 0.72);
-  vec3 base = mix(body, silt, turbid * 0.12) * tint;
+  // Saturated aqua — must survive alpha-over orange sand or it reads as wet dirt.
+  vec3 film = vec3(0.28, 0.72, 0.82);
+  vec3 shallow = vec3(0.16, 0.52, 0.62);
+  vec3 scatter = vec3(0.10, 0.32, 0.40);
+  vec3 silt = vec3(0.50, 0.46, 0.38);
+  vec3 foamC = vec3(0.94, 0.95, 0.93);
+  vec3 wetSand = vec3(0.36, 0.28, 0.20);
+  float bodyT = smoothstep(0.005, 0.055, col);
+  float bodyT2 = smoothstep(0.04, 0.14, col);
+  vec3 body = mix(mix(film, shallow, bodyT), scatter, bodyT2);
+  body = mix(body, silt, turbid * 0.10);
+  vec3 tint = mix(vec3(1.0), vec3(0.52, 0.50, 0.46), smoothstep(0.012, 0.14, col) * 0.74);
+  vec3 base = mix(body, shallow, trans) * tint;
+
+  float streak = 0.0;
+  if (stream > 0.02) {
+    float s1 = sin(dot(vUv, fdir) * 46.0 - uTime * (1.15 + spd) + flow * 2.2);
+    float s2 = 0.0;
+    if (uWaveOctaves > 1.5) {
+      s2 = sin(dot(vUv, fdir) * 72.0 + uTime * 1.7 + flow);
+    }
+    streak = (s1 * 0.7 + s2 * 0.3) * stream * (0.2 + flow * 1.4);
+    base *= 1.0 + streak * 0.055;
+  }
 
   float edge = abs(wL - rawW) + abs(wR - rawW) + abs(wVm - rawW) + abs(wVp - rawW);
   float dryN = step(wL, 0.0009) + step(wR, 0.0009) + step(wVm, 0.0009) + step(wVp, 0.0009);
@@ -192,42 +208,43 @@ void main() {
   float bedJump = abs(tL - tR) + abs(tVm - tVp);
   float drop = smoothstep(0.014, 0.055, edge) * smoothstep(0.055, 0.14, flow);
   float obstacle = smoothstep(0.016, 0.055, bedJump) * smoothstep(0.055, 0.14, flow);
-  foam = max(drop, obstacle) * mix(0.42, 0.85, foamDet);
+  foam = max(drop, obstacle) * mix(0.46, 0.88, foamDet);
   float shoreAmt = uShoreFoam > 0.01 ? uShoreFoam : 0.4;
-  foam += contact * smoothstep(0.045, 0.14, flow) * mix(0.28, 0.82, foamDet) * shoreAmt;
+  foam += contact * smoothstep(0.045, 0.14, flow) * mix(0.32, 0.88, foamDet) * shoreAmt;
   if (foamDet > 0.35) {
     float lace = sin(dot(vUv, vec2(22.0, 18.0)) + uTime * 1.55 + flow * 3.2);
     if (uQuality > 2.5) {
       lace = mix(lace, sin(dot(vUv, vec2(31.0, -24.0)) - uTime * 1.9), 0.28);
     }
-    foam *= mix(0.72, 1.08, lace * 0.5 + 0.5);
+    foam *= mix(0.70, 1.12, lace * 0.5 + 0.5);
   }
-  foam = clamp(foam, 0.0, 0.82);
+  foam = clamp(foam, 0.0, 0.84);
 
-  base = mix(base, wetSand, contact * (1.0 - foam) * 0.18);
-  base = mix(base, foamC, foam * mix(0.48, 0.72, foamDet));
+  base = mix(base, wetSand, contact * (1.0 - foam) * 0.16);
+  base = mix(base, foamC, foam * mix(0.50, 0.78, foamDet));
 
   vec3 L = safeNormalize(uSunDir, vec3(0.35, 0.88, 0.28));
   vec3 H = safeNormalize(V + L, vec3(0.0, 1.0, 0.0));
   float specPow = uSpecPower > 4.0 ? uSpecPower : 22.0;
-  float spec = pow(max(dot(N, H), 0.0), mix(specPow * 0.55, specPow * 0.9, 1.0 - foam));
-  spec *= mix(0.05, 0.12, depth) * (1.0 - foam * 0.7);
+  float spec = pow(max(dot(N, H), 0.0), mix(specPow * 0.55, specPow * 0.95, 1.0 - foam));
+  spec *= mix(0.06, 0.16, depth) * (1.0 - foam * 0.7);
+  spec *= 1.0 + max(streak, 0.0) * 0.28;
   float specCap = uSpecCap > 0.01 ? uSpecCap : 0.12;
   spec = min(spec, specCap);
   float ndl = max(dot(N, L), 0.0);
 
-  vec3 sky = vec3(0.76, 0.81, 0.86);
-  float fresAmt = mix(0.36, 0.50, clamp(uQuality * 0.22, 0.0, 1.0));
-  vec3 color = base * (0.80 + ndl * 0.16) + sky * fresnel * fresAmt + uSunColor * spec * 0.30;
-  float hi = uQuality < 1.5 ? 0.78 : 0.86;
-  color = clamp(color, vec3(0.10), vec3(hi));
+  vec3 sky = vec3(0.62, 0.80, 0.92);
+  float fresAmt = mix(0.58, 0.78, clamp(uQuality * 0.22, 0.0, 1.0));
+  vec3 color = base * (0.72 + ndl * 0.20) + sky * fresnel * fresAmt + uSunColor * spec * 0.42;
+  float hi = uQuality < 1.5 ? 0.88 : 0.94;
+  color = clamp(color, vec3(0.14), vec3(hi));
 
   float absorbAlpha = 1.0 - clamp((trans.x + trans.y + trans.z) * 0.333, 0.0, 1.0);
-  float lip = smoothstep(0.0007, 0.016, max(rawW, col));
-  float alpha = mix(0.12, 0.38, depth) + absorbAlpha * 0.10 + foam * 0.10 + fresnel * 0.18;
+  float lip = smoothstep(0.0007, 0.014, max(rawW, col));
+  float alpha = mix(0.58, 0.78, depth) + absorbAlpha * 0.08 + foam * 0.06 + fresnel * 0.12;
   if (geoArea > 4.0e-4) alpha *= mix(0.35, 1.0, smoothstep(0.28, 0.52, geoUp));
   alpha *= lip;
-  alpha = clamp(alpha, 0.08, 0.48);
+  alpha = clamp(alpha, 0.50, 0.84);
 
   gl_FragColor = vec4(color, alpha);
 }
