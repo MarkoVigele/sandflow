@@ -41,6 +41,7 @@ import {
   addCappedDelta,
   addWaterKernelCapped,
   prepareDisplayMaps,
+  relaxPhysicsSpikes,
 } from "./waterDisplay";
 
 const NEIGH = [
@@ -180,6 +181,7 @@ export class ErosionSim {
       if (src.kind === "rain") this.addRain(src);
       else this.addPointSource(src);
     }
+    relaxPhysicsSpikes(this.water, this.visScratch, this.size, 2);
     clampWaterField(this.water, maxWaterDepthFor(this.size));
   }
 
@@ -786,6 +788,7 @@ export class ErosionSim {
     const cx = Math.round(u * (size - 1));
     const cy = Math.round(v * (size - 1));
     addWaterKernelCapped(this.water, size, cx, cy, amount, 0.58, 2, 0.5, POUR_CELL_ADD_CAP);
+    relaxPhysicsSpikes(this.water, this.visScratch, size, 4);
     clampWaterField(this.water, maxWaterDepthFor(size));
   }
 

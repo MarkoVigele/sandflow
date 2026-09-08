@@ -7,12 +7,15 @@ import { ErosionSim } from "./erosionCore";
 import { unpackRgba } from "./mapsContract";
 import { getPreset } from "./presets";
 import {
+  DISPLAY_WATER_CAP,
+  LIPSCHITZ_RATIO,
   POUR_CELL_ADD_CAP,
   RAIN_CELL_ADD_CAP,
   SOURCE_CELL_ADD_CAP,
   addCappedDelta,
   addWaterKernelCapped,
   blurWaterField,
+  clampWaterLipschitz,
   dampFlowField,
   despikeWater,
   packDisplayMapsRgba,
@@ -31,7 +34,7 @@ function almost(a: number, b: number, eps: number, label: string): void {
 }
 
 {
-  if (!(POUR_CELL_ADD_CAP < 0.03 && SOURCE_CELL_ADD_CAP < POUR_CELL_ADD_CAP + 1e-9)) {
+  if (!(POUR_CELL_ADD_CAP < 0.012 && SOURCE_CELL_ADD_CAP <= POUR_CELL_ADD_CAP)) {
     fail("add caps should stay well below a needle column");
   }
   if (!(RAIN_CELL_ADD_CAP < SOURCE_CELL_ADD_CAP)) fail("rain cap should be tighter than a source");
@@ -54,7 +57,7 @@ function almost(a: number, b: number, eps: number, label: string): void {
   }
   almost(vol, 0.8, 1e-5, "capped add keeps volume");
   if (wet < 8) fail(`leftover did not spread: wet=${wet}`);
-  if (peakNeighborRatio(field, size, 0.002) > 2.8) {
+  if (peakNeighborRatio(field, size, 0.002) > 2.2) {
     fail(`capped add still a needle: ${peakNeighborRatio(field, size, 0.002)}`);
   }
 }
@@ -79,12 +82,12 @@ function almost(a: number, b: number, eps: number, label: string): void {
   needle[12 * size + 12] = 0.55;
   const dest = new Float32Array(size * size);
   despikeWater(needle, dest, size);
-  if (dest[12 * size + 12] > 0.08) fail(`despike left a column: ${dest[12 * size + 12]}`);
+  if (dest[12 * size + 12] > 0.04) fail(`despike left a column: ${dest[12 * size + 12]}`);
   if (dest[12 * size + 13] < 0.04) fail("despike should fan excess into neighbors");
   const scratch = new Float32Array(size * size);
   blurWaterField(dest, dest, scratch, size);
   const peak = peakNeighborRatio(dest, size, 0.004);
-  if (peak > 2.4) fail(`blurred needle still sharp: ${peak}`);
+  if (peak > 1.8) fail(`blurred needle still sharp: ${peak}`);
 }
 
 {
@@ -103,8 +106,8 @@ function almost(a: number, b: number, eps: number, label: string): void {
   }
   core /= 12;
   side /= 24;
-  if (core < 0.012) fail(`channel blur killed the vein: core=${core}`);
-  if (side > 0.006) fail(`channel blur sheeted the vein: side=${side}`);
+  if (core < 0.009) fail(`channel blur killed the vein: core=${core}`);
+  if (side > 0.008) fail(`channel blur sheeted the vein: side=${side}`);
 }
 
 {
@@ -116,7 +119,7 @@ function almost(a: number, b: number, eps: number, label: string): void {
   const outF = new Float32Array(size * size);
   const scratch = new Float32Array(size * size);
   dampFlowField(flow, water, outF, scratch, size);
-  if (outF[8 * size + 8] > 0.14) fail(`display flow not damped: ${outF[8 * size + 8]}`);
+  if (outF[8 * size + 8] > 0.11) fail(`display flow not damped: ${outF[8 * size + 8]}`);
   water[8 * size + 8] = 0.002;
   dampFlowField(flow, water, outF, scratch, size);
   if (outF[8 * size + 8] > 0.05) fail(`thin-film flow should mute: ${outF[8 * size + 8]}`);
@@ -132,14 +135,51 @@ function almost(a: number, b: number, eps: number, label: string): void {
   const df = new Float32Array(size * size);
   const scratch = new Float32Array(size * size);
   prepareDisplayMaps(water, flow, size, dw, df, scratch);
-  if (peakNeighborRatio(dw, size, 0.003) > 2.6) {
+  if (peakNeighborRatio(dw, size, 0.003) > 1.35) {
     fail(`display water still spiked: ${peakNeighborRatio(dw, size, 0.003)}`);
   }
+  if (dw[10 * size + 10] > 0.04) fail(`isolated column reached the GPU: ${dw[10 * size + 10]}`);
+  if (dw[10 * size + 10] > DISPLAY_WATER_CAP) fail("display cap");
   if (df[10 * size + 10] >= flow[10 * size + 10]) fail("display flow should be softer than physics");
   const packed = packDisplayMapsRgba(new Float32Array(size * size), water, new Float32Array(size * size), flow, size);
   const maps = unpackRgba(packed, size);
   almost(maps.water[10 * size + 10], dw[10 * size + 10], 1e-6, "packDisplay G");
   almost(maps.flow[10 * size + 10], df[10 * size + 10], 1e-6, "packDisplay A");
+}
+
+{
+  // P0 forest: checkerboard columns must flatten before upload.
+  const size = 28;
+  const forest = new Float32Array(size * size);
+  const flow = new Float32Array(size * size);
+  for (let y = 6; y < 22; y++) {
+    for (let x = 6; x < 22; x++) {
+      forest[y * size + x] = (x + y) % 2 === 0 ? 0.85 : 0.04;
+      flow[y * size + x] = (x + y) % 2 === 0 ? 0.4 : 0.02;
+    }
+  }
+  const dw = new Float32Array(size * size);
+  const df = new Float32Array(size * size);
+  const scratch = new Float32Array(size * size);
+  prepareDisplayMaps(forest, flow, size, dw, df, scratch);
+  const peak = peakNeighborRatio(dw, size, 0.004);
+  if (peak > LIPSCHITZ_RATIO + 0.08) fail(`GPU still sees spike cells: ${peak}`);
+  let maxJump = 0;
+  for (let y = 8; y < 20; y++) {
+    for (let x = 8; x < 20; x++) {
+      const w = dw[y * size + x];
+      const nMax = Math.max(
+        dw[y * size + x - 1],
+        dw[y * size + x + 1],
+        dw[(y - 1) * size + x],
+        dw[(y + 1) * size + x],
+      );
+      maxJump = Math.max(maxJump, w - nMax);
+    }
+  }
+  if (maxJump > 0.012) fail(`display Lipschitz failed: jump=${maxJump}`);
+  clampWaterLipschitz(forest, scratch, size);
+  if (peakNeighborRatio(forest, size, 0.004) > 1.4) fail("raw lipschitz left needles");
 }
 
 {
@@ -169,7 +209,7 @@ function almost(a: number, b: number, eps: number, label: string): void {
   }
   if (wetMid > size * 0.55) fail(`display water sheeted the slope: wetMid=${wetMid}`);
   if (wetMid < 2) fail("display water lost the vein");
-  if (visPeak > Math.min(3.2, rawPeak + 0.15)) fail(`display peak worse than physics: ${visPeak} vs ${rawPeak}`);
+  if (visPeak > 1.45) fail(`display peak still needle-like: ${visPeak} vs raw ${rawPeak}`);
 }
 
 {
@@ -181,9 +221,9 @@ function almost(a: number, b: number, eps: number, label: string): void {
   sim.pour(0.5, 0.5, 1.2);
   let peak = 0;
   for (let i = 0; i < sim.water.length; i++) if (sim.water[i] > peak) peak = sim.water[i];
-  if (peak > 0.09) fail(`pour left a physics needle: ${peak}`);
+  if (peak > 0.045) fail(`pour left a physics needle: ${peak}`);
   const maps = unpackRgba(sim.pack(), size);
-  if (peakNeighborRatio(maps.water, size, 0.003) > 2.4) {
+  if (peakNeighborRatio(maps.water, size, 0.003) > 1.35) {
     fail(`packed pour still spiked: ${peakNeighborRatio(maps.water, size, 0.003)}`);
   }
 }

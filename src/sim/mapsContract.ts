@@ -4,7 +4,7 @@
  *
  * uMaps (RGBA32F, size×size):
  *   R — terrain height
- *   G — water depth (display-smoothed at pack; physics water stays raw)
+ *   G — water depth (display: despike + blur + Lipschitz; no 1-cell spikes)
  *   B — wetness 0..1
  *   A — flow magnitude (display-damped for wave displacement / turbidity)
  *
@@ -21,8 +21,8 @@
  * Optional look uniforms: uTraySize (world width), uRelief, uPivot,
  *   uWaveAmp, uWaveDetail, uTime (water surface only).
  * Water displacement adds a depth sheet + quality-scaled Gerstner on top of R.
- * Sim owns G/A field data (despike, channel-preserving blur, flow damping).
- * Shaders own look — do not undo the field smooth by re-sharpening G/A.
+ * Sim owns G/A field data (despike, channel-preserving blur, Lipschitz clamp,
+ * flow damping). Shaders own look — safe to displace with G; do not re-sharpen.
  * AimCursor still samples R + relief only.
  * Displacement: Y = (uPivot + (R − uPivot) * uRelief) * uHeightScale
  * sand.vert normals: N = (hL-hR, 2·texel·tray, h(v+)-h(v−)) — same as AimCursor.heightfieldNormal.
