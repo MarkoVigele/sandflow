@@ -18,4 +18,5 @@ jobs:
       - run: npm run ui:smoke
       - run: npm run share:smoke
       - run: npm run assets:smoke
+      - run: npm run water:smoke
       - run: npm run build

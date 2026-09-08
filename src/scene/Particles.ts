@@ -37,7 +37,7 @@ export class FlowParticles {
       blending: THREE.NormalBlending,
       premultipliedAlpha: false,
       uniforms: {
-        uSize: { value: 2.4 },
+        uSize: { value: 2.85 },
       },
       vertexShader: particleVert,
       fragmentShader: particleFrag,

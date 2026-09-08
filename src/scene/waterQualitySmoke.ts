@@ -1,0 +1,83 @@
+import {
+  WATER_QUALITY,
+  beerTransmittance,
+  contactLineFoam,
+  flowWaveAmp,
+  schlickFresnel,
+  waterQualityIndex,
+  waterQualityTier,
+} from "./waterQuality";
+import type { QualityId } from "../state/types";
+
+function fail(msg: string): never {
+  console.error(msg);
+  throw new Error(msg);
+}
+
+function almost(a: number, b: number, eps = 1e-4, label = ""): void {
+  if (Math.abs(a - b) > eps) fail(`${label || "value"} expected ${b}, got ${a}`);
+}
+
+const order: QualityId[] = ["low", "medium", "high", "ultra"];
+
+almost(waterQualityIndex("low"), 0, 0, "low index");
+almost(waterQualityIndex("ultra"), 3, 0, "ultra index");
+
+for (let i = 1; i < order.length; i++) {
+  const prev = WATER_QUALITY[order[i - 1]];
+  const next = WATER_QUALITY[order[i]];
+  if (next.meshSegs <= prev.meshSegs) fail(`${next.id} segs should exceed ${prev.id}`);
+  if (next.waveOctaves < prev.waveOctaves) fail(`${next.id} octaves should not drop`);
+  if (next.waveDisplace < prev.waveDisplace) fail(`${next.id} displace should not drop`);
+  if (next.foamDetail < prev.foamDetail) fail(`${next.id} foam should not drop`);
+  if (next.beerStrength < prev.beerStrength) fail(`${next.id} beer should not drop`);
+}
+
+const low = waterQualityTier("low");
+const ultra = waterQualityTier("ultra");
+if (low.waveDisplace !== 0) fail("Low must skip vertex wave displacement");
+if (low.waveOctaves !== 1) fail("Low is a single cheap ripple");
+if (ultra.waveOctaves < 4) fail("Ultra needs four wave octaves");
+if (ultra.meshSegs < 320) fail("Ultra mesh should resolve vertex waves");
+if (low.meshSegs > 80) fail("Low mesh should stay cheaper than the old 80² default");
+if (low.beerStrength >= ultra.beerStrength) fail("Ultra absorbs more than Low");
+
+const sigma: [number, number, number] = [4.6, 1.25, 0.88];
+const shallow = beerTransmittance(0.004, 0.92, sigma, 1);
+const deep = beerTransmittance(0.12, 0.55, sigma, 1.28);
+if (shallow[0] <= deep[0]) fail("deep water should absorb more red");
+if (shallow[1] <= deep[1]) fail("deep water should absorb more green");
+if (deep[0] >= deep[2]) fail("Beer: red absorbs more than blue");
+if (shallow[2] < 0.85) fail(`shallow should stay clear, T.b=${shallow[2]}`);
+if (deep[0] > 0.35) fail(`deep should look inky, T.r=${deep[0]}`);
+
+const facing = schlickFresnel(0.95, 0.02, 1);
+const grazing = schlickFresnel(0.08, 0.02, 1);
+if (grazing <= facing) fail("grazing fresnel should exceed facing");
+if (facing > 0.06) fail(`facing fresnel too hot: ${facing}`);
+if (grazing < 0.55) fail(`grazing fresnel too weak: ${grazing}`);
+
+const open = contactLineFoam(0.04, [0.04, 0.038, 0.041, 0.039], 0.02, 1);
+const shore = contactLineFoam(0.008, [0.0, 0.009, 0.0, 0.012], 0.08, 1);
+if (shore <= open + 0.12) fail(`contact foam should peak at the shoreline (${shore} vs ${open})`);
+if (shore < 0.25) fail(`shoreline foam too weak: ${shore}`);
+
+const dry = contactLineFoam(0, [0, 0, 0, 0], 0, 1);
+if (dry > 0.08) fail(`dry cells should not foam: ${dry}`);
+
+almost(flowWaveAmp(0.08, 0.12, 0), 0, 1e-8, "no displace");
+const ampLow = flowWaveAmp(0.08, 0.12, low.waveDisplace);
+const ampUltra = flowWaveAmp(0.08, 0.12, ultra.waveDisplace);
+if (ampLow !== 0) fail("Low wave amp must be 0");
+if (ampUltra <= 0.0004) fail(`Ultra wave amp too small: ${ampUltra}`);
+if (flowWaveAmp(0.0004, 0.2, ultra.waveDisplace) > ampUltra * 0.25) {
+  fail("thin films should not take full wave displacement");
+}
+
+console.log("waterQualitySmoke ok", {
+  low: { segs: low.meshSegs, oct: low.waveOctaves, beer: low.beerStrength },
+  ultra: { segs: ultra.meshSegs, oct: ultra.waveOctaves, beer: ultra.beerStrength },
+  beer: { shallow, deep },
+  fresnel: { facing, grazing },
+  foam: { open, shore },
+});

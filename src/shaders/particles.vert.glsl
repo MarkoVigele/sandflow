@@ -9,6 +9,6 @@ void main() {
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   gl_Position = projectionMatrix * mv;
   float dist = max(-mv.z, 0.35);
-  float size = uSize * (140.0 / dist);
-  gl_PointSize = vAlive > 0.5 ? clamp(size, 2.0, 9.0) : 0.0;
+  float size = uSize * (155.0 / dist);
+  gl_PointSize = vAlive > 0.5 ? clamp(size, 2.2, 11.0) : 0.0;
 }
