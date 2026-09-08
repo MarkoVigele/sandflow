@@ -12,7 +12,7 @@ WebGL2, am besten Chrome oder Firefox. Telefon geht, Mittel reicht dort meist.
 - Quellen, die auf dem Sand sitzen. **Tippen wählt, Ziehen verschiebt** — auch wenn die Kamera aktiv ist.
 - Werkzeuge für Sand, Beton, Kiesel und Gießen. Beton bleibt hart, Kiesel sitzen auf einer kleinen Hartinsel.
 - Qualität von Niedrig bis Ultra, plus **Auto**. Auto bleibt an, bis wir eine feste Stufe wählen.
-- Vorlagen von der flachen Wanne bis Staudamm, inkl. Regenhang.
+- Vorlagen vom hellen Strand bis Staudamm, inkl. Quellen ziehen und Regenhang.
 - Tempo 0,25×–8×, Zeitraffer, optionale Höhenspur, PNG neben Play.
 - Speichern als JSON, Teilen per Link oder Share-JSON — ohne Cloud.
 - Farbkarte (Strömung / Nässe) und ein Querschnitt rechts in der Leiste.
@@ -63,20 +63,22 @@ Wenn es hakelt: eine Stufe tiefer, Tempo 0,5×, weniger Quellen, Ultra meiden.
 
 ## Vorlagen
 
-- **Flache Wanne** — ebenes Bett, Quelle oben. Adern entstehen von allein.
-- **Sanfte Schräge** — Gefälle, das Wasser bleibt in der Spur und gräbt nach.
+- **Flache Wanne** — eine Quelle oben. Adern entstehen von allein.
+- **Heller Strand** — helles, flaches Bett. Sanfte Quelle, dünne Adern.
+- **Sanfte Schräge** — Gefälle, Wasser bleibt in der Spur und gräbt nach.
 - **Vorgegrabenes Bett** — ein Rinnsal liegt schon da, Ufer werden später angefressen.
 - **Zwei Quellen** — zwei Zuläufe treffen sich in einer Mulde.
+- **Quellen ziehen** — drei Pins. Tippen wählt, Ziehen verschiebt.
 - **Mini-Canyon** — steile Wände, tiefes Bett.
-- **Delta / Verzweigung** — ein Zulauf teilt sich in mehrere Arme.
+- **Delta** — ein Zulauf teilt sich in mehrere Arme.
 - **Referenz-Rinne** — tiefes, klares Bett als Vergleichsspur.
 - **Dünne Adern** — viele feine Rinnen auf der Schräge.
-- **Betonkanal** — Labor-Rinne mit Betonwänden und Sandsohle. Die Wände erodieren nicht.
-- **Delta ins Becken** — Sanddelta läuft in ein Beton-Auffangbecken.
-- **Treppenüberlauf** — gestufte Betonkaskade, unten ein Sandfang.
-- **Betonwehr** — ein Wehr quert die Sandstrecke, Überlauf darunter.
-- **Regenhang** — Schräge unter Regen, Betonrinnen fangen Adern, unten eine Pfütze.
-- **Staudamm** — Betonstaumauer, See oben, Überlauf nagt unten am Sand.
+- **Betonkanal** — Betonwände, Sandsohle. Die Wände erodieren nicht.
+- **Delta ins Becken** — Sanddelta läuft in ein Betonbecken.
+- **Treppenüberlauf** — Betonkaskade, unten ein Sandfang.
+- **Betonwehr** — Wehr quert die Strecke, Überlauf darunter.
+- **Regenhang** — Regen auf der Schräge, Betonrinnen, unten eine Pfütze.
+- **Staudamm** — Staumauer, See oben, Überlauf nagt am Sand.
 
 ## Lokal
 

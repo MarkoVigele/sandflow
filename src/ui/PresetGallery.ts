@@ -28,10 +28,10 @@ export class PresetGallery {
           <div class="cards">
             ${PRESETS.map(
               (p) => `
-              <button class="card ${this.store.state.presetId === p.id ? "is-active" : ""}" data-id="${p.id}">
-                <span class="card-swatch swatch-${p.id}"></span>
-                <strong>${p.title}</strong>
-                <span>${p.blurb}</span>
+              <button class="card ${this.store.state.presetId === p.id ? "is-active" : ""}" data-id="${p.id}" aria-label="${p.title}">
+                <span class="card-swatch swatch-${p.id}" aria-hidden="true"></span>
+                <strong class="card-title">${p.title}</strong>
+                <span class="card-blurb">${p.blurb}</span>
               </button>`,
             ).join("")}
           </div>
