@@ -33,6 +33,35 @@ export const PICK_MIN_WATER = 0.007;
 export const PICK_MAX_WATER = 0.048;
 /** Filling sheets on a flat bed stop earlier than a sloped thread. */
 export const PICK_MAX_WATER_FLAT = 0.026;
+/**
+ * Water-column ceiling. Coarse grids (Low 128²) need ~1 of head so a
+ * carved delta can overtop into arms. Ultra (768²) must stay lower or the
+ * pipe solve blows up.
+ */
+export const MAX_WATER_DEPTH = 1.15;
+export const MAX_WATER_DEPTH_ULTRA = 0.28;
+const ULTRA_GRID = 640;
+
+export function maxWaterDepthFor(size: number): number {
+  if (size >= ULTRA_GRID) return MAX_WATER_DEPTH_ULTRA;
+  return MAX_WATER_DEPTH;
+}
+
+/** Cells / time — MacCormack backtrace stays local even on a 768² grid. */
+export const MAX_PIPE_SPEED = 8;
+
+export function clampWaterDepth(w: number, max = MAX_WATER_DEPTH): number {
+  if (!(w > 0)) return 0;
+  return w > max ? max : w;
+}
+
+export function clampWaterField(water: Float32Array, max = MAX_WATER_DEPTH): void {
+  for (let i = 0; i < water.length; i++) {
+    const w = water[i];
+    if (w > max) water[i] = max;
+    else if (!(w > 0)) water[i] = 0;
+  }
+}
 
 export function clamp(x: number, lo: number, hi: number): number {
   return x < lo ? lo : x > hi ? hi : x;
@@ -317,7 +346,7 @@ export function applyPipeFlux(
       const fin =
         fluxR[i - 1] + fluxL[i + 1] + fluxT[i - size] + fluxB[i + size];
       const fout = fluxL[i] + fluxR[i] + fluxT[i] + fluxB[i];
-      const d2 = Math.max(0, d1 + dt * (fin - fout));
+      const d2 = clampWaterDepth(d1 + dt * (fin - fout), maxWaterDepthFor(size));
       water[i] = d2;
       const avg = 0.5 * (d1 + d2);
       if (avg < 1e-5) {
@@ -327,8 +356,8 @@ export function applyPipeFlux(
       }
       const dWx = 0.5 * (fluxR[i - 1] - fluxL[i] + fluxR[i] - fluxL[i + 1]);
       const dWy = 0.5 * (fluxT[i - size] - fluxB[i] + fluxT[i] - fluxB[i + size]);
-      velX[i] = dWx / avg;
-      velY[i] = dWy / avg;
+      velX[i] = clamp(dWx / avg, -MAX_PIPE_SPEED, MAX_PIPE_SPEED);
+      velY[i] = clamp(dWy / avg, -MAX_PIPE_SPEED, MAX_PIPE_SPEED);
     }
   }
 }

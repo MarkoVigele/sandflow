@@ -1,5 +1,6 @@
 import { fbm } from "../assets/noise";
 import type { SourceKind, WaterSource } from "../state/types";
+import { HARD_THRESHOLD } from "./mapsContract";
 
 export interface CameraPose {
   position: [number, number, number];
@@ -22,6 +23,12 @@ export interface PresetDef {
 
 const BASE = 0.42;
 const TRAY = 0.08;
+/** Keep pins / pour kernels off the raised tray lip. */
+const SOURCE_RIM = 0.07;
+/** Rain / dam inlets that read as a flood, not a lab trickle. */
+export const SENSIBLE_SOURCE_RATE_MIN = 0.85;
+export const SENSIBLE_SOURCE_RATE_MAX = 1.85;
+const MIN_SOURCE_BED = 0.08;
 
 function idx(x: number, y: number, size: number): number {
   return y * size + x;
@@ -43,6 +50,70 @@ function source(
   if (kind) src.kind = kind;
   if (spread != null) src.spread = spread;
   return src;
+}
+
+function cellAt(u: number, v: number, size: number): { x: number; y: number; i: number } {
+  const x = Math.max(0, Math.min(size - 1, Math.round(u * (size - 1))));
+  const y = Math.max(0, Math.min(size - 1, Math.round(v * (size - 1))));
+  return { x, y, i: y * size + x };
+}
+
+/**
+ * Snap a source UV onto the sand bed: not hardmask, not the tray rim.
+ * Prefers the lowest nearby sand so pins sit in the channel, not on a wall.
+ */
+export function placeSourceOnTerrain(
+  terrain: Float32Array,
+  hard: Float32Array | undefined,
+  size: number,
+  u: number,
+  v: number,
+): { x: number; y: number } {
+  const lo = SOURCE_RIM;
+  const hi = 1 - SOURCE_RIM;
+  const u0 = clamp01(Math.max(lo, Math.min(hi, u)));
+  const v0 = clamp01(Math.max(lo, Math.min(hi, v)));
+  const here = cellAt(u0, v0, size);
+  const hereHard = (hard?.[here.i] ?? 0) >= HARD_THRESHOLD;
+  if (!hereHard && terrain[here.i] > MIN_SOURCE_BED) {
+    return { x: u0, y: v0 };
+  }
+  const radius = Math.max(4, Math.round(size * 0.045));
+  let bestU = u0;
+  let bestV = v0;
+  let bestScore = -Infinity;
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      const uu = u0 + dx / Math.max(1, size - 1);
+      const vv = v0 + dy / Math.max(1, size - 1);
+      if (uu < lo || uu > hi || vv < lo || vv > hi) continue;
+      const { i } = cellAt(uu, vv, size);
+      if ((hard?.[i] ?? 0) >= HARD_THRESHOLD) continue;
+      if (!(terrain[i] > MIN_SOURCE_BED)) continue;
+      const dist = Math.hypot(dx, dy);
+      const score = 2 - terrain[i] - dist * 0.08;
+      if (score > bestScore) {
+        bestScore = score;
+        bestU = uu;
+        bestV = vv;
+      }
+    }
+  }
+  return { x: clamp01(bestU), y: clamp01(bestV) };
+}
+
+export function sourceSitsOnTerrain(
+  terrain: Float32Array,
+  hard: Float32Array | undefined,
+  size: number,
+  src: { x: number; y: number },
+): boolean {
+  if (src.x < SOURCE_RIM || src.x > 1 - SOURCE_RIM) return false;
+  if (src.y < SOURCE_RIM || src.y > 1 - SOURCE_RIM) return false;
+  const { i } = cellAt(src.x, src.y, size);
+  if ((hard?.[i] ?? 0) >= HARD_THRESHOLD) return false;
+  if (!(terrain[i] > MIN_SOURCE_BED) || terrain[i] > 1.6) return false;
+  return true;
 }
 
 function rim(terrain: Float32Array, size: number, openDown = false): void {
@@ -574,10 +645,11 @@ export const PRESETS: PresetDef[] = [
         terrain[i] = BASE + 0.16 + (1 - v) * 0.48;
       }
       rim(terrain, size, true);
+      const rainAt = placeSourceOnTerrain(terrain, hard, size, 0.5, 0.16);
       return {
         terrain,
         hardmask: hard,
-        sources: [source("s-regen", 0.5, 0.08, 2.05, "rain", 0.46)],
+        sources: [source("s-regen", rainAt.x, rainAt.y, 1.4, "rain", 0.34)],
       };
     },
   },
@@ -624,7 +696,8 @@ export const PRESETS: PresetDef[] = [
         if (u < 0.16 || u > 0.84) terrain[i] = BASE + 0.86;
       }
       rim(terrain, size, true);
-      return { terrain, hardmask: hard, sources: [source("s-stau", 0.5, 0.08, 2.15)] };
+      const inlet = placeSourceOnTerrain(terrain, hard, size, 0.5, 0.16);
+      return { terrain, hardmask: hard, sources: [source("s-stau", inlet.x, inlet.y, 1.65)] };
     },
   },
 ];
