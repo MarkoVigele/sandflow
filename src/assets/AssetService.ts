@@ -124,10 +124,10 @@ export class ProceduralAssetProvider implements AssetProvider {
         const n2 = fbmTiled(u, v, freq * 2, 3, seed + 3);
         const n3 = fbmTiled(u, v, freq * 4, 2, seed + 7);
         const speck = hash2(x * 0.37, y * 0.41, seed);
-        const t = Math.min(1, Math.max(0, n1 * 0.7 + n2 * 0.22 + n3 * 0.08));
+        const t = Math.min(1, Math.max(0, n1 * 0.55 + n2 * 0.32 + n3 * 0.13));
         let col = mix(pal.dryA, pal.dryB, t);
         if (speck > 0.993 - pal.grain * 0.012) col = mix(col, pal.pebble, 0.55);
-        const jitter = (rand() - 0.5) * 3.2;
+        const jitter = (rand() - 0.5) * 5.5;
         const i = (y * size + x) * 4;
         aImg.data[i] = Math.max(0, Math.min(255, col[0] + jitter));
         aImg.data[i + 1] = Math.max(0, Math.min(255, col[1] + jitter * 0.8));
@@ -227,8 +227,8 @@ function withDerivedSand(
   prompt: string,
   provider: string,
 ): GeneratedMaps {
-  const dryMaps = deriveCanvasMaps(dry, 1.45);
-  const wetMaps = deriveCanvasMaps(wet, 0.95);
+  const dryMaps = deriveCanvasMaps(dry, 1.65);
+  const wetMaps = deriveCanvasMaps(wet, 1.05);
   const woodMaps = deriveCanvasMaps(wood, 0.85);
   return {
     albedo: dry,

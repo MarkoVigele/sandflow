@@ -73,7 +73,7 @@ void main() {
   if (!(wet == wet)) wet = 0.0;
   if (!(water == water) || water < 0.0) water = 0.0;
 
-  float uvScale = uUvScale > 0.2 ? uUvScale : (1.72 + uGrain * 0.9);
+  float uvScale = uUvScale > 0.2 ? uUvScale : (1.95 + uGrain * 0.95);
   vec2 tile = vUv * uvScale;
   // ~60° second sample + hash mix hides JPEG blocks without a second normal fetch.
   vec2 tileB = vec2(0.5 * tile.x - 0.8660254 * tile.y, 0.8660254 * tile.x + 0.5 * tile.y) * 0.84
@@ -99,7 +99,7 @@ void main() {
   vec3 wetCol = mix(moistened, wetAlb, 0.34);
   vec3 albedo = mix(dryAlb, wetCol, wetMask);
 
-  vec3 N = safeNormalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.07, vec3(0.0, 1.0, 0.0));
+  vec3 N = safeNormalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.12, vec3(0.0, 1.0, 0.0));
 
   albedo = mix(albedo, albedo * vec3(0.92, 0.90, 0.84), smoothstep(0.003, 0.04, water) * 0.1);
 

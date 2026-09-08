@@ -51,8 +51,8 @@ assert(labTexelBudget("medium") === 512 && labTexelBudget("high") === 1024, "lab
 assert(gpuAnisotropy("medium") === 2, "medium aniso stays modest");
 assert(gpuAnisotropy("high") >= 8, "high aniso uses mips well");
 assert(gpuAnisotropy("ultra") >= 8, "ultra aniso");
-assert(sandUvScale(0.55) < 2.8, "UV scale below the old stamp repeat");
-assert(sandUvScale(0) >= 1.6 && sandUvScale(1) <= 2.8, "UV scale in a grainy but tileable band");
+assert(sandUvScale(0.55) < 3.0, "UV scale below the old stamp repeat");
+assert(sandUvScale(0) >= 1.8 && sandUvScale(1) <= 3.0, "UV scale in a grainy but tileable band");
 assert(TRAY_SAND_CLEARANCE > 0.02, "rim sits outside the sand plane");
 
 const wrapA = fbmTiled(0, 0.37, 8, 4, 99);

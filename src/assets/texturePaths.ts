@@ -31,7 +31,7 @@ export function gpuAnisotropy(quality: QualityId): number {
 /** Repeats across the tray. Lower than the old 3.4–5.4 stamp; processed maps hide the rest. */
 export function sandUvScale(grain: number): number {
   const g = Math.max(0, Math.min(1, grain));
-  return 1.72 + g * 0.9;
+  return 1.95 + g * 0.95;
 }
 
 export function bakedTextureUrl(
