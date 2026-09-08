@@ -39,6 +39,7 @@ import {
   lapseSpeed,
   speedFromIndex,
   speedIndex,
+  stepAccumAfterTransport,
   stepsThisFrame,
   togglePlaying,
 } from "./transport";
@@ -151,6 +152,9 @@ assert(playOnboard.playing && playOnboard.onboardStep === 0 && playOnboard.persi
 assert(stepsThisFrame(0.25, 0.8).steps === 1, "sub-1 speed accumulates");
 assert(stepsThisFrame(2, 0).steps === 2, "2× steps two");
 assert(stepsThisFrame(0, 0).steps === 0, "paused speed 0");
+assert(stepAccumAfterTransport(false, false, 0.8) === 0, "pause clears fractional ticks");
+assert(stepAccumAfterTransport(true, true, 0.8) === 0, "zeitraffer jump clears accum");
+assert(stepAccumAfterTransport(true, false, 0.8) === 0.8, "steady play keeps accum");
 
 const size = 8;
 const terrain = new Float32Array(size * size).map((_, i) => (i % size) / size);

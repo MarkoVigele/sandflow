@@ -46,3 +46,9 @@ export function stepsThisFrame(speed: number, accum: number): { steps: number; a
   }
   return { steps: Math.round(s), accum: 0 };
 }
+
+/** Drop fractional ticks on pause or a Zeitraffer jump so the next play starts clean. */
+export function stepAccumAfterTransport(playing: boolean, speedChanged: boolean, accum: number): number {
+  if (!playing || speedChanged) return 0;
+  return Number.isFinite(accum) ? accum : 0;
+}

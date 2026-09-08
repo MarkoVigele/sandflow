@@ -47,10 +47,25 @@ export function planSimStep(
   return { send, backlog: 0, skipped: n - send };
 }
 
+/**
+ * Pause must drop the coalesced tick. Flushing it after Play/Zeitraffer
+ * would keep the worker stepping while the UI thinks it is stopped.
+ */
+export function planFlushBacklog(
+  playing: boolean,
+  pendingFrames: number,
+  backlog: number,
+): { send: number; backlog: number } {
+  if (!playing) return { send: 0, backlog: 0 };
+  if (pendingFrames > 0 || backlog <= 0) return { send: 0, backlog };
+  return { send: backlog, backlog: 0 };
+}
+
 export class SimClient {
   private worker: Worker;
   busy = false;
   skippedSteps = 0;
+  playing = true;
   private pendingFrames = 0;
   private backlog = 0;
   private frameHandlers = new Set<(f: SimFrame) => void>();
@@ -107,12 +122,17 @@ export class SimClient {
     this.busy = true;
   }
 
+  setPlaying(playing: boolean): void {
+    this.playing = playing;
+    if (!playing) this.backlog = 0;
+  }
+
   private flushBacklog(): void {
-    if (this.pendingFrames > 0 || this.backlog <= 0) return;
-    const n = this.backlog;
-    this.backlog = 0;
+    const plan = planFlushBacklog(this.playing, this.pendingFrames, this.backlog);
+    this.backlog = plan.backlog;
+    if (plan.send <= 0) return;
     this.expectFrame();
-    this.send({ type: "step", steps: n });
+    this.send({ type: "step", steps: plan.send });
   }
 
   init(
