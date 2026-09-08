@@ -251,6 +251,7 @@ export class Viewport {
     this.syncAimHost();
     this.unsubStore = this.store.subscribe(() => {
       this.syncAimHost();
+      this.sim?.setPlaying(this.store.state.playing);
       if (this.store.state.cameraMode) this.aim.hide();
       else if (this.lastPointer) {
         const hit = this.hitFromClient(this.lastPointer.clientX, this.lastPointer.clientY);
@@ -264,6 +265,7 @@ export class Viewport {
     this.syncSunUniforms();
 
     this.sim = new SimClient();
+    this.sim.setPlaying(store.state.playing);
     this.sim.onFrame((frame) => this.applyFrame(frame));
 
     this.applyQuality(q, false);
