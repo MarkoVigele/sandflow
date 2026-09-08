@@ -7,6 +7,8 @@ uniform sampler2D uHard;
 uniform sampler2D uConcrete;
 uniform vec3 uSunDir;
 uniform vec3 uSunColor;
+uniform vec3 uFillDir;
+uniform vec3 uFillColor;
 uniform vec3 uAmbient;
 uniform float uReceiveShadow;
 uniform float uGrain;
@@ -17,6 +19,8 @@ uniform float uRelief;
 uniform float uPivot;
 uniform float uTexel;
 uniform float uTraySize;
+uniform float uAoSteps;
+uniform float uLookGrain;
 
 varying vec2 vUv;
 varying vec3 vWorldPos;
@@ -39,18 +43,37 @@ float heightAt(vec2 uv) {
   return (h == h) ? h : 0.0;
 }
 
-float heightfieldAO(vec2 uv, float h0, float texel) {
+// 4-tap always; diagonals + ridge axis only when the quality budget allows.
+float heightfieldAO(vec2 uv, float h0, float texel, float steps) {
   float acc = 0.0;
   acc += max(heightAt(uv + vec2(-texel, 0.0)) - h0, 0.0);
   acc += max(heightAt(uv + vec2(texel, 0.0)) - h0, 0.0);
   acc += max(heightAt(uv + vec2(0.0, -texel)) - h0, 0.0);
   acc += max(heightAt(uv + vec2(0.0, texel)) - h0, 0.0);
-  acc += max(heightAt(uv + vec2(-texel, -texel)) - h0, 0.0) * 0.65;
-  acc += max(heightAt(uv + vec2(texel, texel)) - h0, 0.0) * 0.65;
-  return clamp(1.0 - acc * 1.85, 0.48, 1.0);
+  if (steps > 2.5) {
+    acc += max(heightAt(uv + vec2(-texel, -texel)) - h0, 0.0) * 0.65;
+    acc += max(heightAt(uv + vec2(texel, texel)) - h0, 0.0) * 0.65;
+    acc += max(heightAt(uv + vec2(-texel, texel)) - h0, 0.0) * 0.65;
+    acc += max(heightAt(uv + vec2(texel, -texel)) - h0, 0.0) * 0.65;
+  }
+  if (steps > 5.5) {
+    float hL = heightAt(uv + vec2(-texel, 0.0));
+    float hR = heightAt(uv + vec2(texel, 0.0));
+    float hVm = heightAt(uv + vec2(0.0, -texel));
+    float hVp = heightAt(uv + vec2(0.0, texel));
+    vec2 ridge = vec2(hR - hL, hVp - hVm);
+    float rlen = length(ridge);
+    if (rlen > 1.0e-5) {
+      ridge *= texel * 1.35 / rlen;
+      acc += max(heightAt(uv + ridge) - h0, 0.0) * 0.85;
+      acc += max(heightAt(uv - ridge) - h0, 0.0) * 0.85;
+    }
+  }
+  return clamp(1.0 - acc * 1.85, 0.52, 1.0);
 }
 
-float heightfieldContact(vec2 uv, float h0, vec3 L, float texel, float tray) {
+float heightfieldContact(vec2 uv, float h0, vec3 L, float texel, float tray, float steps) {
+  if (steps < 0.5) return 1.0;
   vec2 dirUv = vec2(L.x, -L.z);
   float len = length(dirUv);
   if (len < 1.0e-4) return 1.0;
@@ -59,13 +82,15 @@ float heightfieldContact(vec2 uv, float h0, vec3 L, float texel, float tray) {
   float stepWorld = stepUv * tray;
   float shadow = 1.0;
   float y = h0;
-  for (int i = 1; i <= 6; i++) {
+  int n = int(clamp(steps, 1.0, 8.0) + 0.5);
+  for (int i = 1; i <= 8; i++) {
+    if (i > n) break;
     y += L.y * stepWorld;
     float hs = heightAt(uv + dirUv * stepUv * float(i));
     float occ = (hs - y) / max(stepWorld * 2.4, 1.0e-3);
-    shadow *= 1.0 - clamp(occ, 0.0, 1.0) * 0.42;
+    shadow *= 1.0 - clamp(occ, 0.0, 1.0) * 0.28;
   }
-  return clamp(shadow, 0.32, 1.0);
+  return clamp(shadow, 0.55, 1.0);
 }
 
 void main() {
@@ -95,8 +120,11 @@ void main() {
   if (!(nTex.x == nTex.x)) nTex = vec3(0.0, 0.0, 1.0);
   if (!(roughPair.x == roughPair.x)) roughPair = vec2(0.86, 0.30);
 
-  // Sharp wet/dry: wet banks go dark and cohesive; dry stays light.
-  float wetMask = smoothstep(0.008, 0.18, wet);
+  // Sharp wet/dry at the waterline; residual moisture inland stays a softer bank.
+  float wetBank = smoothstep(0.02, 0.16, wet);
+  float wetShore = smoothstep(0.0006, 0.022, water);
+  float wetSharp = smoothstep(0.006, 0.045, wet);
+  float wetMask = max(wetShore, mix(wetBank, wetSharp, wetShore));
   vec3 moistened = dryAlb * vec3(0.34, 0.28, 0.22);
   vec3 wetCol = mix(moistened, wetAlb, 0.18);
   vec3 albedo = mix(dryAlb, wetCol, wetMask);
@@ -114,7 +142,17 @@ void main() {
     albedo = mix(albedo, conc, hardMask);
   }
 
-  vec3 N = safeNormalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.12, vec3(0.0, 1.0, 0.0));
+  float lookG = clamp(uLookGrain, 0.0, 1.0);
+  float luma = dot(dryAlb, vec3(0.2126, 0.7152, 0.0722));
+  if (!(luma == luma)) luma = 0.5;
+  float micro = 1.0 + (luma - 0.5) * lookG * 0.22;
+  albedo *= mix(1.0, micro, 1.0 - hardMask * 0.65);
+
+  float nAmt = mix(0.10, 0.20, lookG);
+  vec3 N = safeNormalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * nAmt, vec3(0.0, 1.0, 0.0));
+  float gdx = dFdx(luma);
+  float gdy = dFdy(luma);
+  N = safeNormalize(N + vec3(-gdx, 0.0, -gdy) * (0.35 * lookG), vec3(0.0, 1.0, 0.0));
 
   albedo = mix(albedo, albedo * vec3(0.92, 0.90, 0.84), smoothstep(0.003, 0.04, water) * 0.1);
 
@@ -122,28 +160,35 @@ void main() {
   float roughness = mix(mix(0.90, 0.82, uGrain), 0.30, wet * 0.78);
   roughness = mix(roughness, roughTex, 0.58);
   roughness = mix(roughness, mix(0.64, 0.40, wetMask), hardMask);
+  roughness += (0.48 - luma) * lookG * 0.12;
   roughness = clamp(roughness, 0.22, 0.96);
 
   vec3 V = safeNormalize(vViewDir, vec3(0.0, 1.0, 0.0));
   vec3 L = safeNormalize(uSunDir, vec3(0.4, 0.8, 0.3));
+  vec3 Fdir = safeNormalize(uFillDir, vec3(-0.35, 0.55, -0.28));
   vec3 H = safeNormalize(V + L, vec3(0.0, 1.0, 0.0));
   float ndl = max(dot(N, L), 0.0);
-  float wrap = mix(ndl, clamp((dot(N, L) + 0.06) / 1.06, 0.0, 1.0), 0.28);
+  float wrap = mix(ndl, clamp((dot(N, L) + 0.22) / 1.22, 0.0, 1.0), 0.42);
+  float fillN = max(dot(N, Fdir), 0.0);
+  float fillWrap = mix(fillN, clamp((dot(N, Fdir) + 0.45) / 1.45, 0.0, 1.0), 0.55);
 
   float texel = max(uTexel, 1.0e-4);
   float tray = uTraySize > 0.5 ? uTraySize : 8.0;
   float h0 = heightAt(vUv);
-  float ao = heightfieldAO(vUv, h0, texel);
-  float contact = heightfieldContact(vUv, h0, L, texel, tray);
-  float slopeShade = mix(0.62, 1.0, clamp(N.y, 0.0, 1.0));
-  float gpuShadow = mix(1.0, 0.82 + wrap * 0.18, step(0.5, uReceiveShadow));
+  float ao = heightfieldAO(vUv, h0, texel, uAoSteps);
+  float contact = heightfieldContact(vUv, h0, L, texel, tray, uAoSteps);
+  float slopeShade = mix(0.72, 1.0, clamp(N.y, 0.0, 1.0));
+  float gpuShadow = mix(1.0, 0.86 + wrap * 0.14, step(0.5, uReceiveShadow));
   float shade = ao * contact * slopeShade * gpuShadow;
 
-  float specPow = mix(6.0, 22.0, 1.0 - roughness);
-  float spec = pow(max(dot(N, H), 0.0), specPow) * mix(0.012, 0.09, wet);
-  spec = min(spec, 0.09);
+  float specPow = mix(5.0, 16.0, 1.0 - roughness);
+  float spec = pow(max(dot(N, H), 0.0), specPow) * mix(0.008, 0.055, wet);
+  spec = min(spec, 0.055);
 
-  vec3 color = albedo * (uAmbient * ao + uSunColor * wrap * shade) + uSunColor * spec * shade;
+  vec3 fillC = uFillColor;
+  if (!(fillC.x == fillC.x)) fillC = vec3(0.18, 0.20, 0.22);
+  vec3 color = albedo * (uAmbient * ao + uSunColor * wrap * shade + fillC * fillWrap * ao)
+    + uSunColor * spec * shade;
   float underWater = smoothstep(0.002, 0.055, water);
   color = mix(color, color * vec3(0.74, 0.64, 0.50), underWater * 0.42);
 

@@ -12,6 +12,8 @@ uniform float uBeerStrength;
 uniform float uFresnelScale;
 uniform float uFoamDetail;
 uniform float uSpecPower;
+uniform float uSpecCap;
+uniform float uShoreFoam;
 uniform sampler2D uMaps;
 
 varying vec2 vUv;
@@ -134,18 +136,20 @@ void main() {
   // Beer's law: longer optical path in deep / glancing water, red absorbed first.
   float optical = vDepth / max(ndv, 0.12);
   if (uQuality > 0.5) optical = mix(optical, vDepth / max(ssFacing, 0.12), 0.35);
-  // Weak beer: bed stays readable. Tint is sand, not teal soup.
-  vec3 sigma = vec3(1.8, 1.15, 1.05) * beer;
+  // Depth-weighted beer: films stay clear, carved beds pick up a sand-brown tint.
+  float beerDeep = beer * mix(0.72, 1.28, smoothstep(0.008, 0.10, vDepth));
+  vec3 sigma = vec3(2.05, 1.22, 1.06) * beerDeep;
   vec3 trans = exp(-sigma * optical);
   if (!(trans.x == trans.x)) trans = vec3(0.72, 0.78, 0.80);
 
   vec3 shallow = vec3(0.64, 0.58, 0.46);
-  vec3 scatter = vec3(0.46, 0.42, 0.34);
+  vec3 scatter = vec3(0.42, 0.36, 0.28);
   vec3 silt = vec3(0.52, 0.46, 0.34);
   vec3 foamC = vec3(0.93, 0.94, 0.92);
   vec3 wetSand = vec3(0.34, 0.26, 0.18);
   vec3 body = mix(scatter, shallow, trans);
-  vec3 base = mix(body, silt, turbid * 0.12);
+  vec3 tint = mix(vec3(1.0), vec3(0.62, 0.54, 0.46), smoothstep(0.015, 0.11, vDepth) * 0.55);
+  vec3 base = mix(body, silt, turbid * 0.12) * tint;
 
   float edge =
     abs(sL.g - vDepth) + abs(sR.g - vDepth) + abs(sVm.g - vDepth) + abs(sVp.g - vDepth);
@@ -167,13 +171,15 @@ void main() {
   float thin = 1.0 - smoothstep(0.01, 0.058, vDepth);
   float flat = smoothstep(0.62, 0.88, geoUp);
   float contact = smoothstep(0.55, 2.6, dryN) * thin * flat;
-  // Foam only at turbulence: steps, obstacles, fast overflow — not a calm shoreline glow.
+  // Turbulence foam at steps / obstacles, plus soft velocity lace at the shore.
   float bedJump = abs(sL.r - sR.r) + abs(sVm.r - sVp.r);
   float drop = smoothstep(0.014, 0.055, edge) * smoothstep(0.028, 0.11, flow);
   float obstacle = smoothstep(0.016, 0.055, bedJump) * smoothstep(0.03, 0.12, flow);
   float turb = max(drop, obstacle);
   foam = turb * mix(0.5, 1.0, foamDet);
   foam += smoothstep(0.09, 0.2, flow) * 0.22;
+  float shoreAmt = uShoreFoam > 0.01 ? uShoreFoam : 0.4;
+  foam += contact * smoothstep(0.018, 0.09, flow) * mix(0.35, 1.0, foamDet) * shoreAmt;
   if (foamDet > 0.35) {
     float lace = sin(dot(vUv, vec2(46.0, 39.0)) + uTime * 3.05 + flow * 8.0);
     if (uQuality > 2.5) {
@@ -190,13 +196,16 @@ void main() {
   vec3 H = safeNormalize(V + L, vec3(0.0, 1.0, 0.0));
   float specPow = uSpecPower > 4.0 ? uSpecPower : 22.0;
   float spec = pow(max(dot(N, H), 0.0), mix(specPow * 0.4, specPow * 0.75, 1.0 - foam));
-  spec *= mix(0.1, 0.22, depth) * (1.0 - foam * 0.65);
-  spec = min(spec, 0.2);
+  spec *= mix(0.08, 0.18, depth) * (1.0 - foam * 0.65);
+  float specCap = uSpecCap > 0.01 ? uSpecCap : 0.16;
+  spec = min(spec, specCap);
   float ndl = max(dot(N, L), 0.0);
 
   vec3 sky = vec3(0.76, 0.81, 0.86);
-  vec3 color = base * (0.78 + ndl * 0.18) + sky * fresnel * 0.72 + uSunColor * spec * 0.55;
-  color = clamp(color, vec3(0.12), vec3(0.92));
+  float fresAmt = mix(0.52, 0.68, clamp(uQuality * 0.28, 0.0, 1.0));
+  vec3 color = base * (0.78 + ndl * 0.18) + sky * fresnel * fresAmt + uSunColor * spec * 0.48;
+  float hi = uQuality < 1.5 ? 0.82 : 0.90;
+  color = clamp(color, vec3(0.10), vec3(hi));
 
   float absorbAlpha = 1.0 - clamp((trans.x + trans.y + trans.z) * 0.333, 0.0, 1.0);
   float alpha = mix(0.14, 0.34, depth) + absorbAlpha * 0.08 + foam * 0.14 + fresnel * 0.32;

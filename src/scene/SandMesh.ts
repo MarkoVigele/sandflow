@@ -1,11 +1,13 @@
 import * as THREE from "three";
 import sandVert from "../shaders/sand.vert.glsl?raw";
 import sandFrag from "../shaders/sand.frag.glsl?raw";
+import { qualityProfile } from "../state/quality";
 import { DEFAULT_RELIEF, HEIGHT_PIVOT, type HeatmapMode, type QualityId } from "../state/types";
 import { canvasTexture } from "./mapsTexture";
 import { fitCanvas } from "../assets/deriveMaps";
 import { gpuAnisotropy, gpuTexelBudget, sandUvScale } from "../assets/texturePaths";
 import type { GeneratedMaps } from "../assets/AssetService";
+import { lookAoSteps } from "./look";
 
 const MESH_SEGS: Record<QualityId, number> = {
   low: 96,
@@ -58,11 +60,15 @@ export class SandMesh {
         uPivot: { value: HEIGHT_PIVOT },
         uTexel: { value: 1 / maps.image.width },
         uTraySize: { value: traySize },
-        uSunDir: { value: new THREE.Vector3(0.72, 0.48, 0.50).normalize() },
-        uSunColor: { value: new THREE.Color(1.0, 0.88, 0.68) },
-        uAmbient: { value: new THREE.Color(0.13, 0.12, 0.11) },
+        uSunDir: { value: new THREE.Vector3(0.42, 0.82, 0.38).normalize() },
+        uSunColor: { value: new THREE.Color(1.0, 0.91, 0.76) },
+        uFillDir: { value: new THREE.Vector3(-0.38, 0.55, -0.32).normalize() },
+        uFillColor: { value: new THREE.Color(0.22, 0.24, 0.27) },
+        uAmbient: { value: new THREE.Color(0.22, 0.21, 0.19) },
         uReceiveShadow: { value: 0 },
         uGrain: { value: 0.55 },
+        uAoSteps: { value: lookAoSteps(quality) },
+        uLookGrain: { value: qualityProfile(quality).lookGrain },
         uUvScale: { value: sandUvScale(0.55) },
         uHeatMode: { value: 0 },
       },
@@ -98,6 +104,8 @@ export class SandMesh {
     this.mesh.geometry = geo;
     const shadows = quality === "high" || quality === "ultra";
     this.material.uniforms.uReceiveShadow.value = shadows ? 1 : 0;
+    this.material.uniforms.uAoSteps.value = lookAoSteps(quality);
+    this.material.uniforms.uLookGrain.value = qualityProfile(quality).lookGrain;
     this.mesh.receiveShadow = shadows;
   }
 
@@ -134,10 +142,18 @@ export class SandMesh {
     this.material.uniforms.uRelief.value = relief;
   }
 
-  setSun(dir: THREE.Vector3, color: THREE.Color, ambient: THREE.Color): void {
+  setSun(
+    dir: THREE.Vector3,
+    color: THREE.Color,
+    ambient: THREE.Color,
+    fillDir?: THREE.Vector3,
+    fillColor?: THREE.Color,
+  ): void {
     this.material.uniforms.uSunDir.value.copy(dir);
     this.material.uniforms.uSunColor.value.copy(color);
     this.material.uniforms.uAmbient.value.copy(ambient);
+    if (fillDir) this.material.uniforms.uFillDir.value.copy(fillDir);
+    if (fillColor) this.material.uniforms.uFillColor.value.copy(fillColor);
   }
 
   setGrain(grain: number): void {

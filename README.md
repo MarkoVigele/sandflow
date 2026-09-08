@@ -54,7 +54,7 @@ Zusätzliche Werkzeuge: **Feststampfen** (Kohäsion lokal), **Rinne** vorzeichne
 
 - **Mittel** ist die Vorgabe auf dem Telefon, **Hoch** am Rechner.
 - **Auto** bleibt an, bis eine feste Stufe gewählt wird. Unter 25 Bildern/s rutscht die Qualität eine Stufe tiefer (Toast).
-- Gitter: Niedrig 128², Mittel 256², Hoch/Ultra 512². Pixelverhältnis und sichtbare Strömungspartikel steigen mit der Stufe (Niedrig 0, Mittel ~⅓, Hoch ~¾, Ultra voll). Schatten ab Hoch.
+- Gitter: Niedrig 128², Mittel 256², Hoch/Ultra 512². Pixelverhältnis und sichtbare Strömungspartikel steigen mit der Stufe (Niedrig 0, Mittel ~⅓, Hoch ~¾, Ultra voll). Schatten ab Hoch. Kontakt-AO, Mikro-Korn und Wasserspiegelungen folgen derselben Qualitätsstufe — Niedrig bleibt mobil-sicher (kein Schattenmarsch, gedämpftes Specular).
 - Texturen: Mittel/Niedrig bleiben bei 512er- (bzw. 256er-) Karten und niedriger Anisotropie, damit ein Qualitätswechsel die Albedo nicht neu ableitet.
 - Wenn es hakelt: Qualität senken, Tempo auf 0,5×, weniger Quellen, Ultra meiden.
 
@@ -66,7 +66,7 @@ JSON (Speichern) nimmt Höhe, Wasser, Quellen und Materialparameter in voller Ge
 
 Gegen die ursprüngliche V1-Skizze ist der spielbare Kern gewachsen. Neu bzw. fest verdrahtet:
 
-- Wasser über virtuelle Rohre (Mei / O’Brien): Fluxkarte → Geschwindigkeit → Sediment per MacCormack-Advektion. Kapazität im Gleichgewicht (C ∝ sin α · |v|), Erosion nur bei Fluss×Gefälle — stehende Tropfen brennen nicht ein. Nach dem Schnitt rutschen Ufer über den Böschungswinkel (thermisch). Flaches, lesbares Wasser über dem Bett; Wellen-Normalen folgen der Fließrichtung. Schaum nur an Turbulenz. Transiente Blasen-Cluster an Schub/Stufen, dünne Bedload-Körner in schnellem klarem Fluss.
+- Wasser über virtuelle Rohre (Mei / O’Brien): Fluxkarte → Geschwindigkeit → Sediment per MacCormack-Advektion. Kapazität im Gleichgewicht (C ∝ sin α · |v|), Erosion nur bei Fluss×Gefälle — stehende Tropfen brennen nicht ein. Nach dem Schnitt rutschen Ufer über den Böschungswinkel (thermisch). Flaches, lesbares Wasser über dem Bett; Wellen-Normalen folgen der Fließrichtung. Tieferes Wasser färbt sich sandbraun; weicher Schaum an der Uferlinie nur bei Strömung, plus Turbulenz an Stufen. Transiente Blasen-Cluster an Schub/Stufen, dünne Bedload-Körner in schnellem klarem Fluss. Weiches Key-/Fill-Licht und Höhenfeld-AO, damit Relief lesbar bleibt, ohne die Höhe aufzublasen.
 - Zielring (AimCursor) sitzt auf der verformten Sandoberfläche, nicht auf der flachen Mesh-Ebene.
 - Quellenpins sitzen auf derselben Höhe (UV → verdrängtes Gelände). Quelle ziehen verschiebt den Pin auf dem Sand.
 - Werkzeuge **Feststampfen**, **Rinne**, **Einebnen**, **Beton** (nicht erodierbar), plus **Kiesel** und **Radierer**.
