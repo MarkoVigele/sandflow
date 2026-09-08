@@ -1,5 +1,6 @@
 import {
   DEFAULT_PARAMS,
+  DEFAULT_RELIEF,
   defaultQuality,
   type HeatmapMode,
   type OnboardStep,
@@ -46,6 +47,7 @@ export interface UiState {
   texturePrompt: string;
   presetId: string;
   heatmap: HeatmapMode;
+  relief: number;
   onboardStep: OnboardStep;
   menuOpen: null | "reset" | "share";
 }
@@ -71,6 +73,7 @@ export const initialUiState = (): UiState => {
     texturePrompt: "feiner Quarzsand, warm, trocken",
     presetId: "flat",
     heatmap: "off",
+    relief: DEFAULT_RELIEF,
     onboardStep,
     menuOpen: null,
   };

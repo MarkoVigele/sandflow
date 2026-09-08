@@ -1,11 +1,14 @@
 import * as THREE from "three";
 import { MAP_R_TERRAIN } from "../sim/mapsContract";
 import { pebbleSitY } from "../scene/PropsLite";
+import { HEIGHT_PIVOT, HEIGHT_WORLD } from "../state/types";
+import { displaceY, effectiveHeight01 } from "../scene/heightDisplace";
 import {
   AIM_BRUSH_FILL,
   AIM_POUR_FILL,
   aimCursorVisible,
   aimRadiusWorld,
+  heightfieldNormal,
   isPourAim,
   pickDeformedSand,
   samplePackedHeight,
@@ -125,6 +128,46 @@ const miss = pickDeformedSand(
   mound,
 );
 assert(!miss, "ray far from tray misses");
+
+const slopeU = (u: number, _v: number): number => u;
+const nU = heightfieldNormal(0.5, 0.5, heightScale, tray, slopeU);
+assert(nU.x < -0.15, `+X slope must face −X, nx=${nU.x}`);
+assert(nU.y > 0.35, `normal stays upward, ny=${nU.y}`);
+const slopeV = (_u: number, v: number): number => v;
+const nV = heightfieldNormal(0.5, 0.5, heightScale, tray, slopeV);
+assert(nV.z > 0.15, `+V (toward −Z) slope must face +Z, nz=${nV.z}`);
+
+const tall = (): number => 1.15;
+const tallScale = HEIGHT_WORLD;
+const tallHit = pickDeformedSand(
+  new THREE.Vector3(0, 8, 0.15),
+  new THREE.Vector3(0, -1, 0),
+  tray,
+  tallScale,
+  tall,
+);
+assert(!!tallHit, "exaggerated relief still picks");
+almost(tallHit!.world.y, 1.15 * tallScale, 0.04, "tall pick Y matches displacement");
+almost(tallHit!.u, 0.5, 0.04, "tall pick u");
+almost(tallHit!.v, 0.5, 0.04, "tall pick v");
+
+almost(effectiveHeight01(HEIGHT_PIVOT, 1.5), HEIGHT_PIVOT, 1e-6, "relief keeps the bed pivot");
+almost(displaceY(HEIGHT_PIVOT, 1.5), HEIGHT_PIVOT * HEIGHT_WORLD, 1e-6, "pivot world Y stays 1.05");
+assert(
+  displaceY(1.04, 1.5) > displaceY(HEIGHT_PIVOT, 1.5) + 0.8,
+  "relief still lifts ridges above the bed",
+);
+const relieved = (u: number, v: number): number => effectiveHeight01(mound(u, v), 1.5);
+const lookRel = new THREE.Vector3(0, displaceY(mound(0.5, 0.5), 1.5), 0);
+const dirRel = lookRel.clone().sub(origin).normalize();
+const relievedHit = pickDeformedSand(origin, dirRel, tray, HEIGHT_WORLD, relieved);
+assert(!!relievedHit, "pivot relief still picks");
+almost(
+  relievedHit!.world.y,
+  displaceY(mound(relievedHit!.u, relievedHit!.v), 1.5),
+  0.05,
+  "pick Y matches relief displacement",
+);
 
 const geo = new THREE.PlaneGeometry(tray, tray, 2, 2);
 geo.rotateX(-Math.PI / 2);

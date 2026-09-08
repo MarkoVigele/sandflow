@@ -317,7 +317,7 @@ export class App {
             <p>Kurzanleitung: <strong>Sand formen</strong> → <strong>Quelle setzen</strong> → <strong>Abspielen</strong>.</p>
             <p>Rechtsklick oder zwei Finger drehen die Kamera. Ein Finger (oder die linke Taste) bedient das Werkzeug. Unter <em>Kamera</em> geht das Drehen auch mit einem Finger.</p>
             <p>Oben: <em>Tempo</em> und <em>Zeitraffer</em>, Qualität inkl. Auto, Szene oder nur Wasser zurücksetzen, Teilen per Link oder JSON. Kiesel sind kleine Steine — der Radierer nimmt sie weg.</p>
-            <p>Unter <em>Erweitert</em> liegt eine optionale Heatmap für Fluss oder Wassertiefe. Texturen entstehen lokal aus einer kurzen Beschreibung.</p>
+            <p>Unter <em>Erweitert</em> liegen Heatmap (Fluss oder Tiefe) und <em>Relief</em>, das die Höhen in der Wanne überhöht. Texturen entstehen lokal aus einer kurzen Beschreibung.</p>
           </div>
         </div>`
         : "";

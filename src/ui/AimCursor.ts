@@ -85,6 +85,26 @@ export function surfaceWorld(
   return new THREE.Vector3(x, height01 * heightScale, z);
 }
 
+/**
+ * World-space normal of the displaced sand plane.
+ * u+ → +X, v+ → −Z; Y = height01 * heightScale. Matches sand.vert.
+ */
+export function heightfieldNormal(
+  u: number,
+  v: number,
+  heightScale: number,
+  traySize: number,
+  heightAt: HeightSampleFn,
+  du = 1 / 64,
+): THREE.Vector3 {
+  const hL = heightAt(u - du, v) * heightScale;
+  const hR = heightAt(u + du, v) * heightScale;
+  const hVp = heightAt(u, v + du) * heightScale;
+  const hVm = heightAt(u, v - du) * heightScale;
+  const dx = du * traySize;
+  return new THREE.Vector3(hL - hR, 2 * dx, hVp - hVm).normalize();
+}
+
 export function isPourAim(tool: ToolId): boolean {
   return tool === "pour" || tool === "source";
 }
@@ -164,7 +184,7 @@ export function pickDeformedSand(
     origin,
     dir,
     new THREE.Vector3(-half, -0.08, -half),
-    new THREE.Vector3(half, heightScale + 0.35, half),
+    new THREE.Vector3(half, heightScale * 2.5 + 0.6, half),
   );
   if (!bounds) return fallbackPlanePick(origin, dir, traySize, heightScale, heightAt);
 
@@ -259,13 +279,7 @@ function surfaceHit(
   const world = rayPoint
     ? new THREE.Vector3(rayPoint.px, y, rayPoint.pz)
     : surfaceWorld(u, v, height01, traySize, heightScale);
-  const du = 1 / 64;
-  const hL = heightAt(u - du, v) * heightScale;
-  const hR = heightAt(u + du, v) * heightScale;
-  const hD = heightAt(u, v + du) * heightScale;
-  const hU = heightAt(u, v - du) * heightScale;
-  const dx = du * traySize;
-  const normal = new THREE.Vector3(hL - hR, 2 * dx, hD - hU).normalize();
+  const normal = heightfieldNormal(u, v, heightScale, traySize, heightAt);
   return { u, v, world, normal };
 }
 

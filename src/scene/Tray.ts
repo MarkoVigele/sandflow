@@ -40,7 +40,7 @@ export function createTray(traySize: number): TrayHandle {
     metalness: 0.02,
   });
 
-  // Sand sits at ~BASE * HEIGHT_SCALE ≈ 1.05; rim must clear that so wood is visible.
+  // Flat bed stays near BASE * HEIGHT_WORLD ≈ 1.05; Relief exaggerates ridges, not the slab.
   const wallH = 1.18;
   const wallT = 0.3;
   const inner = traySize + TRAY_SAND_CLEARANCE * 2;

@@ -2,6 +2,10 @@ uniform vec3 uSunDir;
 uniform vec3 uSunColor;
 uniform float uTime;
 uniform float uTexel;
+uniform float uHeightScale;
+uniform float uRelief;
+uniform float uPivot;
+uniform float uTraySize;
 uniform sampler2D uMaps;
 
 varying vec2 vUv;
@@ -24,42 +28,59 @@ float waterAwareHeight(vec4 s, float centerWater) {
   return s.r + mix(centerWater, w, wet);
 }
 
+float displaceY(float h01, float relief) {
+  return (uPivot + (h01 - uPivot) * relief) * uHeightScale;
+}
+
 void main() {
   if (!(vDepth == vDepth) || vDepth < 0.0009) discard;
 
-  float depth = clamp(vDepth * 16.0, 0.0, 1.0);
+  float depth = clamp(vDepth * 11.0, 0.0, 1.0);
   float flow = clamp(vFlow, 0.0, 1.0);
   if (!(flow == flow)) flow = 0.0;
-  float turbid = clamp(flow * 1.8 + depth * 0.12, 0.0, 0.65);
+  float turbid = clamp(flow * 2.6 + depth * 0.2, 0.0, 0.88);
+  float foam = smoothstep(0.028, 0.14, flow) * mix(0.92, 0.38, depth);
 
-  vec3 clearC = vec3(0.34, 0.46, 0.42);
-  vec3 shallow = vec3(0.54, 0.56, 0.50);
-  vec3 silt = vec3(0.50, 0.46, 0.38);
-  vec3 base = mix(mix(shallow, clearC, depth), silt, turbid * 0.2);
+  vec3 clearC = vec3(0.42, 0.56, 0.54);
+  vec3 shallow = vec3(0.64, 0.66, 0.60);
+  vec3 deep = vec3(0.28, 0.44, 0.46);
+  vec3 silt = vec3(0.58, 0.52, 0.40);
+  vec3 foamC = vec3(0.90, 0.92, 0.88);
+  vec3 body = mix(shallow, mix(clearC, deep, depth), clamp(depth * 1.15, 0.0, 1.0));
+  vec3 base = mix(body, silt, turbid * 0.42);
+  base = mix(base, foamC, foam * 0.78);
 
   vec3 V = safeNormalize(vViewDir, vec3(0.0, 1.0, 0.0));
   float texel = max(uTexel, 0.0015);
+  float tray = uTraySize > 0.5 ? uTraySize : 8.0;
 
   vec4 sL = texture2D(uMaps, vUv + vec2(-texel, 0.0));
   vec4 sR = texture2D(uMaps, vUv + vec2(texel, 0.0));
-  vec4 sD = texture2D(uMaps, vUv + vec2(0.0, -texel));
-  vec4 sU = texture2D(uMaps, vUv + vec2(0.0, texel));
+  vec4 sVm = texture2D(uMaps, vUv + vec2(0.0, -texel));
+  vec4 sVp = texture2D(uMaps, vUv + vec2(0.0, texel));
 
-  float hL = waterAwareHeight(sL, vDepth);
-  float hR = waterAwareHeight(sR, vDepth);
-  float hD = waterAwareHeight(sD, vDepth);
-  float hU = waterAwareHeight(sU, vDepth);
+  float relief = uRelief > 0.05 ? uRelief : 1.0;
+  float hL = displaceY(waterAwareHeight(sL, vDepth), relief);
+  float hR = displaceY(waterAwareHeight(sR, vDepth), relief);
+  float hVp = displaceY(waterAwareHeight(sVp, vDepth), relief);
+  float hVm = displaceY(waterAwareHeight(sVm, vDepth), relief);
 
-  vec2 grad = vec2(hL - hR, hD - hU);
+  float edge =
+    abs(sL.g - vDepth) + abs(sR.g - vDepth) + abs(sVm.g - vDepth) + abs(sVp.g - vDepth);
+  foam = clamp(foam + smoothstep(0.012, 0.05, edge) * (0.22 + flow * 0.45), 0.0, 1.0);
+  base = mix(base, foamC, foam * 0.55);
+
+  float dx = texel * tray;
+  vec2 grad = vec2(hL - hR, hVp - hVm);
   if (!(grad.x == grad.x && grad.y == grad.y)) grad = vec2(0.0);
-  grad *= 0.22 * smoothstep(0.0009, 0.016, vDepth);
+  grad *= smoothstep(0.0009, 0.014, vDepth);
 
   float rip =
-    sin((vUv.x + vUv.y) * 18.0 + uTime * 1.35 + flow * 3.0) * 0.008 +
-    sin((vUv.x * 1.5 - vUv.y) * 11.0 - uTime * 0.9) * 0.005;
-  rip *= depth * 0.7;
+    sin((vUv.x + vUv.y) * 22.0 + uTime * 1.55 + flow * 4.2) * 0.012 +
+    sin((vUv.x * 1.7 - vUv.y) * 13.0 - uTime * 1.15) * 0.007;
+  rip *= (0.35 + depth * 0.65) * (0.45 + flow * 1.4);
 
-  vec3 N = safeNormalize(vec3(grad.x + rip, 0.72, grad.y + rip * 0.65), vec3(0.0, 1.0, 0.0));
+  vec3 N = safeNormalize(vec3(grad.x + rip, 2.0 * dx, grad.y + rip * 0.7), vec3(0.0, 1.0, 0.0));
 
   vec3 dpdx = dFdx(vWorldPos);
   vec3 dpdy = dFdy(vWorldPos);
@@ -70,20 +91,21 @@ void main() {
   if (geoArea > 4.0e-4 && geoUp < 0.14) discard;
 
   float ndv = max(dot(N, V), 0.0);
-  float fresnel = pow(1.0 - ndv, 5.0) * 0.08 * depth;
+  float fresnel = pow(1.0 - ndv, 5.0) * mix(0.06, 0.16, depth);
 
   vec3 L = safeNormalize(uSunDir, vec3(0.4, 0.8, 0.3));
   vec3 H = safeNormalize(V + L, vec3(0.0, 1.0, 0.0));
-  float spec = pow(max(dot(N, H), 0.0), 18.0) * 0.08 * depth;
-  spec = min(spec, 0.09);
+  float spec = pow(max(dot(N, H), 0.0), mix(14.0, 28.0, 1.0 - foam)) * mix(0.07, 0.16, depth);
+  spec = min(spec, 0.14);
+  float ndl = max(dot(N, L), 0.0);
 
-  vec3 color = base + uSunColor * (spec + fresnel);
-  color = mix(color, vec3(0.48, 0.50, 0.46), 0.12);
-  color = clamp(color, vec3(0.05), vec3(0.70));
+  vec3 color = base * (0.62 + ndl * 0.38) + uSunColor * (spec + fresnel);
+  color = mix(color, vec3(0.50, 0.52, 0.48), 0.08);
+  color = clamp(color, vec3(0.05), vec3(0.86));
 
-  float alpha = mix(0.34, 0.60, depth) + turbid * 0.04 + fresnel;
+  float alpha = mix(0.28, 0.52, depth) + turbid * 0.06 + foam * 0.14 + fresnel;
   if (geoArea > 4.0e-4) alpha *= mix(0.45, 1.0, smoothstep(0.14, 0.40, geoUp));
-  alpha = clamp(alpha, 0.22, 0.64);
+  alpha = clamp(alpha, 0.18, 0.62);
 
   gl_FragColor = vec4(color, alpha);
 }

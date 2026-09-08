@@ -10,6 +10,9 @@
  *
  * Required sim uniforms (names stay):
  *   uMaps, uHeightScale, uTexel
+ * Optional look uniforms: uTraySize (world width), uRelief, uPivot.
+ * Displacement: Y = (uPivot + (R − uPivot) * uRelief) * uHeightScale
+ * sand.vert normals: N = (hL-hR, 2·texel·tray, h(v+)-h(v−)) — same as AimCursor.heightfieldNormal.
  *
  * Particles: triples [u, v, terrain+water] in 0..1 uv, height in sim units.
  */

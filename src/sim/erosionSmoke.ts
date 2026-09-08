@@ -90,6 +90,27 @@ if (report.wetLow < 1) fail("Wasser kommt nicht über die Mitte hinaus");
 if (report.wetMid > size * 0.4) fail(`Flächenabfluss statt Ader: wetMid=${report.wetMid}`);
 if (report.clusters < 1) fail("keine Ader in der Mitte");
 
+function waterDepthStats(sim: ErosionSim) {
+  const depths: number[] = [];
+  for (let i = 0; i < sim.water.length; i++) {
+    if (sim.water[i] > 0.0015) depths.push(sim.water[i]);
+  }
+  depths.sort((a, b) => a - b);
+  const at = (q: number) => depths.length ? depths[Math.min(depths.length - 1, Math.round(q * (depths.length - 1)))] : 0;
+  return {
+    wet: depths.length,
+    p50: +at(0.5).toFixed(4),
+    p90: +at(0.9).toFixed(4),
+    max: +(depths[depths.length - 1] ?? 0).toFixed(4),
+  };
+}
+
+const depths90 = waterDepthStats(sim);
+console.log(JSON.stringify({ depths90 }));
+if (depths90.p90 < depths90.p50 * 1.25) {
+  fail(`zu wenig Tiefenvariation: p50=${depths90.p50} p90=${depths90.p90}`);
+}
+
 sim.step(90);
 const later = measureVein(sim, initial);
 console.log(JSON.stringify({ later }));
@@ -182,3 +203,21 @@ console.log(JSON.stringify({ bed: bedReport }));
 if (bedReport.eroded < 0.8) fail(`vorgegrabenes Bett erodiert zu wenig: ${bedReport.eroded}`);
 if (bedReport.centroidY < 30) fail(`Bett-Fluss bleibt oben: ${bedReport.centroidY}`);
 if (bedReport.wetMid > size * 0.45) fail(`Bett wird zur Fläche: wetMid=${bedReport.wetMid}`);
+
+const deltaBuilt = getPreset("delta").build(size);
+const deltaSim = new ErosionSim(size, DEFAULT_PARAMS, deltaBuilt.terrain);
+deltaSim.sources = deltaBuilt.sources;
+deltaSim.step(160);
+const row = (size * 0.72) | 0;
+let deltaClusters = 0;
+let inRun = false;
+for (let x = 2; x < size - 2; x++) {
+  const on = deltaSim.water[row * size + x] > 0.0018 || deltaSim.flow[row * size + x] > 0.012;
+  if (on && !inRun) {
+    deltaClusters++;
+    inRun = true;
+  }
+  if (!on) inRun = false;
+}
+console.log(JSON.stringify({ deltaClusters, deltaVol: +deltaSim.waterVolume().toFixed(3) }));
+if (deltaClusters < 2) fail(`Delta verzweigt nicht: clusters=${deltaClusters}`);
