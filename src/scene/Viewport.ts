@@ -183,6 +183,7 @@ export class Viewport {
     });
 
     this.applyRelief();
+    this.applyWaves();
     this.syncSunUniforms();
 
     this.sim = new SimClient();
@@ -218,6 +219,7 @@ export class Viewport {
     this.sim.setParams(this.store.state.params);
     this.sand.setGrain(this.store.state.params.grain);
     this.applyRelief();
+    this.applyWaves();
   }
 
   get heightScale(): number {
@@ -237,6 +239,10 @@ export class Viewport {
     this.water.setHeightScale(HEIGHT_WORLD);
     this.sand.setRelief(relief);
     this.water.setRelief(relief);
+  }
+
+  applyWaves(amp = this.store.state.waves): void {
+    this.water.setWaves(amp);
   }
 
   private syncSunUniforms(): void {
