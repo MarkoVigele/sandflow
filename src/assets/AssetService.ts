@@ -1,11 +1,13 @@
 import {
   darkenCanvas,
   deriveCanvasMaps,
-  generateWoodCanvas,
+  generateLabRimCanvas,
   imageToCanvas,
   packRoughnessCanvas,
+  prepareLabRimCanvas,
+  prepareSandCanvas,
 } from "./deriveMaps";
-import { fbm, hash2, mulberry32 } from "./noise";
+import { fbmTiled, hash2, mulberry32 } from "./noise";
 import { BAKED_TEXTURE_FILES, bakedTextureUrl, preferBakedSand } from "./texturePaths";
 
 export type MapKind = "albedo" | "normal" | "roughness" | "wet";
@@ -52,9 +54,9 @@ interface Palette {
 
 function parsePrompt(prompt: string): Palette {
   const p = prompt.toLowerCase();
-  let dryA: [number, number, number] = [196, 162, 112];
-  let dryB: [number, number, number] = [168, 132, 86];
-  let pebble: [number, number, number] = [122, 98, 72];
+  let dryA: [number, number, number] = [214, 186, 142];
+  let dryB: [number, number, number] = [186, 156, 112];
+  let pebble: [number, number, number] = [138, 116, 88];
   let grain = 0.55;
 
   if (/dunkel|basalt|vulkan|schwarz/.test(p)) {
@@ -113,36 +115,37 @@ export class ProceduralAssetProvider implements AssetProvider {
     const nImg = nCtx.createImageData(size, size);
     const rImg = rCtx.createImageData(size, size);
 
-    const freq = 6 + pal.grain * 10;
+    const freq = Math.max(4, Math.round(5 + pal.grain * 8));
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         const u = x / size;
         const v = y / size;
-        const n1 = fbm(u * freq, v * freq, 4, seed);
-        const n2 = fbm(u * freq * 2.4 + 4.1, v * freq * 2.4, 3, seed + 3);
+        const n1 = fbmTiled(u, v, freq, 4, seed);
+        const n2 = fbmTiled(u, v, freq * 2, 3, seed + 3);
+        const n3 = fbmTiled(u, v, freq * 4, 2, seed + 7);
         const speck = hash2(x * 0.37, y * 0.41, seed);
-        const t = Math.min(1, Math.max(0, n1 * 0.82 + n2 * 0.18));
+        const t = Math.min(1, Math.max(0, n1 * 0.55 + n2 * 0.32 + n3 * 0.13));
         let col = mix(pal.dryA, pal.dryB, t);
-        if (speck > 0.978 - pal.grain * 0.03) col = pal.pebble;
-        const jitter = (rand() - 0.5) * 4;
+        if (speck > 0.993 - pal.grain * 0.012) col = mix(col, pal.pebble, 0.55);
+        const jitter = (rand() - 0.5) * 5.5;
         const i = (y * size + x) * 4;
         aImg.data[i] = Math.max(0, Math.min(255, col[0] + jitter));
         aImg.data[i + 1] = Math.max(0, Math.min(255, col[1] + jitter * 0.8));
         aImg.data[i + 2] = Math.max(0, Math.min(255, col[2] + jitter * 0.5));
         aImg.data[i + 3] = 255;
 
-        const hL = fbm((x - 1) / size * freq, v * freq, 4, seed);
-        const hR = fbm((x + 1) / size * freq, v * freq, 4, seed);
-        const hD = fbm(u * freq, (y - 1) / size * freq, 4, seed);
-        const hU = fbm(u * freq, (y + 1) / size * freq, 4, seed);
-        const nx = (hL - hR) * (0.7 + pal.grain * 0.45);
-        const ny = (hD - hU) * (0.7 + pal.grain * 0.45);
+        const hL = fbmTiled((x - 1) / size, v, freq, 4, seed);
+        const hR = fbmTiled((x + 1) / size, v, freq, 4, seed);
+        const hD = fbmTiled(u, (y - 1) / size, freq, 4, seed);
+        const hU = fbmTiled(u, (y + 1) / size, freq, 4, seed);
+        const nx = (hL - hR) * (0.55 + pal.grain * 0.4);
+        const ny = (hD - hU) * (0.55 + pal.grain * 0.4);
         nImg.data[i] = Math.max(0, Math.min(255, 128 + nx * 96));
         nImg.data[i + 1] = Math.max(0, Math.min(255, 128 + ny * 96));
         nImg.data[i + 2] = 255;
         nImg.data[i + 3] = 255;
 
-        const rough = 180 + n2 * 50 + pal.grain * 20;
+        const rough = 176 + n2 * 46 + pal.grain * 18;
         rImg.data[i] = rImg.data[i + 1] = rImg.data[i + 2] = Math.min(255, rough);
         rImg.data[i + 3] = 255;
       }
@@ -152,7 +155,7 @@ export class ProceduralAssetProvider implements AssetProvider {
     nCtx.putImageData(nImg, 0, 0);
     rCtx.putImageData(rImg, 0, 0);
 
-    return { albedo, normal, roughness, prompt, provider: this.id };
+    return { albedo, albedoWet: darkenCanvas(albedo), normal, roughness, prompt, provider: this.id };
   }
 }
 
@@ -224,9 +227,9 @@ function withDerivedSand(
   prompt: string,
   provider: string,
 ): GeneratedMaps {
-  const dryMaps = deriveCanvasMaps(dry, 1.7);
-  const wetMaps = deriveCanvasMaps(wet, 1.15);
-  const woodMaps = deriveCanvasMaps(wood, 1.35);
+  const dryMaps = deriveCanvasMaps(dry, 1.65);
+  const wetMaps = deriveCanvasMaps(wet, 1.05);
+  const woodMaps = deriveCanvasMaps(wood, 0.85);
   return {
     albedo: dry,
     albedoWet: wet,
@@ -248,15 +251,21 @@ export async function loadLabMaps(
 ): Promise<GeneratedMaps> {
   const dryImg = await loadOptionalImage(bakedTextureUrl(BAKED_TEXTURE_FILES.sandDry), loadImage);
   const wetImg = await loadOptionalImage(bakedTextureUrl(BAKED_TEXTURE_FILES.sandWet), loadImage);
+  const labRimImg = await loadOptionalImage(bakedTextureUrl(BAKED_TEXTURE_FILES.labRim), loadImage);
   const woodImg = await loadOptionalImage(bakedTextureUrl(BAKED_TEXTURE_FILES.woodRim), loadImage);
+  const rimImg = labRimImg ?? woodImg;
 
-  const wood = woodImg ? imageToCanvas(woodImg, maxSize) : generateWoodCanvas(Math.min(512, maxSize));
+  const rimSize = Math.min(512, maxSize);
+  const wood = rimImg ? prepareLabRimCanvas(imageToCanvas(rimImg, maxSize)) : generateLabRimCanvas(rimSize);
   const useBakedDry = preferBakedSand(prompt) && !!dryImg;
   const procSize = Math.min(512, maxSize);
-  const dry = useBakedDry ? imageToCanvas(dryImg!, maxSize) : (await procedural.generate(prompt, procSize)).albedo;
-  const wet = wetImg ? imageToCanvas(wetImg, maxSize) : darkenCanvas(dry);
+  const dry = useBakedDry
+    ? prepareSandCanvas(imageToCanvas(dryImg!, maxSize), "dry")
+    : (await procedural.generate(prompt, procSize)).albedo;
+  const wet =
+    useBakedDry && wetImg ? prepareSandCanvas(imageToCanvas(wetImg, maxSize), "wet") : darkenCanvas(dry);
 
-  const bakedCount = Number(!!dryImg) + Number(!!wetImg) + Number(!!woodImg);
+  const bakedCount = Number(!!dryImg) + Number(!!wetImg) + Number(!!rimImg);
   const provider =
     bakedCount === 3 && useBakedDry ? "baked" : bakedCount > 0 ? "baked+procedural" : "procedural";
 

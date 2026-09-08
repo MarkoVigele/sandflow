@@ -40,6 +40,52 @@ export function fbm(
   return sum / norm;
 }
 
+/** Periodic value noise. `periodX` / `periodY` are the wrap period in cells. */
+export function valueNoiseTiled(
+  x: number,
+  y: number,
+  periodX: number,
+  periodY: number,
+  seed = 1337,
+): number {
+  const px = Math.max(1, Math.round(periodX));
+  const py = Math.max(1, Math.round(periodY));
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const x0 = ((xi % px) + px) % px;
+  const y0 = ((yi % py) + py) % py;
+  const x1 = (x0 + 1) % px;
+  const y1 = (y0 + 1) % py;
+  const fx = fade(x - xi);
+  const fy = fade(y - yi);
+  const a = hash2(x0, y0, seed);
+  const b = hash2(x1, y0, seed);
+  const c = hash2(x0, y1, seed);
+  const d = hash2(x1, y1, seed);
+  return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+}
+
+/** Tileable FBM. `u`,`v` in [0,1]; `freq` is rounded to an integer period. */
+export function fbmTiled(
+  u: number,
+  v: number,
+  freq = 8,
+  octaves = 5,
+  seed = 1337,
+): number {
+  let period = Math.max(1, Math.round(freq));
+  let amp = 0.5;
+  let sum = 0;
+  let norm = 0;
+  for (let i = 0; i < octaves; i++) {
+    sum += amp * valueNoiseTiled(u * period, v * period, period, period, seed + i * 19);
+    norm += amp;
+    amp *= 0.5;
+    period *= 2;
+  }
+  return sum / norm;
+}
+
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {

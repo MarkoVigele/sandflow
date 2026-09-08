@@ -6,6 +6,7 @@ export const BAKED_TEXTURE_FILES = {
   sandDry: "sand-dry-albedo.jpg",
   sandWet: "sand-wet-albedo.jpg",
   woodRim: "wood-rim.jpg",
+  labRim: "concrete-albedo.jpg",
 } as const;
 
 /** GPU albedo/normal/rough size. Medium stays at 512 so mobile does not thrash 1k maps. */
@@ -23,14 +24,14 @@ export function labTexelBudget(quality: QualityId): number {
 export function gpuAnisotropy(quality: QualityId): number {
   if (quality === "low") return 1;
   if (quality === "medium") return 2;
-  if (quality === "high") return 4;
-  return 8;
+  if (quality === "high") return 8;
+  return 16;
 }
 
-/** Repeats across the tray. Fine grain tiles more, but stays below the old 3.4–5.4 stamp. */
+/** Repeats across the tray. Lower than the old 3.4–5.4 stamp; processed maps hide the rest. */
 export function sandUvScale(grain: number): number {
   const g = Math.max(0, Math.min(1, grain));
-  return 2.05 + g * 1.2;
+  return 1.95 + g * 0.95;
 }
 
 export function bakedTextureUrl(

@@ -73,16 +73,19 @@ void main() {
   if (!(wet == wet)) wet = 0.0;
   if (!(water == water) || water < 0.0) water = 0.0;
 
-  float uvScale = uUvScale > 0.2 ? uUvScale : (2.05 + uGrain * 1.2);
+  float uvScale = uUvScale > 0.2 ? uUvScale : (1.95 + uGrain * 0.95);
   vec2 tile = vUv * uvScale;
-  // Second, rotated sample hides JPEG tile edges without a second normal fetch.
-  vec2 tileB = tile.yx * 0.73 + vec2(0.19, 0.33);
+  // ~60° second sample + hash mix hides JPEG blocks without a second normal fetch.
+  vec2 tileB = vec2(0.5 * tile.x - 0.8660254 * tile.y, 0.8660254 * tile.x + 0.5 * tile.y) * 0.84
+    + vec2(0.17, 0.31);
   vec3 dryA = texture2D(uAlbedo, tile).rgb;
   vec3 dryB = texture2D(uAlbedo, tileB).rgb;
   vec3 wetA = texture2D(uAlbedoWet, tile).rgb;
   vec3 wetB = texture2D(uAlbedoWet, tileB).rgb;
-  vec3 dryAlb = mix(dryA, dryB, 0.22);
-  vec3 wetAlb = mix(wetA, wetB, 0.22);
+  float stamp = fract(sin(dot(floor(vUv * 16.0), vec2(12.9898, 78.233))) * 43758.5453);
+  float mixB = mix(0.12, 0.26, stamp);
+  vec3 dryAlb = mix(dryA, dryB, mixB);
+  vec3 wetAlb = mix(wetA, wetB, mixB);
   vec3 nTex = texture2D(uNormal, tile).rgb * 2.0 - 1.0;
   vec2 roughPair = texture2D(uRough, tile).rg;
   if (!(dryAlb.x == dryAlb.x)) dryAlb = vec3(0.70, 0.58, 0.40);
@@ -90,13 +93,13 @@ void main() {
   if (!(nTex.x == nTex.x)) nTex = vec3(0.0, 0.0, 1.0);
   if (!(roughPair.x == roughPair.x)) roughPair = vec2(0.86, 0.30);
 
-  // Keep dry grain in wet patches; the wet photo is a tint, not a second stamp.
-  float wetMask = smoothstep(0.035, 0.58, wet);
-  vec3 moistened = dryAlb * vec3(0.64, 0.58, 0.50);
-  vec3 wetCol = mix(moistened, wetAlb, 0.52);
+  // Keep dry grain; wet photo is a stain, not a second albedo stamp.
+  float wetMask = smoothstep(0.02, 0.70, wet);
+  vec3 moistened = dryAlb * vec3(0.56, 0.48, 0.40);
+  vec3 wetCol = mix(moistened, wetAlb, 0.34);
   vec3 albedo = mix(dryAlb, wetCol, wetMask);
 
-  vec3 N = safeNormalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.07, vec3(0.0, 1.0, 0.0));
+  vec3 N = safeNormalize(vNormalW + vec3(nTex.x, 0.0, nTex.y) * 0.12, vec3(0.0, 1.0, 0.0));
 
   albedo = mix(albedo, albedo * vec3(0.92, 0.90, 0.84), smoothstep(0.003, 0.04, water) * 0.1);
 
