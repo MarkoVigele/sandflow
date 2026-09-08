@@ -66,6 +66,7 @@ Gegen die ursprüngliche V1-Skizze ist der spielbare Kern gewachsen. Neu bzw. fe
 
 - Wasser mit SWE-ähnlicher Kontinuität (Impuls, Trägheit, Wellenfronten). Flaches, lesbares Wasser über dem Bett; Schaum nur an Turbulenz. Transiente Blasen-Cluster an Schub/Stufen, dünne Bedload-Körner in schnellem klarem Fluss. Stehende Pools brennen nicht ein.
 - Zielring (AimCursor) sitzt auf der verformten Sandoberfläche, nicht auf der flachen Mesh-Ebene.
+- Quellenpins sitzen auf derselben Höhe (UV → verdrängtes Gelände). Quelle ziehen verschiebt den Pin auf dem Sand.
 - Werkzeuge **Feststampfen**, **Rinne**, **Einebnen**, **Beton** (nicht erodierbar), plus **Kiesel** und **Radierer**.
 - Vorlagen inkl. Referenz-Rinne, dünnen Adern und Beton-Szenen (Kanal, Becken, Treppe, Wehr); Heatmap für Fluss oder Tiefe.
 - Kurzanleitung, Tempo bis 8× / Zeitraffer, Auto-Qualität, Szene oder nur Wasser zurücksetzen.

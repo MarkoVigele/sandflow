@@ -139,30 +139,3 @@ export function applyTrayWood(
   tray.wood.needsUpdate = true;
   tray.lip.needsUpdate = true;
 }
-
-export function createSourceMarker(): THREE.Group {
-  const g = new THREE.Group();
-  const stem = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.035, 0.045, 0.28, 12),
-    new THREE.MeshStandardMaterial({
-      color: 0xb0894a,
-      metalness: 0.55,
-      roughness: 0.35,
-    }),
-  );
-  stem.position.y = 0.22;
-  const drop = new THREE.Mesh(
-    new THREE.SphereGeometry(0.055, 16, 12),
-    new THREE.MeshStandardMaterial({
-      color: 0x6aa8ba,
-      roughness: 0.2,
-      metalness: 0.1,
-      transparent: true,
-      opacity: 0.85,
-    }),
-  );
-  drop.position.y = 0.42;
-  g.add(stem, drop);
-  g.userData.drop = drop;
-  return g;
-}
