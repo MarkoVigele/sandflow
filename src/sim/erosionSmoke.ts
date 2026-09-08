@@ -1,7 +1,7 @@
 import { fbm } from "../assets/noise";
 import { DEFAULT_PARAMS } from "../state/types";
 import { ErosionSim } from "./erosionCore";
-import { MAP_A_FLOW, MAP_B_WETNESS, MAP_G_WATER, MAP_R_TERRAIN, unpackRgba } from "./mapsContract";
+import { MAP_B_WETNESS, MAP_R_TERRAIN, unpackRgba } from "./mapsContract";
 import { getPreset } from "./presets";
 
 function fail(msg: string): never {

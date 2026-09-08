@@ -19,7 +19,7 @@ export const RAIN_CELL_ADD_CAP = 0.003;
 const WET_EPS = 0.00035;
 const DESPIKE_RATIO = 1.22;
 const DESPIKE_PAD = 0.0035;
-const DRY_WEIGHT = 0.08;
+const DRY_WEIGHT = 0.018;
 const BLUR_PASSES = 4;
 const TEMPORAL_WATER = 0.34;
 const TEMPORAL_FLOW = 0.48;
@@ -200,6 +200,9 @@ function blurAxis(
     for (let x = 1; x < size - 1; x++) {
       const i = idx(x, y, size);
       const center = src[i];
+      // Dry cells stay dry so a 1-wide vein cannot sheet. Isolated
+      // needles are already fanned by despike / Lipschitz.
+      if (center < WET_EPS) continue;
       const nMax = neighborMax4(src, size, x, y);
       const spike = center > nMax * DESPIKE_RATIO + DESPIKE_PAD;
       let acc = 0;
@@ -210,9 +213,7 @@ function blurAxis(
         if (xx < 0 || yy < 0 || xx >= size || yy >= size) continue;
         const s = src[idx(xx, yy, size)];
         const kern = KERNEL[k + 2];
-        const wet = s > WET_EPS || center > WET_EPS;
-        const allowDry = spike || center < WET_EPS;
-        const w = kern * (wet ? (s > WET_EPS || allowDry ? 1 : DRY_WEIGHT) : DRY_WEIGHT);
+        const w = kern * (s > WET_EPS || spike ? 1 : DRY_WEIGHT);
         acc += s * w;
         wsum += w;
       }

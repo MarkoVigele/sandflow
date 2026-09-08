@@ -138,8 +138,12 @@ function almost(a: number, b: number, eps: number, label: string): void {
   if (peakNeighborRatio(dw, size, 0.003) > 1.35) {
     fail(`display water still spiked: ${peakNeighborRatio(dw, size, 0.003)}`);
   }
-  if (dw[10 * size + 10] > 0.04) fail(`isolated column reached the GPU: ${dw[10 * size + 10]}`);
-  if (dw[10 * size + 10] > DISPLAY_WATER_CAP) fail("display cap");
+  const iso = dw[10 * size + 10];
+  const isoN =
+    (dw[10 * size + 9] + dw[10 * size + 11] + dw[9 * size + 10] + dw[11 * size + 10]) / 4;
+  if (iso > 0.12) fail(`isolated column reached the GPU: ${iso}`);
+  if (iso > isoN * 1.35 + 0.004) fail(`isolated cell still towers: ${iso} vs n=${isoN}`);
+  if (iso > DISPLAY_WATER_CAP) fail("display cap");
   if (df[10 * size + 10] >= flow[10 * size + 10]) fail("display flow should be softer than physics");
   const packed = packDisplayMapsRgba(new Float32Array(size * size), water, new Float32Array(size * size), flow, size);
   const maps = unpackRgba(packed, size);
