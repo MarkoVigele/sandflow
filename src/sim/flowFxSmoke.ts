@@ -5,6 +5,7 @@ import {
   KIND_FOAM,
   KIND_GRAIN,
   PARTICLE_STRIDE,
+  VISUAL_WATER_SHEET_CAP,
   bubbleSpawnScore,
   countByKind,
   grainSpawnScore,
@@ -12,6 +13,7 @@ import {
   packParticleAttr,
   unpackParticleKind,
   unpackParticleLife,
+  visualWaterSheet,
 } from "./flowFx";
 import { getPreset } from "./presets";
 
@@ -23,6 +25,11 @@ function fail(msg: string): never {
 function almost(a: number, b: number, eps = 1e-4, label = ""): void {
   if (Math.abs(a - b) > eps) fail(`${label || "value"} expected ${b}, got ${a}`);
 }
+
+if (visualWaterSheet(1.15) > VISUAL_WATER_SHEET_CAP + 1e-6) {
+  fail(`foam sheet must cap SWE spikes: ${visualWaterSheet(1.15)}`);
+}
+if (visualWaterSheet(0.01) > 0.008) fail(`film foam too tall: ${visualWaterSheet(0.01)}`);
 
 almost(packParticleAttr(KIND_FOAM, 1), 0.999, 1e-6, "foam attr");
 almost(unpackParticleKind(packParticleAttr(KIND_BUBBLE, 0.4)), KIND_BUBBLE, 0, "bubble kind");
@@ -67,8 +74,18 @@ for (let y = 0; y < size; y++) {
 const drop = new ErosionSim(size, { ...DEFAULT_PARAMS, infiltration: 0, evaporation: 0 }, dropT);
 drop.sources = [{ id: "fx-drop", x: 0.5, y: 0.12, rate: 2.4 }];
 drop.step(70);
-const drop0 = countByKind(listParticles(drop.collectParticles()));
+const dropList = listParticles(drop.collectParticles());
+const drop0 = countByKind(dropList);
 if (drop0.bubble < 5) fail(`drop/shear should spawn bubble clusters: ${drop0.bubble}`);
+let tallFx = 0;
+for (const p of dropList) {
+  if (p.kind === KIND_GRAIN) continue;
+  const x = Math.max(0, Math.min(size - 1, Math.round(p.u * (size - 1))));
+  const y = Math.max(0, Math.min(size - 1, Math.round(p.v * (size - 1))));
+  const i = y * size + x;
+  if (p.h > drop.terrain[i] + VISUAL_WATER_SHEET_CAP + 0.002) tallFx++;
+}
+if (tallFx > 0) fail(`FX must sit on the visual sheet, not the SWE column: ${tallFx}`);
 
 for (let i = 0; i < 22; i++) drop.collectParticles();
 const dropAged = countByKind(listParticles(drop.collectParticles()));

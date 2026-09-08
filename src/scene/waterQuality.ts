@@ -16,12 +16,16 @@ export type WaterQualityTier = {
   waveOctaves: number;
   /** Extra sheet height in heightmap units. 0 on Low (fragment ripples only). */
   waveDisplace: number;
+  /** Hard vertex lift ceiling in heightmap units. Needles are impossible above this. */
+  sheetCap: number;
   /** 0..1 — shoreline lace / second foam ring. */
   foamDetail: number;
   /** Multiplier on Beer's-law absorption coefficients. */
   beerStrength: number;
   /** Schlick / screen-space fresnel scale. */
   fresnelScale: number;
+  /** Hard ceiling so glancing water cannot glitter into needles. */
+  fresnelCap: number;
   specPower: number;
 };
 
@@ -31,39 +35,47 @@ export const WATER_QUALITY: Record<QualityId, WaterQualityTier> = {
     meshSegs: 80,
     waveOctaves: 1,
     waveDisplace: 0,
-    foamDetail: 0.28,
+    sheetCap: 0.012,
+    foamDetail: 0.22,
     beerStrength: 0.52,
-    fresnelScale: 0.68,
+    fresnelScale: 0.48,
+    fresnelCap: 0.22,
     specPower: 10,
   },
   medium: {
     id: "medium",
     meshSegs: 128,
     waveOctaves: 2,
-    waveDisplace: 0.00115,
-    foamDetail: 0.52,
+    waveDisplace: 0.0007,
+    sheetCap: 0.012,
+    foamDetail: 0.42,
     beerStrength: 0.74,
-    fresnelScale: 0.92,
+    fresnelScale: 0.62,
+    fresnelCap: 0.28,
     specPower: 16,
   },
   high: {
     id: "high",
     meshSegs: 224,
     waveOctaves: 3,
-    waveDisplace: 0.00225,
-    foamDetail: 0.72,
+    waveDisplace: 0.0012,
+    sheetCap: 0.012,
+    foamDetail: 0.58,
     beerStrength: 0.9,
-    fresnelScale: 1.12,
+    fresnelScale: 0.74,
+    fresnelCap: 0.34,
     specPower: 22,
   },
   ultra: {
     id: "ultra",
     meshSegs: 352,
     waveOctaves: 4,
-    waveDisplace: 0.00355,
-    foamDetail: 0.88,
+    waveDisplace: 0.0018,
+    sheetCap: 0.012,
+    foamDetail: 0.70,
     beerStrength: 1.08,
-    fresnelScale: 1.22,
+    fresnelScale: 0.82,
+    fresnelCap: 0.38,
     specPower: 24,
   },
 };
@@ -143,30 +155,47 @@ function mix(a: number, b: number, t: number): number {
 
 export function flowWaveAmp(depth: number, flow: number, displace: number): number {
   if (displace <= 0) return 0;
-  const body = smoothstep(0.005, 0.05, Number.isFinite(depth) ? depth : 0);
-  const fl = Number.isFinite(flow) ? Math.min(0.4, Math.max(0, flow)) : 0;
-  const stream = smoothstep(0.012, 0.1, fl);
-  return displace * body * stream * (0.22 + fl * 3.2);
+  const body = smoothstep(0.008, 0.055, Number.isFinite(depth) ? depth : 0);
+  const fl = Number.isFinite(flow) ? Math.min(0.35, Math.max(0, flow)) : 0;
+  const stream = smoothstep(0.038, 0.15, fl);
+  return displace * body * stream * (0.18 + fl * 1.8);
 }
 
+/** Isolated inlet cells collapse toward neighbors (matches water.vert blur clamp). */
+export function suppressWaterPeak(
+  center: number,
+  neighbors: readonly [number, number, number, number],
+): number {
+  const c = Number.isFinite(center) && center > 0 ? center : 0;
+  const n = neighbors.map((v) => (Number.isFinite(v) && v > 0 ? v : 0));
+  const nMax = Math.max(n[0]!, n[1]!, n[2]!, n[3]!);
+  const nAvg = (n[0]! + n[1]! + n[2]! + n[3]!) * 0.25;
+  const avg = (c * 4 + nAvg * 8) / 12;
+  return Math.min(avg, nMax + 0.014);
+}
+
+export const WATER_SHEET_CAP = 0.012;
+
 /**
- * Visual sheet height above the bed. Films stay thin; pools lift so
- * carved basins read as volume (matches `water.vert.glsl`).
+ * Visual sheet height above the bed. Thin continuous coating — pool depth
+ * is a shading problem, not a vertex spike (matches water.vert.glsl).
  */
-export function sheetHeight(water: number, flow = 0): number {
-  const w = Number.isFinite(water) && water > 0.0008 ? water : 0;
-  if (w <= 0) return 0;
-  const film = Math.min(w, 0.02);
-  const pool = Math.max(0, Math.min(w, 0.24) - 0.02);
-  const deep = smoothstep(0.022, 0.13, w);
-  const fl = Number.isFinite(flow) ? Math.min(0.18, Math.max(0, flow)) : 0;
-  return 0.0034 + film * 0.22 + pool * 0.44 + deep * 0.016 + fl * 0.008;
+export function sheetHeight(water: number, _flow = 0, cap = WATER_SHEET_CAP): number {
+  const w = Number.isFinite(water) && water > 0 ? water : 0;
+  const cover = smoothstep(0.0006, 0.014, w);
+  const body = smoothstep(0.008, 0.1, w);
+  return Math.min((0.003 + body * 0.0065) * cover, cap);
 }
 
 /** How much the water normal tilts from reconstructed flow. Still water ≈ 0. */
 export function flowWaveNormalScale(flow: number): number {
   const fl = Number.isFinite(flow) ? Math.max(0, flow) : 0;
-  return smoothstep(0.012, 0.11, fl);
+  return smoothstep(0.038, 0.15, fl);
+}
+
+/** Hard fresnel ceiling for the quality tier. */
+export function waterFresnelCap(quality: QualityId): number {
+  return WATER_QUALITY[quality].fresnelCap;
 }
 
 function smoothstep(e0: number, e1: number, x: number): number {

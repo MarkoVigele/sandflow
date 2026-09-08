@@ -20,9 +20,9 @@
  *   uMaps, uHeightScale, uTexel
  * Optional look uniforms: uTraySize (world width), uRelief, uPivot,
  *   uWaveAmp, uWaveDetail, uTime (water surface only).
- * Water displacement adds a depth sheet + quality-scaled Gerstner on top of R.
- * Sim owns G/A field data (despike, channel-preserving blur, Lipschitz clamp,
- * flow damping). Shaders own look — safe to displace with G; do not re-sharpen.
+ * Water displacement: sim owns G/A (despike, channel-preserving blur,
+ * Lipschitz clamp, flow damping). Shaders add a thin capped sheet (≤ 0.012)
+ * on top of R — never a raw SWE column. Do not re-sharpen G.
  * AimCursor still samples R + relief only.
  * Displacement: Y = (uPivot + (R − uPivot) * uRelief) * uHeightScale
  * sand.vert normals: N = (hL-hR, 2·texel·tray, h(v+)-h(v−)) — same as AimCursor.heightfieldNormal.

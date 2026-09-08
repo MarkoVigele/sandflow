@@ -14,6 +14,7 @@ import {
   clusterJitter,
   grainSpawnScore,
   packParticleAttr,
+  visualWaterSheet,
   type ParticleKind,
 } from "./flowFx";
 import {
@@ -855,7 +856,7 @@ export class ErosionSim {
       const o = w * PARTICLE_STRIDE;
       out[o] = x / (size - 1);
       out[o + 1] = y / (size - 1);
-      out[o + 2] = this.terrain[i] + this.water[i];
+      out[o + 2] = this.terrain[i] + visualWaterSheet(this.visReady ? this.visWater[i] : this.water[i]);
       out[o + 3] = packParticleAttr(KIND_FOAM, 1);
       w++;
     }
@@ -904,7 +905,7 @@ export class ErosionSim {
         this.fxH[k] = this.terrain[i] + Math.min(w * 0.14, 0.005);
       } else {
         const lift = 0.35 + (this.fxU[k] * 17 + this.fxV[k] * 9) % 0.5;
-        this.fxH[k] = this.terrain[i] + w * Math.min(0.92, lift);
+        this.fxH[k] = this.terrain[i] + visualWaterSheet(w) * Math.min(0.92, lift);
       }
       if (keep !== k) {
         this.fxU[keep] = this.fxU[k];
@@ -955,7 +956,7 @@ export class ErosionSim {
         const j = clusterJitter(x, y, k, this.tick + k * 13);
         const u = Math.min(0.99, Math.max(0.01, x / denom + j.du));
         const v = Math.min(0.99, Math.max(0.01, y / denom + j.dv));
-        const h = this.terrain[i] + w * j.lift;
+        const h = this.terrain[i] + visualWaterSheet(w) * j.lift;
         const life = 8 + ((hash2(x, k, this.tick + 29) * 7) | 0);
         this.pushFx(u, v, h, KIND_BUBBLE, life);
         bubbles++;

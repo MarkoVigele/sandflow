@@ -27,6 +27,21 @@ function clamp01(x: number): number {
   return Math.min(1, Math.max(0, x));
 }
 
+function smoothstep(e0: number, e1: number, x: number): number {
+  const t = clamp01((x - e0) / (e1 - e0));
+  return t * t * (3 - 2 * t);
+}
+
+/** Must match `sheetFromColumn` in the water shaders — foam sits on the coating. */
+export const VISUAL_WATER_SHEET_CAP = 0.012;
+
+export function visualWaterSheet(water: number): number {
+  const w = Number.isFinite(water) && water > 0 ? water : 0;
+  const cover = smoothstep(0.0006, 0.014, w);
+  const body = smoothstep(0.008, 0.1, w);
+  return Math.min((0.003 + body * 0.0065) * cover, VISUAL_WATER_SHEET_CAP);
+}
+
 /** attr = kind + life∈[0,1). Foam uses life≈1 so it stays fully visible. */
 export function packParticleAttr(kind: ParticleKind, life: number): number {
   const k = kind === KIND_BUBBLE || kind === KIND_GRAIN ? kind : KIND_FOAM;
