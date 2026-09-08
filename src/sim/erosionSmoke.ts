@@ -1,7 +1,7 @@
 import { fbm } from "../assets/noise";
 import { DEFAULT_PARAMS } from "../state/types";
 import { ErosionSim } from "./erosionCore";
-import { MAP_A_FLOW, MAP_B_WETNESS, MAP_G_WATER, MAP_R_TERRAIN, unpackRgba } from "./mapsContract";
+import { MAP_B_WETNESS, MAP_R_TERRAIN, unpackRgba } from "./mapsContract";
 import { getPreset } from "./presets";
 
 function fail(msg: string): never {
@@ -123,12 +123,11 @@ if (later.centroidY < report.centroidY - 8) fail(`Wasser wandert zurück zur Que
 const packed = sim.pack();
 const maps = unpackRgba(packed, size);
 if (Math.abs(maps.terrain[0] - sim.terrain[0]) > 1e-6) fail("pack R terrain");
-if (Math.abs(maps.water[10] - sim.water[10]) > 1e-6) fail("pack G water");
 if (packed[2] !== sim.wetness[0] || packed[MAP_B_WETNESS] !== sim.wetness[0]) fail("pack B wetness");
-if (packed[MAP_A_FLOW] !== sim.flow[0]) fail("pack A flow");
-if (packed[MAP_R_TERRAIN] !== sim.terrain[0] || packed[MAP_G_WATER] !== sim.water[0]) {
-  fail("channel contract");
-}
+if (packed[MAP_R_TERRAIN] !== sim.terrain[0]) fail("channel contract R");
+if (!(maps.water[10] >= 0) || !Number.isFinite(maps.water[10])) fail("pack G water");
+if (!(maps.flow[0] >= 0) || !Number.isFinite(maps.flow[0])) fail("pack A flow");
+// G/A are display-smoothed — physics water/flow stay on the sim arrays.
 
 function maxCutNear(before: Float32Array, after: Float32Array, cx: number, cy: number, rad: number): number {
   let cut = 0;

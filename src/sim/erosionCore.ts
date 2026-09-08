@@ -34,6 +34,15 @@ import {
 import { HARD_CONCRETE_VIS, HARD_STONE, HARD_THRESHOLD, packMapsRgba } from "./mapsContract";
 import { thermalSlip } from "./thermalErosion";
 import type { BrushKind } from "./types";
+import {
+  POUR_CELL_ADD_CAP,
+  RAIN_CELL_ADD_CAP,
+  SOURCE_CELL_ADD_CAP,
+  addCappedDelta,
+  addWaterKernelCapped,
+  prepareDisplayMaps,
+  relaxPhysicsSpikes,
+} from "./waterDisplay";
 
 const NEIGH = [
   [1, 0],
@@ -102,6 +111,13 @@ export class ErosionSim {
   private fxLife = new Uint8Array(MAX_FX);
   private fxN = 0;
   private tick = 0;
+  /** Display G/A — physics water/flow stay raw. */
+  private visWater: Float32Array;
+  private visFlow: Float32Array;
+  private visPrevWater: Float32Array;
+  private visPrevFlow: Float32Array;
+  private visScratch: Float32Array;
+  private visReady = false;
 
   constructor(size: number, params: SimParams, terrain: Float32Array) {
     this.size = size;
@@ -130,6 +146,11 @@ export class ErosionSim {
     this.aerate = new Float32Array(n);
     this.lastDir = new Uint8Array(n);
     this.lastDir.fill(255);
+    this.visWater = new Float32Array(n);
+    this.visFlow = new Float32Array(n);
+    this.visPrevWater = new Float32Array(n);
+    this.visPrevFlow = new Float32Array(n);
+    this.visScratch = new Float32Array(n);
   }
 
   private i(x: number, y: number): number {
@@ -160,21 +181,25 @@ export class ErosionSim {
       if (src.kind === "rain") this.addRain(src);
       else this.addPointSource(src);
     }
+    relaxPhysicsSpikes(this.water, this.visScratch, this.size, 2);
     clampWaterField(this.water, maxWaterDepthFor(this.size));
   }
 
   private addPointSource(src: WaterSource): void {
     const { size } = this;
-    const water = this.water;
     const x = Math.max(1, Math.min(size - 2, Math.round(src.x * (size - 1))));
     const y = Math.max(1, Math.min(size - 2, Math.round(src.y * (size - 1))));
-    const add = src.rate * 0.048;
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        const fall = Math.exp(-(dx * dx + dy * dy) * 0.95);
-        water[this.i(x + dx, y + dy)] += add * fall * 0.62;
-      }
-    }
+    addWaterKernelCapped(
+      this.water,
+      size,
+      x,
+      y,
+      src.rate * 0.048,
+      0.95,
+      1,
+      0.62,
+      SOURCE_CELL_ADD_CAP,
+    );
   }
 
   /** Sparse rain band: seeds rivulets instead of a sheet. */
@@ -199,7 +224,7 @@ export class ErosionSim {
         if (fall < 0.08) continue;
         const drop = hash2(x, y, this.tick + 17);
         if (drop < 0.52) continue;
-        water[this.i(x, y)] += add * fall * (0.5 + drop);
+        addCappedDelta(water, size, x, y, add * fall * (0.5 + drop), RAIN_CELL_ADD_CAP);
       }
     }
   }
@@ -762,15 +787,8 @@ export class ErosionSim {
     const { size } = this;
     const cx = Math.round(u * (size - 1));
     const cy = Math.round(v * (size - 1));
-    for (let dy = -2; dy <= 2; dy++) {
-      for (let dx = -2; dx <= 2; dx++) {
-        const x = cx + dx;
-        const y = cy + dy;
-        if (x < 1 || y < 1 || x >= size - 1 || y >= size - 1) continue;
-        const fall = Math.exp(-(dx * dx + dy * dy) * 0.58);
-        this.water[this.i(x, y)] += amount * fall * 0.5;
-      }
-    }
+    addWaterKernelCapped(this.water, size, cx, cy, amount, 0.58, 2, 0.5, POUR_CELL_ADD_CAP);
+    relaxPhysicsSpikes(this.water, this.visScratch, size, 4);
     clampWaterField(this.water, maxWaterDepthFor(size));
   }
 
@@ -789,10 +807,30 @@ export class ErosionSim {
     this.aerate.fill(0);
     this.fxN = 0;
     this.lastDir.fill(255);
+    this.visWater.fill(0);
+    this.visFlow.fill(0);
+    this.visPrevWater.fill(0);
+    this.visPrevFlow.fill(0);
+    this.visReady = false;
   }
 
   pack(): Float32Array {
-    return packMapsRgba(this.terrain, this.water, this.wetness, this.flow);
+    if (this.visReady) {
+      this.visPrevWater.set(this.visWater);
+      this.visPrevFlow.set(this.visFlow);
+    }
+    prepareDisplayMaps(
+      this.water,
+      this.flow,
+      this.size,
+      this.visWater,
+      this.visFlow,
+      this.visScratch,
+      this.visReady ? this.visPrevWater : undefined,
+      this.visReady ? this.visPrevFlow : undefined,
+    );
+    this.visReady = true;
+    return packMapsRgba(this.terrain, this.visWater, this.wetness, this.visFlow);
   }
 
   collectParticles(): Float32Array {
