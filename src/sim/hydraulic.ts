@@ -378,9 +378,30 @@ export function updatePipeFlux(
   }
 }
 
+/** 4-neighbor water max, ignoring beds that sit above this free surface. */
+export function hydroNeighborWaterMax(
+  water: Float32Array,
+  terrain: Float32Array,
+  i: number,
+  size: number,
+  eta: number,
+): number {
+  const neigh = [i - 1, i + 1, i - size, i + size];
+  let nMax = 0;
+  let found = false;
+  for (let k = 0; k < 4; k++) {
+    const j = neigh[k];
+    if (terrain[j] >= eta - 1e-5) continue;
+    found = true;
+    if (water[j] > nMax) nMax = water[j];
+  }
+  return found ? nMax : water[i];
+}
+
 /**
  * Physics despike that will not teleport a column onto a bed above its
  * free surface (the display Lipschitz can walk water over a dam).
+ * A lake against a wall is not a spike — only beds under η count.
  */
 export function relaxPhysicsSpikesHydro(
   water: Float32Array,
@@ -399,10 +420,10 @@ export function relaxPhysicsSpikesHydro(
         const i = row + x;
         const w = scratch[i];
         if (w < 1e-6) continue;
-        const nMax = Math.max(scratch[i - 1], scratch[i + 1], scratch[i - size], scratch[i + size]);
+        const eta = terrain[i] + w;
+        const nMax = hydroNeighborWaterMax(scratch, terrain, i, size, eta);
         const ceil = nMax * HYDRO_SPIKE_RATIO + HYDRO_SPIKE_PAD;
         if (w <= ceil) continue;
-        const eta = terrain[i] + w;
         let dests = 0;
         for (let oy = -1; oy <= 1; oy++) {
           for (let ox = -1; ox <= 1; ox++) {
@@ -425,9 +446,22 @@ export function relaxPhysicsSpikesHydro(
   }
 }
 
+let pondSeen: Uint8Array | null = null;
+let pondStack: Int32Array | null = null;
+let pondCells: Int32Array | null = null;
+
+function pondScratch(n: number): { seen: Uint8Array; stack: Int32Array; cells: Int32Array } {
+  if (!pondSeen || pondSeen.length < n) {
+    pondSeen = new Uint8Array(n);
+    pondStack = new Int32Array(n);
+    pondCells = new Int32Array(n);
+  }
+  return { seen: pondSeen, stack: pondStack!, cells: pondCells! };
+}
+
 /**
- * Flatten the free surface of a pond without dumping down a cliff.
- * Overflow / weirs stay in the pipe solve.
+ * Spread a filling pond into neighbors under η, then flatten each connected
+ * body to one free surface. Cliffs / weirs stay in the pipe solve.
  */
 export function equalizePondSurface(
   terrain: Float32Array,
@@ -439,6 +473,7 @@ export function equalizePondSurface(
   if (size < 3) return;
   const n = size * size;
   const nPass = Math.max(1, passes | 0);
+  const fill = POND_DEPTH;
   for (let p = 0; p < nPass; p++) {
     delta.fill(0);
     for (let y = 1; y < size - 1; y++) {
@@ -446,16 +481,10 @@ export function equalizePondSurface(
       for (let x = 1; x < size - 1; x++) {
         const i = row + x;
         const w = water[i];
-        if (w < POND_DEPTH) continue;
+        if (w < fill) continue;
         const z0 = terrain[i];
         const eta = z0 + w;
         const neigh = [i - 1, i + 1, i - size, i + size];
-        let openFall = 0;
-        for (let k = 0; k < 4; k++) {
-          const j = neigh[k];
-          if (terrain[j] < z0 - 0.003 && terrain[j] + water[j] < eta - 0.004) openFall++;
-        }
-        if (openFall > 0) continue;
         let share = 0;
         let dests = 0;
         const dest = [0, 0, 0, 0];
@@ -464,12 +493,11 @@ export function equalizePondSurface(
           const j = neigh[k];
           const zj = terrain[j];
           if (zj >= eta) continue;
-          if (zj > z0 + 0.008) continue;
-          if (z0 - zj > 0.014) continue;
           const etaJ = zj + water[j];
           const drop = eta - etaJ;
           if (drop <= 1e-5) continue;
-          const move = Math.min(w * 0.22, drop * 0.45);
+          if (z0 - zj > 0.04 && drop > 0.012) continue;
+          const move = Math.min(w * 0.3, drop * 0.55);
           if (move < 1e-7) continue;
           dest[dests] = j;
           amt[dests] = move;
@@ -477,7 +505,7 @@ export function equalizePondSurface(
           dests++;
         }
         if (dests === 0 || share < 1e-8) continue;
-        const k = share > w * 0.55 ? (w * 0.55) / share : 1;
+        const k = share > w * 0.62 ? (w * 0.62) / share : 1;
         let sent = 0;
         for (let d = 0; d < dests; d++) {
           const move = amt[d] * k;
@@ -489,6 +517,74 @@ export function equalizePondSurface(
     }
     for (let i = 0; i < n; i++) {
       const next = water[i] + delta[i];
+      water[i] = next > 0 ? next : 0;
+    }
+  }
+  flattenPondComponents(terrain, water, size);
+}
+
+function flattenPondComponents(terrain: Float32Array, water: Float32Array, size: number): void {
+  const n = size * size;
+  const { seen, stack, cells } = pondScratch(n);
+  seen.fill(0);
+  const minW = POND_DEPTH * 0.45;
+  for (let seed = 0; seed < n; seed++) {
+    if (seen[seed] || water[seed] < minW) continue;
+    const sy = (seed / size) | 0;
+    const sx = seed - sy * size;
+    if (sx < 1 || sy < 1 || sx >= size - 1 || sy >= size - 1) {
+      seen[seed] = 1;
+      continue;
+    }
+    let top = 0;
+    let count = 0;
+    let vol = 0;
+    stack[top++] = seed;
+    seen[seed] = 1;
+    while (top > 0) {
+      const i = stack[--top];
+      cells[count++] = i;
+      vol += water[i];
+      const eta = terrain[i] + water[i];
+      const neigh = [i - 1, i + 1, i - size, i + size];
+      for (let k = 0; k < 4; k++) {
+        const j = neigh[k];
+        const yj = (j / size) | 0;
+        const xj = j - yj * size;
+        if (xj < 1 || yj < 1 || xj >= size - 1 || yj >= size - 1) continue;
+        if (seen[j]) continue;
+        const zj = terrain[j];
+        if (zj >= eta) continue;
+        if (terrain[i] - zj > 0.04 && zj + water[j] < eta - 0.012) continue;
+        if (water[j] < 0.006) continue;
+        seen[j] = 1;
+        stack[top++] = j;
+      }
+    }
+    if (count < 8 || vol < POND_DEPTH * 6) continue;
+    if (vol / count < POND_DEPTH * 0.85) continue;
+    let lo = 9;
+    let hi = 0;
+    for (let c = 0; c < count; c++) {
+      const z = terrain[cells[c]];
+      if (z < lo) lo = z;
+      const topEta = z + 0.55;
+      if (topEta > hi) hi = topEta;
+    }
+    for (let it = 0; it < 20; it++) {
+      const mid = 0.5 * (lo + hi);
+      let hold = 0;
+      for (let c = 0; c < count; c++) {
+        const d = mid - terrain[cells[c]];
+        if (d > 0) hold += d;
+      }
+      if (hold > vol) hi = mid;
+      else lo = mid;
+    }
+    const eta = 0.5 * (lo + hi);
+    for (let c = 0; c < count; c++) {
+      const i = cells[c];
+      const next = eta - terrain[i];
       water[i] = next > 0 ? next : 0;
     }
   }

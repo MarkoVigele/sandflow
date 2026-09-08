@@ -374,4 +374,37 @@ if (!(MAX_PIPE_SPEED > 1) || !Number.isFinite(MAX_PIPE_SPEED)) fail("pipe speed 
   if (a - b > 0.12) fail(`pond did not level: ${a} vs ${b}`);
 }
 
+{
+  // Sloped bed behind a wall must become a flat lake, not a mound.
+  const sizeB = 32;
+  const nB = sizeB * sizeB;
+  const terrain = new Float32Array(nB);
+  const water = new Float32Array(nB);
+  const delta = new Float32Array(nB);
+  const wallX = 20;
+  for (let y = 0; y < sizeB; y++) {
+    for (let x = 0; x < sizeB; x++) {
+      terrain[y * sizeB + x] = x === wallX ? 0.92 : 0.42 + (20 - x) * 0.006;
+    }
+  }
+  for (let y = 4; y < sizeB - 4; y++) {
+    for (let x = 4; x < wallX; x++) water[y * sizeB + x] = 0.1 + (x % 3) * 0.04;
+  }
+  equalizePondSurface(terrain, water, delta, sizeB, 8);
+  const etas: number[] = [];
+  let leaked = 0;
+  for (let y = 4; y < sizeB - 4; y++) {
+    for (let x = 4; x < wallX; x++) {
+      const w = water[y * sizeB + x];
+      if (w > 0.02) etas.push(terrain[y * sizeB + x] + w);
+    }
+    for (let x = wallX + 1; x < sizeB - 2; x++) leaked += water[y * sizeB + x];
+  }
+  etas.sort((a, b) => a - b);
+  const span = etas.length ? etas[etas.length - 1] - etas[0] : 9;
+  console.log(JSON.stringify({ slopedLake: { span: +span.toFixed(3), n: etas.length, leaked: +leaked.toFixed(4) } }));
+  if (span > 0.07) fail(`sloped pond did not level: ${span}`);
+  if (leaked > 0.05) fail(`equalize dumped over the wall: ${leaked}`);
+}
+
 console.log("hydraulicSmoke ok");

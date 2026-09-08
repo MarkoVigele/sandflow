@@ -25,6 +25,9 @@ varying float vComparePick;
 // Hard ceiling in heightmap units. Relief × world must never grow a needle.
 // 0.012 × 1.5 × 2.5 ≈ 4.5 cm on the tray — a coating, not a column.
 const float SHEET_CAP_DEFAULT = 0.012;
+const float POND_LIFT_START = 0.022;
+const float POND_LIFT_FULL = 0.055;
+const float POND_LIFT_CAP = 0.42;
 
 vec2 safeDir(vec2 g, vec2 fallback) {
   if (!(g.x == g.x && g.y == g.y)) return fallback;
@@ -82,13 +85,22 @@ float smoothWater(vec2 uv, float texel) {
   return min(avg, nMax + pad);
 }
 
-// Thin continuous coating. Depth is a color problem, not a vertex spike.
+// Thin continuous coating for streams. Ponds use visualLift.
 float sheetFromColumn(float column) {
   float w = max(column, 0.0);
   float cover = smoothstep(0.0006, 0.014, w);
   float body = smoothstep(0.008, 0.10, w);
   float cap = uSheetCap > 1.0e-5 ? uSheetCap : SHEET_CAP_DEFAULT;
   return min((0.0030 + body * 0.0065) * cover, cap);
+}
+
+// Streams stay a film. A still pond rises with the column so a dam can fill.
+float visualLift(float column) {
+  float film = sheetFromColumn(column);
+  float w = max(column, 0.0);
+  float pond = smoothstep(POND_LIFT_START, POND_LIFT_FULL, w);
+  float rise = min(w, POND_LIFT_CAP);
+  return mix(film, rise, pond);
 }
 
 // Flow-aligned Gerstner ripples. Still water stays flat. Cap is the sheet.
@@ -134,9 +146,10 @@ void main() {
   float flow = sampleH.a;
   vFlow = (flow == flow && flow > 0.0) ? flow : 0.0;
 
-  // Every vertex gets the same continuous sheet — no wet/dry cliff walls.
+  // Streams: thin sheet. Ponds: hydrostatic column. Dry verts tuck under cliffs
+  // so the mesh cannot climb a dam face (the needle regression).
   float cap = uSheetCap > 1.0e-5 ? uSheetCap : SHEET_CAP_DEFAULT;
-  float sheet = sheetFromColumn(wSmooth);
+  float lift = visualLift(wSmooth);
   float wave = 0.0;
   vec2 dir = safeDir(
     vec2(
@@ -148,10 +161,37 @@ void main() {
     vec2(0.72, 0.42)
   );
   wave = flowWave(uv, wSmooth, vFlow, dir);
-  sheet = min(max(sheet + wave, 0.0), cap);
+  float pond = smoothstep(POND_LIFT_START, POND_LIFT_FULL, wSmooth);
+  lift = max(lift + wave * (1.0 - pond * 0.35), 0.0);
   vWave = wave;
 
-  float h01 = terrain + sheet;
+  float h01 = terrain + min(lift, POND_LIFT_CAP + cap);
+  if (wSmooth < 0.0008) {
+    float tuck = 1.0e9;
+    float found = 0.0;
+    float r1 = max(texel * 2.0, 0.012);
+    float r2 = max(texel * 6.0, 0.03);
+    float r3 = 0.05;
+    vec2 o;
+    float ww;
+    o = uv + vec2(r1, 0.0); ww = wat(o); if (ww > 0.008) { found = 1.0; tuck = min(tuck, ter(o, terrain) + visualLift(ww)); }
+    o = uv + vec2(-r1, 0.0); ww = wat(o); if (ww > 0.008) { found = 1.0; tuck = min(tuck, ter(o, terrain) + visualLift(ww)); }
+    o = uv + vec2(0.0, r1); ww = wat(o); if (ww > 0.008) { found = 1.0; tuck = min(tuck, ter(o, terrain) + visualLift(ww)); }
+    o = uv + vec2(0.0, -r1); ww = wat(o); if (ww > 0.008) { found = 1.0; tuck = min(tuck, ter(o, terrain) + visualLift(ww)); }
+    o = uv + vec2(r2, 0.0); ww = wat(o); if (ww > 0.008) { found = 1.0; tuck = min(tuck, ter(o, terrain) + visualLift(ww)); }
+    o = uv + vec2(-r2, 0.0); ww = wat(o); if (ww > 0.008) { found = 1.0; tuck = min(tuck, ter(o, terrain) + visualLift(ww)); }
+    o = uv + vec2(0.0, r2); ww = wat(o); if (ww > 0.008) { found = 1.0; tuck = min(tuck, ter(o, terrain) + visualLift(ww)); }
+    o = uv + vec2(0.0, -r2); ww = wat(o); if (ww > 0.008) { found = 1.0; tuck = min(tuck, ter(o, terrain) + visualLift(ww)); }
+    o = uv + vec2(r3, 0.0); ww = wat(o); if (ww > 0.008) { found = 1.0; tuck = min(tuck, ter(o, terrain) + visualLift(ww)); }
+    o = uv + vec2(-r3, 0.0); ww = wat(o); if (ww > 0.008) { found = 1.0; tuck = min(tuck, ter(o, terrain) + visualLift(ww)); }
+    o = uv + vec2(0.0, r3); ww = wat(o); if (ww > 0.008) { found = 1.0; tuck = min(tuck, ter(o, terrain) + visualLift(ww)); }
+    o = uv + vec2(0.0, -r3); ww = wat(o); if (ww > 0.008) { found = 1.0; tuck = min(tuck, ter(o, terrain) + visualLift(ww)); }
+    o = uv + vec2(r2, r2); ww = wat(o); if (ww > 0.008) { found = 1.0; tuck = min(tuck, ter(o, terrain) + visualLift(ww)); }
+    o = uv + vec2(-r2, r2); ww = wat(o); if (ww > 0.008) { found = 1.0; tuck = min(tuck, ter(o, terrain) + visualLift(ww)); }
+    o = uv + vec2(r2, -r2); ww = wat(o); if (ww > 0.008) { found = 1.0; tuck = min(tuck, ter(o, terrain) + visualLift(ww)); }
+    o = uv + vec2(-r2, -r2); ww = wat(o); if (ww > 0.008) { found = 1.0; tuck = min(tuck, ter(o, terrain) + visualLift(ww)); }
+    if (found > 0.5 && tuck < terrain) h01 = tuck;
+  }
   float relief = uRelief > 0.05 ? uRelief : 1.0;
   float h = (uPivot + (h01 - uPivot) * relief) * uHeightScale;
   if (!(h == h)) h = 0.0;

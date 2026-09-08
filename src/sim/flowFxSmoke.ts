@@ -13,6 +13,7 @@ import {
   packParticleAttr,
   unpackParticleKind,
   unpackParticleLife,
+  visualWaterLift,
   visualWaterSheet,
 } from "./flowFx";
 import { getPreset } from "./presets";
@@ -30,6 +31,8 @@ if (visualWaterSheet(1.15) > VISUAL_WATER_SHEET_CAP + 1e-6) {
   fail(`foam sheet must cap SWE spikes: ${visualWaterSheet(1.15)}`);
 }
 if (visualWaterSheet(0.01) > 0.008) fail(`film foam too tall: ${visualWaterSheet(0.01)}`);
+if (visualWaterLift(0.16) < 0.12) fail(`pond foam must sit on the rising surface: ${visualWaterLift(0.16)}`);
+if (visualWaterLift(0.008) > 0.01) fail(`thread foam must stay a film: ${visualWaterLift(0.008)}`);
 
 almost(packParticleAttr(KIND_FOAM, 1), 0.999, 1e-6, "foam attr");
 almost(unpackParticleKind(packParticleAttr(KIND_BUBBLE, 0.4)), KIND_BUBBLE, 0, "bubble kind");
@@ -83,7 +86,7 @@ for (const p of dropList) {
   const x = Math.max(0, Math.min(size - 1, Math.round(p.u * (size - 1))));
   const y = Math.max(0, Math.min(size - 1, Math.round(p.v * (size - 1))));
   const i = y * size + x;
-  if (p.h > drop.terrain[i] + VISUAL_WATER_SHEET_CAP + 0.002) tallFx++;
+  if (p.h > drop.terrain[i] + visualWaterLift(drop.water[i]) + 0.003) tallFx++;
 }
 if (tallFx > 0) fail(`FX must sit on the visual sheet, not the SWE column: ${tallFx}`);
 

@@ -440,13 +440,17 @@ export class Viewport {
     this.lastHard = built.hardmask ? built.hardmask.slice() : new Float32Array(grid * grid);
     if (this.lastHard) uploadHard(this.hardTex, this.lastHard, grid);
     const empty = new Float32Array(grid * grid);
-    const packed = packMapsRgba(built.terrain, empty, empty, empty);
+    const water0 = built.water ?? empty;
+    const packed = built.water
+      ? packDisplayMapsRgba(built.terrain, water0, empty, empty, grid)
+      : packMapsRgba(built.terrain, empty, empty, empty);
     this.lastPacked = packed;
     this.lastSize = grid;
     uploadPacked(this.maps, packed, grid);
     this.seedTrail(packed, grid);
     this.sim.init(grid, this.store.state.params, built.terrain, this.sources, {
       hardmask: built.hardmask,
+      water: built.water,
     });
     this.captureBefore({ terrain: built.terrain, size: grid });
     this.syncSourcePins();

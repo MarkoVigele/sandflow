@@ -21,8 +21,9 @@
  * Optional look uniforms: uTraySize (world width), uRelief, uPivot,
  *   uWaveAmp, uWaveDetail, uTime (water surface + bed caustics).
  * Water displacement: sim owns G/A (despike, channel-preserving blur,
- * Lipschitz clamp, flow damping). Shaders add a thin capped sheet (≤ 0.012)
- * on top of R — never a raw SWE column. Do not re-sharpen G.
+ * terrain-aware Lipschitz, flow damping). Streams stay a thin sheet (≤ 0.012)
+ * on top of R. Ponds lift with the hydrostatic column (capped, no dam climb).
+ * Do not re-sharpen G.
  * AimCursor still samples R + relief only.
  * Displacement: Y = (uPivot + (R − uPivot) * uRelief) * uHeightScale
  * sand.vert normals: N = (hL-hR, 2·texel·tray, h(v+)-h(v−)) — same as AimCursor.heightfieldNormal.
