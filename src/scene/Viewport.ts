@@ -29,6 +29,7 @@ import {
 } from "../state/types";
 import { CrossSectionView } from "../ui/crossSection";
 import { allowOneFingerOrbit, claimSourceGesture, pinGrabBeatsOrbit } from "../ui/sourceGesture";
+import { isShapeTool, strokeWaypoints, toolBrushKind } from "../ui/tools";
 import { stepsThisFrame } from "../ui/transport";
 import {
   AimCursor,
@@ -739,47 +740,19 @@ export class Viewport {
     }
     if (tool === "erase") {
       this.propsLite.removeNear(u, v, brushRadius);
-      this.strokeBrush("soft", u, v, brushRadius, brushStrength);
-      return;
     }
-    if (tool === "concrete") {
-      this.strokeBrush("concrete", u, v, brushRadius, brushStrength);
-      return;
+    const kind = toolBrushKind(tool);
+    if (kind) {
+      this.strokeBrush(kind, u, v, brushRadius, brushStrength);
     }
-    const stroke = tool === "groove" || tool === "tamp" || tool === "flatten";
-    if (stroke && this.lastStroke) {
-      const du = u - this.lastStroke.u;
-      const dv = v - this.lastStroke.v;
-      const dist = Math.hypot(du, dv);
-      const steps = Math.max(1, Math.ceil(dist / Math.max(0.008, brushRadius * 0.32)));
-      for (let s = 1; s <= steps; s++) {
-        const t = s / steps;
-        this.sim.brush(tool as BrushKind, this.lastStroke.u + du * t, this.lastStroke.v + dv * t, brushRadius, brushStrength);
-      }
-      this.lastStroke = { u, v };
-    } else {
-      this.sim.brush(tool as BrushKind, u, v, brushRadius, brushStrength);
-      this.lastStroke = { u, v };
-    }
-    if (this.store.state.onboardStep === 1) {
+    if (this.store.state.onboardStep === 1 && isShapeTool(tool)) {
       this.store.patch({ onboardStep: 2, tool: "source" });
     }
   }
 
   private strokeBrush(kind: BrushKind, u: number, v: number, radius: number, strength: number): void {
-    if (this.lastStroke) {
-      const du = u - this.lastStroke.u;
-      const dv = v - this.lastStroke.v;
-      const dist = Math.hypot(du, dv);
-      const steps = Math.max(1, Math.ceil(dist / Math.max(0.008, radius * 0.32)));
-      for (let s = 1; s <= steps; s++) {
-        const t = s / steps;
-        this.sim.brush(kind, this.lastStroke.u + du * t, this.lastStroke.v + dv * t, radius, strength);
-      }
-      this.lastStroke = { u, v };
-      return;
-    }
-    this.sim.brush(kind, u, v, radius, strength);
+    const pts = strokeWaypoints(this.lastStroke, { u, v }, radius);
+    for (const p of pts) this.sim.brush(kind, p.u, p.v, radius, strength);
     this.lastStroke = { u, v };
   }
 

@@ -8,27 +8,8 @@ import {
   WAVES_MIN,
   type HeatmapMode,
   type SimParams,
-  type ToolId,
 } from "../state/types";
-import { SOURCE_TOOL_TIP } from "./sourceGesture";
-
-const TOOL_COPY: Record<ToolId, { title: string; body: string }> = {
-  pile: { title: "Hügel aufschütten", body: "Ziehen häufelt Sand an. Der Kreis ist die Pinselgröße." },
-  dig: { title: "Mulde graben", body: "Ziehen nimmt Sand weg — gut, um dem Wasser eine Spur zu geben." },
-  smooth: { title: "Glätten", body: "Ziehen weicht Kanten und Wellen im Sand auf." },
-  dam: { title: "Wall setzen", body: "Setzt einen steilen Wall, höher und schärfer als ein Hügel." },
-  tamp: { title: "Sand feststampfen", body: "Drückt den Sand fest, damit fließendes Wasser ihn nicht so leicht mitnimmt." },
-  groove: { title: "Rinne ziehen", body: "Zeichnet eine Furche mit leichten Ufern. Wasser folgt ihr später von allein." },
-  flatten: { title: "Einebnen", body: "Macht die Fläche unter dem Finger glatt. Unten: die ganze Wanne. Beton bleibt stehen." },
-  concrete: { title: "Beton setzen", body: "Niedrige Stärke = Platte, hohe Stärke = Mauer. Wasser fließt darüber, der Beton bleibt. Der Radierer nimmt ihn weg." },
-  stone: { title: "Kiesel legen", body: "Kleine Steine auf den Sand. Die Größe stellst du am Regler ein. Der Radierer nimmt sie weg." },
-  erase: { title: "Radierer", body: "Nimmt Steine und Beton in Reichweite weg. Sand und Wasser bleiben." },
-  pour: { title: "Wasser gießen", body: "Der Kreis zeigt, wo es tropft. Taste oder Finger halten." },
-  source: {
-    title: "Quelle",
-    body: `${SOURCE_TOOL_TIP} Freier Sand setzt eine neue Quelle. Löschen nimmt sie weg. Die Menge stellst du am Regler ein.`,
-  },
-};
+import { toolSpec } from "./tools";
 
 function slider(
   name: string,
@@ -72,14 +53,14 @@ export class Inspector {
 
   private render(): void {
     const s = this.store.state;
-    const copy = TOOL_COPY[s.tool];
+    const spec = toolSpec(s.tool);
     const src = this.viewport.sources.find((x) => x.id === s.selectedSourceId);
 
     this.el.innerHTML = `
       <section class="inspector-card">
         <p class="kicker">Werkzeug</p>
-        <h3>${copy.title}</h3>
-        <p class="lede">${copy.body}</p>
+        <h3>${spec.title}</h3>
+        <p class="lede">${spec.body}</p>
         ${
           s.tool === "source"
             ? `
@@ -89,9 +70,9 @@ export class Inspector {
           ${src ? slider("Wie stark die Quelle läuft", 0.2, 6, 0.1, src.rate, "sourceRate") : ""}`
             : `
           ${s.tool === "pour" ? slider("Wie stark es tropft", 0.25, 4, 0.05, s.pourRate, "pourRate") : ""}
-          ${s.tool !== "pour" ? slider(s.tool === "stone" ? "Größe" : s.tool === "erase" ? "Reichweite" : "Radius", 0.02, 0.16, 0.005, s.brushRadius, "brushRadius") : ""}
-          ${s.tool !== "pour" && s.tool !== "stone" && s.tool !== "erase" ? slider("Stärke", 0.3, 2.2, 0.05, s.brushStrength, "brushStrength") : ""}
-          ${s.tool === "flatten" ? `<div class="row"><button class="btn" data-flatten>Ganze Wanne</button></div>` : ""}`
+          ${spec.brushSize ? slider(spec.brushSizeLabel, 0.02, 0.16, 0.005, s.brushRadius, "brushRadius") : ""}
+          ${spec.strength ? slider("Stärke", 0.3, 2.2, 0.05, s.brushStrength, "brushStrength") : ""}
+          ${spec.flattenAll ? `<div class="row"><button class="btn" data-flatten>Ganze Wanne</button></div>` : ""}`
         }
         <div class="row">
           <button class="btn" data-reset-water>Nur Wasser zurücksetzen</button>
