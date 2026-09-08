@@ -102,7 +102,7 @@ export class SandMesh {
     const geo = new THREE.PlaneGeometry(traySize, traySize, segs, segs);
     geo.rotateX(-Math.PI / 2);
     this.mesh.geometry = geo;
-    const shadows = quality === "high" || quality === "ultra";
+    const shadows = qualityProfile(quality).shadows;
     this.material.uniforms.uReceiveShadow.value = shadows ? 1 : 0;
     this.material.uniforms.uAoSteps.value = lookAoSteps(quality);
     this.material.uniforms.uLookGrain.value = qualityProfile(quality).lookGrain;

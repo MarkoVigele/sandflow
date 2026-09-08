@@ -61,6 +61,15 @@ export class FlowParticles {
     this.points.name = "flow-particles";
   }
 
+  setBudget(max: number): void {
+    const n = Number.isFinite(max) ? Math.max(0, max | 0) : 0;
+    this.max = Math.min(this.positions.length / 3, n);
+    if (this.max <= 0) {
+      this.geo.setDrawRange(0, 0);
+      this.points.visible = false;
+    }
+  }
+
   update(
     particles: Float32Array,
     traySize: number,

@@ -8,11 +8,20 @@ import { getPreset, resampleHeight, type CameraPose } from "../sim/presets";
 import { History } from "../state/history";
 import type { Store } from "../state/store";
 import { effectiveHeight01 } from "./heightDisplace";
-import { particleDrawCount, pixelRatioFor, qualityProfile } from "../state/quality";
+import {
+  autoQualityToast,
+  isIosWebKit,
+  nextLowerQuality,
+  particleDrawCount,
+  pixelRatioFor,
+  qualityAntialias,
+  qualityProfile,
+  rendererPowerPreference,
+  tickAutoQuality,
+} from "../state/quality";
 import {
   HEIGHT_WORLD,
   QUALITY_GRID,
-  QUALITY_LABEL,
   isMobile,
   type QualityId,
   type ToolId,
@@ -105,6 +114,9 @@ export class Viewport {
   private section: CrossSectionView;
   /** Hook: keep one-finger orbit off while a source pin is claimed. */
   private orbitLockedBySource = false;
+  private hidden = false;
+  private contextLost = false;
+  private iosWebKit = isIosWebKit();
 
   constructor(host: HTMLElement, store: Store, onUi: () => void) {
     this.host = host;
@@ -116,11 +128,16 @@ export class Viewport {
 
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: !(isMobile() || store.state.quality === "low"),
+      antialias: qualityAntialias(store.state.quality, isMobile(), this.iosWebKit),
       alpha: false,
-      powerPreference: "high-performance",
+      powerPreference: rendererPowerPreference(this.iosWebKit),
+      stencil: false,
+      depth: true,
+      failIfMajorPerformanceCaveat: false,
     });
-      this.renderer.setPixelRatio(pixelRatioFor(store.state.quality, window.devicePixelRatio || 1));
+    this.renderer.setPixelRatio(
+      pixelRatioFor(store.state.quality, window.devicePixelRatio || 1, isMobile(), this.iosWebKit),
+    );
     this.renderer.setClearColor(0x14110e, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -229,7 +246,12 @@ export class Viewport {
     canvas.addEventListener("pointercancel", this.onPointerUp);
     canvas.addEventListener("pointerleave", this.onPointerLeave);
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+    canvas.addEventListener("webglcontextlost", this.onContextLost, false);
+    canvas.addEventListener("webglcontextrestored", this.onContextRestored, false);
     window.addEventListener("resize", this.resize);
+    document.addEventListener("visibilitychange", this.onVisibility);
+    window.addEventListener("pagehide", this.onPageHide);
+    window.addEventListener("pageshow", this.onPageShow);
     this.resize();
     this.loop();
   }
@@ -289,11 +311,15 @@ export class Viewport {
 
   applyQuality(quality: QualityId, resample = true): void {
     const profile = qualityProfile(quality);
-    const shadows = quality === "high" || quality === "ultra";
-    this.renderer.shadowMap.enabled = shadows;
-    this.sun.castShadow = shadows;
-    this.sun.shadow.mapSize.set(quality === "ultra" ? 2048 : 1024, quality === "ultra" ? 2048 : 1024);
-    this.renderer.setPixelRatio(pixelRatioFor(quality, window.devicePixelRatio || 1));
+    this.renderer.shadowMap.enabled = profile.shadows;
+    this.sun.castShadow = profile.shadows;
+    const map = Math.max(1, profile.shadowMap || 1);
+    this.sun.shadow.mapSize.set(map, map);
+    this.renderer.setPixelRatio(
+      pixelRatioFor(quality, window.devicePixelRatio || 1, isMobile(), this.iosWebKit),
+    );
+    this.sim.setParticleBudget(profile.particles);
+    this.particles.setBudget(profile.particles);
     this.sand.setQuality(quality, TRAY_SIZE);
     this.water.setQuality(quality, TRAY_SIZE);
     this.fill.intensity = 0.18 + profile.lookFill * 0.35;
@@ -551,8 +577,13 @@ export class Viewport {
   }
 
   dispose(): void {
-    cancelAnimationFrame(this.raf);
+    this.pauseLoop();
     window.removeEventListener("resize", this.resize);
+    document.removeEventListener("visibilitychange", this.onVisibility);
+    window.removeEventListener("pagehide", this.onPageHide);
+    window.removeEventListener("pageshow", this.onPageShow);
+    this.canvas.removeEventListener("webglcontextlost", this.onContextLost);
+    this.canvas.removeEventListener("webglcontextrestored", this.onContextRestored);
     this.unsubStore();
     this.sim.dispose();
     this.sand.dispose();
@@ -580,13 +611,14 @@ export class Viewport {
     }
     const q = this.store.state.quality;
     const incoming = frame.particles ? (frame.particles.length / 4) | 0 : 0;
+    const draw = particleDrawCount(incoming, q);
     this.particles.update(
       frame.particles,
       TRAY_SIZE,
       this.heightScale,
-      qualityProfile(q).particleRatio > 0,
+      draw > 0,
       this.relief,
-      particleDrawCount(incoming, q),
+      draw,
     );
     this.syncSourcePins();
     this.paintSection();
@@ -910,6 +942,10 @@ export class Viewport {
   };
 
   private loop = (): void => {
+    if (this.hidden || this.contextLost) {
+      this.raf = 0;
+      return;
+    }
     this.raf = requestAnimationFrame(this.loop);
     const dt = Math.min(0.05, this.clock.getDelta());
     const t = this.clock.elapsedTime;
@@ -968,25 +1004,78 @@ export class Viewport {
 
   private maybeAutoQuality(): void {
     if (!this.store.state.autoQuality) return;
-    if (this.fps > 0 && this.fps < 25) {
-      this.lowFpsMs += 500;
-      if (this.lowFpsMs >= 2000) {
-        const order: QualityId[] = ["ultra", "high", "medium", "low"];
-        const i = order.indexOf(this.store.state.quality);
-        if (i < order.length - 1) {
-          const next = order[i + 1];
-          this.lowFpsMs = 0;
-          this.autoDropped = true;
-          this.store.patch({ quality: next });
-          this.applyQuality(next, true);
-          this.onToast(`Qualität automatisch auf ${QUALITY_LABEL[next]} gesenkt.`);
-          this.onUi();
-        }
-      }
-    } else {
-      this.lowFpsMs = 0;
-    }
+    const tick = tickAutoQuality(this.fps, this.lowFpsMs);
+    this.lowFpsMs = tick.lowFpsMs;
+    if (!tick.shouldDrop) return;
+    const next = nextLowerQuality(this.store.state.quality);
+    if (!next) return;
+    this.autoDropped = true;
+    this.store.patch({ quality: next });
+    this.applyQuality(next, true);
+    this.onToast(autoQualityToast(next));
+    this.onUi();
   }
+
+  private pauseLoop(): void {
+    if (this.raf) cancelAnimationFrame(this.raf);
+    this.raf = 0;
+    this.clock.stop();
+  }
+
+  private resumeLoop(): void {
+    if (this.hidden || this.contextLost) return;
+    this.clock.start();
+    this.clock.getDelta();
+    if (!this.raf) this.loop();
+  }
+
+  private onVisibility = (): void => {
+    if (typeof document !== "undefined" && document.hidden) this.enterBackground();
+    else this.leaveBackground();
+  };
+
+  private onPageHide = (): void => {
+    this.enterBackground();
+  };
+
+  private onPageShow = (): void => {
+    this.leaveBackground();
+  };
+
+  private enterBackground(): void {
+    this.hidden = true;
+    this.pauseLoop();
+  }
+
+  private leaveBackground(): void {
+    this.hidden = false;
+    this.resumeLoop();
+  }
+
+  private onContextLost = (ev: Event): void => {
+    ev.preventDefault();
+    this.contextLost = true;
+    this.pauseLoop();
+    this.onToast("WebGL-Kontext verloren — warte auf Wiederherstellung.");
+  };
+
+  private onContextRestored = (): void => {
+    this.contextLost = false;
+    const q = this.store.state.quality;
+    this.renderer.setPixelRatio(
+      pixelRatioFor(q, window.devicePixelRatio || 1, isMobile(), this.iosWebKit),
+    );
+    this.resize();
+    if (this.lastPacked && this.lastSize) {
+      uploadPacked(this.maps, this.lastPacked, this.lastSize);
+    }
+    if (this.lastHard && this.lastSize) {
+      uploadHard(this.hardTex, this.lastHard, this.lastSize);
+    }
+    this.renderer.shadowMap.enabled = qualityProfile(q).shadows;
+    this.onToast("WebGL-Kontext wiederhergestellt.");
+    this.resumeLoop();
+  };
 }
 
 
