@@ -4,6 +4,7 @@ import type { GeneratedMaps } from "../assets/AssetService";
 import { SimClient, type SimFrame, type SimSnapshot } from "../sim/SimClient";
 import type { BrushKind } from "../sim/types";
 import { packMapsRgba, resampleMask, stoneIslandUvRadius, unpackRgba } from "../sim/mapsContract";
+import { packDisplayMapsRgba } from "../sim/waterDisplay";
 import { getPreset, resampleHeight, type CameraPose } from "../sim/presets";
 import { History } from "../state/history";
 import { persistOnboardDone, type Store } from "../state/store";
@@ -490,11 +491,12 @@ export class Viewport {
       cohesion: snap.cohesion,
       hardmask: snap.hardmask ?? new Float32Array(snap.size * snap.size),
     });
-    const packed = packMapsRgba(
+    const packed = packDisplayMapsRgba(
       snap.terrain,
       snap.water,
       snap.wetness,
       new Float32Array(snap.size * snap.size),
+      snap.size,
     );
     this.lastPacked = packed;
     this.lastHard = (snap.hardmask ?? new Float32Array(snap.size * snap.size)).slice();
