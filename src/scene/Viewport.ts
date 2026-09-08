@@ -103,7 +103,7 @@ export class Viewport {
     this.renderer.setClearColor(0x14110e, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.18;
     this.renderer.shadowMap.enabled = false;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -132,7 +132,7 @@ export class Viewport {
     this.scene.fog = new THREE.Fog(0x14110e, 14, 28);
     this.scene.background = new THREE.Color(0x14110e);
 
-    this.hemi = new THREE.HemisphereLight(0xd2e0ec, 0x3f3226, 0.28);
+    this.hemi = new THREE.HemisphereLight(0xd8e4f0, 0x4a3c2c, 0.42);
     this.scene.add(this.hemi);
 
     this.sun = new THREE.DirectionalLight(0xffd9a3, 2.15);
@@ -238,7 +238,7 @@ export class Viewport {
   private syncSunUniforms(): void {
     const dir = this.sun.position.clone().sub(this.sun.target.position).normalize();
     const sunColor = this.sun.color.clone().multiplyScalar(0.95);
-    const ambient = new THREE.Color(0.12, 0.11, 0.10);
+    const ambient = new THREE.Color(0.18, 0.16, 0.13);
     this.sand.setSun(dir, sunColor, ambient);
     this.water.setSun(dir, sunColor);
   }
