@@ -173,9 +173,9 @@ export function contactShadow(
  */
 export function depthTint(depth: number): [number, number, number] {
   const d = Number.isFinite(depth) && depth > 0 ? depth : 0;
-  const t = smoothstep(0.01, 0.13, d);
-  const amt = t * 0.86;
-  return [mix(1, 0.46, amt), mix(1, 0.44, amt), mix(1, 0.4, amt)];
+  const t = smoothstep(0.012, 0.14, d);
+  const amt = t * 0.74;
+  return [mix(1, 0.52, amt), mix(1, 0.5, amt), mix(1, 0.46, amt)];
 }
 
 /**
@@ -185,9 +185,9 @@ export function depthTint(depth: number): [number, number, number] {
 export function waterBodyColor(depth: number, flow = 0): [number, number, number] {
   const d = Number.isFinite(depth) && depth > 0 ? depth : 0;
   const fl = Number.isFinite(flow) && flow > 0 ? Math.min(1, flow) : 0;
-  const film: [number, number, number] = [0.6, 0.68, 0.66];
-  const shallow: [number, number, number] = [0.4, 0.52, 0.5];
-  const deep: [number, number, number] = [0.22, 0.28, 0.27];
+  const film: [number, number, number] = [0.55, 0.72, 0.74];
+  const shallow: [number, number, number] = [0.34, 0.54, 0.58];
+  const deep: [number, number, number] = [0.26, 0.38, 0.4];
   const t = smoothstep(0.005, 0.055, d);
   const t2 = smoothstep(0.04, 0.14, d);
   const body = mix3(mix3(film, shallow, t), deep, t2);

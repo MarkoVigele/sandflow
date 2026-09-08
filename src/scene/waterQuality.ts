@@ -34,7 +34,7 @@ export type WaterQualityTier = {
 export const WATER_QUALITY: Record<QualityId, WaterQualityTier> = {
   low: {
     id: "low",
-    meshSegs: 80,
+    meshSegs: 96,
     waveOctaves: 1,
     waveDisplace: 0,
     sheetCap: 0.012,

@@ -138,10 +138,10 @@ const poolTint = depthTint(0.16);
 if (filmTint[0] < 0.97 || filmTint[2] < 0.97) fail(`shallow tint should stay clear: ${filmTint}`);
 if (deepTint[0] >= filmTint[0]) fail("deep water should tint more");
 if (deepTint[0] <= deepTint[2]) fail("depth tint is sand-brown (red stays above blue)");
-if (deepTint[2] < 0.55) fail(`deep tint must not go ink-black: ${deepTint}`);
+if (deepTint[2] < 0.58) fail(`deep tint must not go ink-black: ${deepTint}`);
 if (poolTint[0] >= deepTint[0]) fail("deeper pools should tint further");
-if (poolTint[2] < 0.42) fail(`pool tint must keep the bed readable: ${poolTint}`);
-if (deepTint[0] > 0.78) fail(`#45 film tint was too weak; deep should read: ${deepTint}`);
+if (poolTint[2] < 0.48) fail(`pool tint must keep the bed readable: ${poolTint}`);
+if (deepTint[0] > 0.82) fail(`#45 film tint was too weak; deep should read: ${deepTint}`);
 
 const filmBody = waterBodyColor(0.004, 0);
 const poolBody = waterBodyColor(0.12, 0);

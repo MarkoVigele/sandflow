@@ -220,7 +220,7 @@ void main() {
   vec3 color = albedo * (uAmbient * ao + uSunColor * wrap * shade + fillC * fillWrap * ao)
     + uSunColor * spec * shade;
   float underWater = smoothstep(0.002, 0.055, water);
-  color = mix(color, color * vec3(0.70, 0.60, 0.48), underWater * mix(0.38, 0.58, smoothstep(0.01, 0.12, water)));
+  color = mix(color, color * vec3(0.78, 0.70, 0.58), underWater * mix(0.28, 0.42, smoothstep(0.012, 0.12, water)));
 
   // Soft bed caustics only where a readable column sits. Low skips (uCaustic=0).
   float cauAmt = clamp(uCaustic, 0.0, 1.0);
@@ -232,7 +232,7 @@ void main() {
     float c1 = sin(vUv.x * 36.0 + t * 1.35) * sin(vUv.y * 29.0 - t * 1.05);
     float c2 = sin((vUv.x + vUv.y) * 48.0 + t * 1.7);
     float lace = c1 * 0.55 + c2 * 0.45;
-    color *= 1.0 + lace * cover * fade * cauAmt * 0.16;
+    color *= 1.0 + lace * cover * fade * cauAmt * 0.22;
   }
 
   float trail = texture2D(uTrail, vUv).r;
