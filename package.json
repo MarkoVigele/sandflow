@@ -13,7 +13,7 @@
     "hydraulic:smoke": "npx --yes vite-node src/sim/hydraulicSmoke.ts && npx --yes vite-node src/sim/polishSmoke.ts && npx --yes vite-node src/sim/waterDisplaySmoke.ts",
     "polish:smoke": "npx --yes vite-node src/sim/polishSmoke.ts",
     "tools:smoke": "npx --yes vite-node src/sim/toolsSmoke.ts",
-    "ui:smoke": "npx --yes vite-node src/ui/aimCursorSmoke.ts && npx --yes vite-node src/ui/sourcePinsSmoke.ts && npx --yes vite-node src/ui/toolsSmoke.ts && npx --yes vite-node src/ui/visionSmoke.ts && npx --yes vite-node src/ui/onboardHotkeysSmoke.ts",
+    "ui:smoke": "npx --yes vite-node src/ui/aimCursorSmoke.ts && npx --yes vite-node src/ui/sourcePinsSmoke.ts && npx --yes vite-node src/ui/toolsSmoke.ts && npx --yes vite-node src/ui/visionSmoke.ts && npx --yes vite-node src/ui/onboardHotkeysSmoke.ts && npx --yes vite-node src/ui/donateSmoke.ts",
     "pins:smoke": "npx --yes vite-node src/ui/sourcePinsSmoke.ts",
     "onboard:smoke": "npx --yes vite-node src/ui/onboardHotkeysSmoke.ts",
     "share:smoke": "npx --yes vite-node src/state/shareSmoke.ts",
