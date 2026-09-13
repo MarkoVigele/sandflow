@@ -42,6 +42,7 @@ import { Toolbar } from "./Toolbar";
 import { TopBar } from "./TopBar";
 import { applyPlay } from "./transport";
 import { ICONS } from "./icons";
+import { mountDonate } from "./donate";
 
 export class App {
   readonly store = new Store();
@@ -62,7 +63,10 @@ export class App {
         <div id="onboard"></div>
         <div id="source-tip"></div>
       </main>
-      <aside id="inspector" class="inspector"></aside>
+      <aside id="inspector" class="inspector">
+        <div id="inspector-body"></div>
+        <footer id="donate" class="donate"></footer>
+      </aside>
       <aside id="stats" class="stats"></aside>
       <div id="gallery"></div>
       <div id="about"></div>
@@ -75,7 +79,7 @@ export class App {
     new Toolbar(this.store, root.querySelector("#toolbar")!);
     new Inspector(
       this.store,
-      root.querySelector("#inspector")!,
+      root.querySelector("#inspector-body")!,
       this.viewport,
       (prompt) => void this.loadLabTextures(prompt),
     );
@@ -116,6 +120,7 @@ export class App {
     new StatsPanel(this.store, root.querySelector("#stats")!, this.viewport);
     new Onboarding(this.store, root.querySelector("#onboard")!);
     new SourceTip(this.store, root.querySelector("#source-tip")!);
+    mountDonate(root.querySelector("#donate")!);
 
     this.fileInput = document.createElement("input");
     this.fileInput.type = "file";

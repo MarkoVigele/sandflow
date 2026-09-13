@@ -186,10 +186,39 @@ body {
 
 .inspector {
   grid-area: inspector;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: 12px 12px calc(16px + var(--safe-b));
   background: var(--panel);
   border-left: 1px solid var(--panel-border);
+}
+#inspector-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.donate {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--panel-border);
+}
+a.donate-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  min-width: auto;
+}
+.donate-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
 }
 .inspector-card h3 { margin: 0 0 6px; font-size: 18px; font-weight: 600; }
 .kicker { margin: 0 0 4px; color: var(--sand-dim); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
